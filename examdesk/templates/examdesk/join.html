@@ -1,0 +1,23 @@
+{% extends "examdesk/base.html" %}
+{% block title %}{{ exam.name }} · Exam Desk{% endblock %}
+{% block content %}
+{% if other %}
+  <c-centered-card icon="users" title="{{ other.name }} is already on this exam">
+    <c-slot name="lead">{% filter capfirst %}{% if other.venue %}In {{ other.venue }}, {% endif %}{% if other.online %}online now{% else %}last seen {{ other.last_seen|time:"H:i" }}{% endif %}{% endfilter %}. Is that you, on another device?</c-slot>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="name" value="{{ other.name }}">
+      <button class="btn btn-primary btn-block" name="same" value="1">That's me</button>
+    </form>
+    <a class="btn btn-outline btn-block mt-2" href="{{ request.get_full_path }}">Use a different name</a>
+  </c-centered-card>
+{% else %}
+  <c-centered-card icon="user" title="What's your name?" lead="{{ exam.name }}">
+    <form method="post">
+      {% csrf_token %}
+      <div class="field">{{ form.name.as_field_group }}</div>
+      <button class="btn btn-primary btn-block">Continue</button>
+    </form>
+  </c-centered-card>
+{% endif %}
+{% endblock %}

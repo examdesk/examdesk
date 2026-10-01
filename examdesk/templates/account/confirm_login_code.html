@@ -1,0 +1,2 @@
+{% url 'account_confirm_login_code' as action_url %}
+{% include "account/confirm_code.html" with action_url=action_url submit="Sign in" %}

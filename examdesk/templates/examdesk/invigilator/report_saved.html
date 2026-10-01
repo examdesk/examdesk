@@ -1,0 +1,29 @@
+{% extends "examdesk/invigilator/base.html" %}
+{% load examdesk_tags %}
+{% block content %}
+{% with pk=member.exam.pk clarification=report.clarification %}
+<div class="mb-5 flex items-center gap-3">
+  <div class="brand-mark size-10 shrink-0 bg-green-600"><c-icon name="check" /></div>
+  <div class="min-w-0">
+    <p class="eyebrow">Saved</p>
+    <h1 class="tabular-nums">{{ report.venue }} {{ report.seat }} · {{ clarification.label }}</h1>
+  </div>
+</div>
+{% partialdef live inline %}
+<c-live>
+  <article class="tight mb-5">
+    <c-state-badge :state="report.state" class="mb-2" />
+    <p class="font-medium">{{ report.clarification.summary }}</p>
+    {% if report.text and report.text != report.clarification.wording %}<p class="meta mt-1">{{ report.text }}</p>{% endif %}
+    {% if report.photo %}<img class="mt-3 max-h-48 rounded-md border border-base-300" src="{% url 'photo' member.exam.pk report.pk %}" alt="Question paper">{% endif %}
+  </article>
+  {% if report.state == "to deliver" %}
+    <a class="btn btn-outline btn-block mb-2.5" href="{% seat_url 'invigilator:deliver_seat' member.exam.pk report.venue report.seat report=report.pk back='report' %}"><c-icon name="send" />Show the answer</a>
+  {% endif %}
+</c-live>
+{% endpartialdef %}
+<a class="btn btn-primary btn-block" href="{% url 'invigilator:report' pk %}"><c-icon name="plus" />Report another question</a>
+<p class="mt-5 text-center"><button type="button" class="link-button text-error text-sm" commandfor="delete-report-{{ report.pk }}" command="show-modal">Delete this report</button></p>
+<c-delete-report-dialog :report="report" next="{% url 'invigilator:report' pk %}" />
+{% endwith %}
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "examdesk/base.html" %}
+{% block title %}Sign up · Exam Desk{% endblock %}
+{% block content %}
+<c-centered-card icon="user-plus" title="Sign up">
+  <c-error>{{ form.non_field_errors|join:" " }}</c-error>
+  <form method="post" action="{% url 'account_signup' %}">
+    {% csrf_token %}
+    {{ redirect_field }}
+    {% include "account/field.html" with field=form.email placeholder="Enter your email address" %}
+    {% include "account/field.html" with field=form.name placeholder="Enter your name" %}
+    <button class="btn btn-primary btn-block">Send code</button>
+  </form>
+  <p class="mt-4 text-center text-sm text-muted">Have an account? <a href="{{ login_url }}">Sign in</a></p>
+</c-centered-card>
+{% endblock %}

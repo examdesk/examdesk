@@ -1,0 +1,7 @@
+{% load examdesk_tags %}
+{# allauth's forms keep Django's "Label:" suffix and set their own placeholders. #}
+<div class="field">
+  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {{ field.errors }}
+  {{ field|with_placeholder:placeholder }}
+</div>

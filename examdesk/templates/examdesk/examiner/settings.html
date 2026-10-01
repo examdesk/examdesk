@@ -1,0 +1,49 @@
+{% extends "examdesk/base.html" %}
+{% block content %}
+{% with pk=member.exam.pk name=member.exam.name %}
+<div class="max-w-3xl">
+<div class="page-header">
+  <h1>Settings</h1>
+</div>
+
+<div class="flex flex-col gap-6">
+{% for link in links %}
+  <c-join-link-card :link="link" :exam="member.exam">{% if link.role == "examiner" %}<div class="flash error"><c-icon name="circle-alert" /><span>Full control of the exam. Don't share it with invigilators.</span></div>{% endif %}</c-join-link-card>
+{% endfor %}
+
+{% if member.exam.is_live %}
+  <section class="danger-zone">
+    <div class="flex flex-wrap items-center justify-between gap-4 p-5">
+      <h2>Close the exam</h2>
+      <button type="button" class="btn btn-danger" commandfor="close-dialog" command="show-modal"><c-icon name="lock" />Close exam</button>
+    </div>
+  </section>
+  <c-dialog id="close-dialog" title="Close the exam?" action="{% url 'examiner:close_exam' pk %}" submit="Close the exam" danger>
+    <p>It becomes read-only and the invigilator link stops working.</p>
+  </c-dialog>
+{% else %}
+  <section class="card-box flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h2>Reopen the exam</h2>
+      <p class="mt-1 text-sm text-muted">Invigilators can use their link again.</p>
+    </div>
+    <form method="post" action="{% url 'examiner:reopen_exam' pk %}">
+      {% csrf_token %}
+      <button class="btn btn-primary"><c-icon name="lock-open" />Reopen exam</button>
+    </form>
+  </section>
+  <section class="danger-zone">
+    <div class="flex flex-wrap items-center justify-between gap-4 p-5">
+      <h2>Delete the exam</h2>
+      <button type="button" class="btn btn-danger" commandfor="delete-dialog" command="show-modal"><c-icon name="trash-2" />Delete exam</button>
+    </div>
+  </section>
+  <c-dialog id="delete-dialog" title="Delete {{ name }}?" action="{% url 'examiner:delete_exam' pk %}" submit="Delete permanently" danger :autoopen="delete_form.errors">
+    <p>Its reports, answers and photos are deleted. Backups keep them for {{ config.backup_days }} days.</p>
+    <div class="field">{{ delete_form.name.as_field_group }}</div>
+  </c-dialog>
+{% endif %}
+</div>
+</div>
+{% endwith %}
+{% endblock %}

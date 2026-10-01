@@ -1,0 +1,11 @@
+.git
+.github
+.venv
+**/__pycache__
+.*_cache
+.django_tailwind_cli
+assets
+static
+media
+db.sqlite3
+tests

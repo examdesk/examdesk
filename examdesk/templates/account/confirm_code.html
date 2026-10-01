@@ -1,0 +1,21 @@
+{% extends "examdesk/base.html" %}
+{# Entering an emailed code: to sign in, or to confirm the address on sign-up. #}
+{% block title %}Enter code · Exam Desk{% endblock %}
+{% block content %}
+<c-centered-card icon="mail" title="Check your email">
+  <c-slot name="lead">Enter the code we sent to <strong>{{ email }}</strong>.</c-slot>
+  <c-error>{{ verify_form.non_field_errors|join:" " }}</c-error>
+  <form method="post" action="{{ action_url }}">
+    {% csrf_token %}
+    {{ redirect_field }}
+    {% include "account/field.html" with field=verify_form.code placeholder="Enter code" %}
+    <button class="btn btn-primary btn-block">{{ submit }}</button>
+  </form>
+  <div class="mt-4 flex justify-center gap-4 text-sm">
+    {% if can_resend %}<button class="link-button" form="resend">Send a new code</button>{% endif %}
+    {% if cancel_url %}<a href="{{ cancel_url }}">Use another email</a>{% else %}<button class="link-button" form="cancel">Use another email</button>{% endif %}
+  </div>
+  <form id="resend" method="post" action="{{ action_url }}" hidden>{% csrf_token %}{{ redirect_field }}<input type="hidden" name="action" value="resend"></form>
+  <form id="cancel" method="post" action="{% url 'account_logout' %}" hidden>{% csrf_token %}<input type="hidden" name="next" value="{% url 'account_login' %}"></form>
+</c-centered-card>
+{% endblock %}

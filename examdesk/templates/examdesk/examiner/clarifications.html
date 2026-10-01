@@ -1,0 +1,71 @@
+{% extends "examdesk/base.html" %}
+{% load examdesk_tags %}
+{% block content %}
+{% with pk=member.exam.pk %}
+<div class="page-header">
+  <h1>Clarifications</h1>
+</div>
+<form method="get" class="filters mb-4 grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap" data-autosubmit>
+  <div class="sm:w-44">{{ form.state }}</div> <div class="col-span-2 sm:w-80">{{ form.label }}</div> {{ form.sort }}
+  <noscript><button class="btn btn-outline btn-sm">Apply</button></noscript>
+</form>
+<c-error>{{ form|form_errors }}</c-error>
+
+{% partialdef sortable %}{% if sort.order %} aria-sort="{{ sort.order }}"{% endif %}><a href="{% querystring sort=sort.sort v=None %}" class="sort">{{ label }}{% if sort.order %}<c-icon name="chevron-{% if sort.order == 'ascending' %}up{% else %}down{% endif %}" />{% endif %}</a>{% endpartialdef %}
+
+{% partialdef live inline %}
+<c-live>
+{% with pk=member.exam.pk %}
+  {% if rows %}
+  <div class="table-card">
+  <table>
+    <thead><tr>
+      {% with sort=sorts.question label="Question" %}<th class="w-24 max-sm:hidden"{% partial sortable %}</th>{% endwith %}
+      <th>Clarification</th>
+      {% with sort=sorts.seats label="Seats" %}<th class="w-32 max-sm:hidden"{% partial sortable %}</th>{% endwith %}
+      {% with sort=sorts.wait label="Longest wait" %}<th class="w-32 max-sm:hidden"{% partial sortable %}</th>{% endwith %}
+      {% with sort=sorts.state label="State" %}<th class="w-36 max-sm:hidden"{% partial sortable %}</th>{% endwith %}
+    </tr></thead>
+    <tbody>
+      {% for row in rows %}
+        {% with clarification=row.clarification %}
+        <tr class="row-link">
+          <td class="font-medium whitespace-nowrap max-sm:hidden">{{ clarification.label }}</td>
+          <td>
+            <div class="flex items-center gap-3">
+              {% if clarification.photo_report_id %}<img class="size-10 shrink-0 rounded-md border border-base-300 object-cover" src="{% url 'photo' pk clarification.photo_report_id %}" alt="Question paper">{% endif %}
+              <div class="min-w-0">
+                <a href="{% url 'examiner:clarification' pk clarification.pk %}" class="row-target">{{ clarification.summary|truncatechars:90 }}</a>
+                <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted sm:hidden">
+                  <span class="font-medium text-base-content">{{ clarification.label }}</span> ·
+                  <span>{{ row.reports|length }} seat{{ row.reports|length|pluralize }}</span>
+                  {% if row.since %}<span class="wait{% if clarification.state == 'open' %} {{ row.since|wait_level }}{% endif %}">{{ row.since|wait }}</span>{% endif %}
+                  <c-state-badge :state="clarification.state" />
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="whitespace-nowrap tabular-nums max-sm:hidden">
+            {{ row.reports|length }} seat{{ row.reports|length|pluralize }}
+            {% if clarification.state == "answered" and row.unresolved %}<div class="meta">{{ row.unresolved }} to deliver</div>{% endif %}
+          </td>
+          <td class="max-sm:hidden">
+            {% if row.since %}<span class="wait{% if clarification.state == 'open' %} {{ row.since|wait_level }}{% endif %}" title="Asked at {{ row.since|time:'H:i' }}">{{ row.since|wait }}</span>{% else %}<span class="text-subtle">–</span>{% endif %}
+          </td>
+          <td class="max-sm:hidden"><c-state-badge :state="clarification.state" /></td>
+        </tr>
+        {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% elif filtered %}
+    <c-empty icon="search" title="No clarifications match" />
+  {% else %}
+    <c-empty icon="inbox" title="No open clarifications" />
+  {% endif %}
+{% endwith %}
+</c-live>
+{% endpartialdef %}
+{% endwith %}
+{% endblock %}

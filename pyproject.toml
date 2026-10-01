@@ -1,0 +1,74 @@
+[project]
+name = "examdesk"
+version = "0.1.0"
+description = "Relays students' questions during in-person exams"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_LICENSES"]
+authors = [{ name = "Muhammad Rizki Aulia Rahman Maulana" }]
+requires-python = ">=3.14"
+dependencies = [
+    "dj-database-url>=3.1.2",
+    "django>=6.1.1,<6.2",
+    "django-allauth>=65.19",
+    "django-cotton>=2.7.2",
+    "django-htmx>=1.29.0",
+    "django-tailwind-cli>=4.8.1",
+    "huggingface-hub>=1.33.0",
+    "lucide>=1.1.4",
+    "numpy>=2.5.3",
+    "onnxruntime>=1.30.0",
+    "pillow>=12.3.0",
+    "segno>=1.6.6",
+    "tokenizers>=0.23.2",
+    "whitenoise>=6",
+]
+
+[dependency-groups]
+dev = [
+    "django-stubs>=6.1.1",
+    "model-bakery>=1.24.1",
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "pytest-django>=4.14.0",
+    "pytest-playwright>=0.9.0",
+    "ruff>=0.16.9",
+]
+
+[project.optional-dependencies]
+# Deployment only: the WSGI server and one database driver.
+server = ["gunicorn>=26.2.0"]
+postgres = ["psycopg[binary]>=3.3.6"]
+mysql = ["mysqlclient>=2.3.0"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+extend-exclude = ["examdesk/migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ", "SIM", "RUF", "PT"]
+ignore = ["RUF012"]  # Django's Meta.ordering and Meta.constraints are plain lists
+
+[tool.mypy]
+strict = true
+plugins = ["mypy_django_plugin.main"]
+exclude = ["examdesk/migrations/"]
+
+[[tool.mypy.overrides]]
+module = ["segno.*", "onnxruntime.*", "allauth.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Admin classes aren't subscriptable at runtime without django-stubs-ext.
+module = ["examdesk.admin"]
+disallow_any_generics = false
+
+[tool.django-stubs]
+django_settings_module = "examdesk.settings"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "examdesk.settings"
+testpaths = ["tests"]
+# WhiteNoise wants STATIC_ROOT, which only exists after collectstatic.
+filterwarnings = ["ignore:No directory at:UserWarning"]

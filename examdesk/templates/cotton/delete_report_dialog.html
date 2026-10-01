@@ -1,0 +1,5 @@
+{# Confirms deleting a seat's report; afterwards goes to `next`. Opened by `delete-report-<pk>`. #}
+<c-vars report next />
+<c-dialog id="delete-report-{{ report.pk }}" title="Delete the report from {{ report.venue }} {{ report.seat }}?" action="{% url 'delete_report' report.clarification.exam_id report.pk %}" submit="Delete report" danger>
+  <input type="hidden" name="next" value="{{ next }}">
+</c-dialog>

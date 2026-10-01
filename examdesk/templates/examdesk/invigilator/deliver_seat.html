@@ -1,0 +1,54 @@
+{% extends "examdesk/invigilator/base.html" %}
+{% block content %}
+{# Outside the live part so polls don't clear it. #}
+{% if taken_from %}<div class="flash" role="status"><c-icon name="users" /><span><strong>{{ taken_from.member.name }}</strong> was delivering to this seat. It's yours now.</span></div>{% endif %}
+{% partialdef live inline %}
+<c-live>
+{% with pk=member.exam.pk %}
+<div class="mb-5 flex items-center gap-3">
+  <c-back href="{% if back %}{% url 'invigilator:report' pk %}{% else %}{% url 'invigilator:to_deliver' pk %}{% endif %}" label="Back" square />
+  <div class="min-w-0">
+    <p class="eyebrow inline-flex items-center gap-1"><c-icon name="map-pin" />{{ venue }}</p>
+    <h1 class="tabular-nums">{{ seat }}</h1>
+  </div>
+</div>
+{% if current %}
+  {% for report in reports %}
+    {% with clarification=report.clarification %}
+    <details id="q-{{ report.pk }}" name="clarifications" class="clarification{% if report.delivered %} done{% endif %}"{% if report == current %} open{% endif %}>
+      <summary>
+        <c-state-badge :state="report.state" />
+        <span class="min-w-0 flex-1 truncate"><strong>{{ clarification.label }}</strong> {{ clarification.summary|truncatechars:60 }}</span>
+        <c-icon name="chevron-down" class="chevron" />
+      </summary>
+      <div class="clarification-body">
+      <p class="eyebrow mb-2">Show the student</p>
+      <p class="show-panel">{{ clarification.current_answer.text }}</p>
+      {% if report.delivered %}
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="meta">Delivered by <strong class="font-medium text-base-content">{{ report.current_delivery.member.name }}</strong> at <strong class="num font-medium text-base-content">{{ report.current_delivery.created_at|time:"H:i" }}</strong></span>
+          <form method="post" action="{% url 'invigilator:unmark_delivered' pk report.current_delivery.pk %}" class="ml-auto">
+            {% csrf_token %}
+            {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
+            <button class="btn btn-outline btn-sm">Unmark</button>
+          </form>
+        </div>
+      {% else %}
+        <form method="post" action="{% url 'invigilator:mark_delivered' pk report.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="answer" value="{{ clarification.current_answer_id }}">
+          {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
+          <button class="btn btn-primary btn-block btn-lg"><c-icon name="check" />Delivered to {{ seat }}</button>
+        </form>
+      {% endif %}
+      </div>
+    </details>
+    {% endwith %}
+  {% endfor %}
+{% else %}
+  <c-empty icon="circle-check" title="Nothing to deliver" />
+{% endif %}
+{% endwith %}
+</c-live>
+{% endpartialdef %}
+{% endblock %}

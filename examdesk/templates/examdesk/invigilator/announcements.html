@@ -1,0 +1,43 @@
+{% extends "examdesk/invigilator/base.html" %}
+{% block content %}
+<h1 class="mb-5">Announcements</h1>
+{% partialdef live inline %}
+<c-live>
+  <div class="vstack">
+  {% for announcement, readout in items %}
+    <article class="tight{% if not readout %} border-amber-600/30{% endif %}">
+      <div class="mb-2 flex items-center gap-2">
+        {% if readout %}<span class="badge green"><c-icon name="check" />Read out</span>{% else %}<span class="badge amber"><c-icon name="megaphone" />To read out</span>{% endif %}
+        <span class="meta num ml-auto">{% if announcement.label %}{{ announcement.label }} · {% endif %}{{ announcement.created_at|time:"H:i" }}</span>
+      </div>
+      <p class="prose-answer mb-3 text-[17px] leading-snug font-medium">{{ announcement.text }}</p>
+      {% if readout %}
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span class="meta inline-flex flex-wrap items-center gap-x-1.5">
+            <span class="inline-flex items-center gap-1"><c-icon name="map-pin" title="Venue" />{{ readout.venue }}</span> ·
+            <span class="inline-flex items-center gap-1"><c-icon name="user" title="Read out by" />{{ readout.member.name }}</span> ·
+            <span class="num inline-flex items-center gap-1"><c-icon name="clock" title="Read out at" />{{ readout.created_at|time:"H:i" }}</span>
+          </span>
+          <form method="post" action="{% url 'invigilator:unmark_read_out' member.exam.pk announcement.pk %}" class="ml-auto">
+            {% csrf_token %}
+            <button class="btn btn-ghost btn-sm" aria-label="Read out in {{ readout.venue }}: unmark">Unmark</button>
+          </form>
+        </div>
+      {% elif member.venue %}
+        <c-read-out-button :announcement="announcement" :member="member" />
+      {% else %}
+        <button type="button" class="btn btn-outline btn-block" commandfor="read-out-{{ announcement.pk }}" command="show-modal"><c-icon name="check" />Mark as read out</button>
+        <c-dialog id="read-out-{{ announcement.pk }}" title="Read out in which venue?" action="{% url 'invigilator:mark_read_out' member.exam.pk announcement.pk %}" submit="Mark as read out">
+          <input name="venue" list="venues" aria-label="Venue" placeholder="e.g. LT19" required
+                 autocapitalize="characters" autocomplete="off">
+          <small>It also becomes your venue.</small>
+        </c-dialog>
+      {% endif %}
+    </article>
+  {% empty %}
+    <c-empty icon="megaphone" title="No announcements yet" />
+  {% endfor %}
+  </div>
+</c-live>
+{% endpartialdef %}
+{% endblock %}

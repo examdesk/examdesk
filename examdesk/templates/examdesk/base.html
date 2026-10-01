@@ -1,0 +1,56 @@
+{% load examdesk_tags static %}<!doctype html>
+<html lang="en" data-theme="examdesk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>{% block title %}{% if member %}{{ member.exam.name }} · {% endif %}Exam Desk{% endblock %}</title>
+  <link rel="icon" href="{% static 'examdesk/logo.svg' %}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+  <meta name="htmx-config" content='{"noSwap": [204, 304, "4xx", "5xx"], "morphIgnore": ["data-htmx-powered", "open"]}'>
+  <script src="{% static 'examdesk/htmx-4.0.0.min.js' %}"></script>
+  {# commandfor/command, for Safari before 26.2 #}
+  <script src="{% static 'examdesk/invokers-polyfill-1.0.4.min.js' %}" defer></script>
+  <script src="{% static 'examdesk/tom-select-2.6.2.complete.min.js' %}" defer></script>
+  <script src="{% static 'examdesk/app.js' %}" defer></script>
+</head>
+<body class="min-h-screen{% if invigilator_screen %} invigilator{% endif %}" data-offline-after="{{ config.offline_after }}" data-photo-max-side="{{ config.photo_max_side }}" data-photo-max-bytes="{{ config.photo_max_bytes }}" hx-headers:inherited='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <header class="appbar">
+    <div class="mx-auto flex h-14 items-center gap-2.5 px-4 {% if invigilator_screen %}max-w-2xl{% else %}max-w-6xl sm:px-6{% endif %}">
+      {% if invigilator_screen %}
+        <span class="truncate font-semibold">{{ member.exam.name }}</span>
+      {% else %}
+        <a href="{% url 'home' %}" class="brand"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-8"><span class="{% if member %}max-sm:hidden{% endif %}">Exam Desk</span></a>
+        {% if member %}
+          <span class="crumb-sep" aria-hidden="true">/</span>
+          <span class="truncate font-medium">{{ member.exam.name }}</span>
+          <c-exam-status :exam="member.exam" />
+        {% endif %}
+      {% endif %}
+      <div class="ml-auto flex shrink-0 items-center gap-2">
+        {% block appbar %}{% if member.is_examiner and member.exam.is_live %}<a href="{% url 'invigilator:report' member.exam.pk %}" class="btn btn-ghost btn-sm max-sm:hidden">Invigilator view</a>{% endif %}{% endblock %}
+        {% include "examdesk/includes/account_menu.html" %}
+      </div>
+    </div>
+    {% block nav %}{% include "examdesk/includes/nav.html" %}{% endblock %}
+  </header>
+  <main class="mx-auto px-4 pt-6 {% if invigilator_screen %}max-w-2xl pt-5 pb-28{% else %}max-w-6xl pb-12 sm:px-6{% endif %}">
+    <div class="flash error offline" id="offline" role="alert" hidden>
+      <c-icon name="circle-alert" />
+      <span>Offline since <time></time>. <strong data-unsent hidden>Not sent.</strong></span>
+    </div>
+    {% for message in messages|unique %}
+      <div class="flash {{ message.tags }}" role="alert"><c-icon name="{% if message.tags == 'error' %}circle-alert{% else %}circle-check{% endif %}" /><span>{{ message }}</span></div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+  {% block after_main %}{% endblock %}
+  <p id="news" class="sr-only" aria-live="polite"></p>
+  <datalist id="labels">{% for value in labels %}<option value="{{ value }}">{% endfor %}</datalist>
+  <datalist id="venues">{% for value in venues %}<option value="{{ value }}">{% endfor %}</datalist>
+  <datalist id="seats">{% for value in seats %}<option value="{{ value }}">{% endfor %}</datalist>
+</body>
+</html>

@@ -1,0 +1,341 @@
+/* daisyUI with one custom theme. Plain elements are styled in the components layer, since
+   preflight would override them in base.
+
+   Colours: amber open, blue to deliver, green done, grey closed, red error or destructive. */
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: false;
+}
+@plugin "daisyui/theme" {
+  name: "examdesk";
+  default: true;
+  color-scheme: light;
+  --color-base-100: #ffffff;
+  --color-base-200: #f6f7f9;
+  --color-base-300: #e4e7ec;
+  --color-base-content: #101828;
+  --color-primary: #1d4ed8;
+  --color-primary-content: #ffffff;
+  --color-secondary: #475467;
+  --color-secondary-content: #ffffff;
+  --color-accent: #1d4ed8;
+  --color-accent-content: #ffffff;
+  --color-neutral: #101828;
+  --color-neutral-content: #ffffff;
+  --color-info: #1d4ed8;
+  --color-info-content: #ffffff;
+  --color-success: #067647;
+  --color-success-content: #ffffff;
+  --color-warning: #b54708;
+  --color-warning-content: #ffffff;
+  --color-error: #d92d20;
+  --color-error-content: #ffffff;
+  --radius-selector: 9999px;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-muted: #475467;
+  --color-subtle: #667085;
+}
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body { @apply bg-base-200 font-sans text-[15px] leading-6 text-base-content antialiased; }
+  /* Phones: 16px text avoids zoom on focus; 44px touch targets. */
+  body.invigilator { @apply text-base; --size-field: 0.275rem; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-primary; }
+  ::selection { @apply bg-primary/15; }
+}
+
+@layer components {
+  /* Type */
+  h1 { @apply text-xl font-semibold tracking-tight text-base-content; }
+  h2 { @apply text-base font-semibold text-base-content; }
+  .eyebrow { @apply text-xs font-medium tracking-wide text-subtle uppercase; }
+  /* Not upper-cased: Q3b is not Q3B. */
+  .group-heading { @apply mb-2 flex items-center gap-2 text-sm font-semibold text-muted; }
+  small, .meta { @apply text-[13px] leading-5 text-subtle; }
+  p { @apply text-pretty; }
+  .prose-answer { @apply text-pretty whitespace-pre-wrap; }
+  kbd { @apply rounded border border-base-300 bg-base-100 px-1 font-sans text-xs text-muted; }
+  .num { @apply tabular-nums; }
+
+  /* Links */
+  main a:not([class], .menu *) {
+    @apply font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary;
+  }
+
+  /* Page layout */
+  .page-header {
+    @apply mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-3;
+    > div:first-child { @apply min-w-0; }
+    p { @apply mt-1 text-sm text-muted; }
+  }
+  .vstack { @apply flex flex-col gap-3; }
+
+  /* Cards; `article` is one by default. */
+  article, .card-box { @apply rounded-box border border-base-300 bg-base-100 p-5; }
+  article > header { @apply mb-3 font-semibold; }
+  article.tight { @apply p-4; }
+  .card-header {
+    @apply -mx-5 -mt-5 mb-5 flex items-center justify-between gap-4 border-b border-base-300 px-5 py-3.5;
+  }
+  .card-footer {
+    @apply -mx-5 -mb-5 mt-5 flex flex-wrap items-center justify-end gap-2 rounded-b-box border-t border-base-300 bg-base-200/60 px-5 py-3;
+  }
+  .list-card {
+    @apply overflow-hidden rounded-box border border-base-300 bg-base-100;
+    > * + * { @apply border-t border-base-300; }
+  }
+  .row-item { @apply flex items-center gap-3 px-4 py-3; }
+
+  .link-button { @apply cursor-pointer font-medium text-primary hover:underline; }
+
+  /* Forms */
+  .field { @apply mb-4 flex flex-col gap-1.5; }
+  .field > label { @apply text-sm font-medium text-base-content; }
+  label:has(> input:not([type=checkbox], [type=file]), > textarea) { @apply mb-4 flex flex-col gap-1.5 text-sm font-medium; }
+  .errorlist, [aria-invalid=true] ~ small { @apply text-[13px] text-error; }
+  input[list]::-webkit-calendar-picker-indicator { display: none !important; }
+
+  .icon {
+    @apply inline-block size-[1.15em] shrink-0 align-[-.2em];
+  }
+
+  /* Counts */
+  .count {
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-100 px-1.5 text-xs font-semibold text-gray-700 tabular-nums;
+    &.action { @apply bg-primary text-white; }
+    &.urgent { @apply bg-error text-white; }
+  }
+  .live-dot { @apply inline-flex size-2 rounded-full bg-green-600; }
+
+  /* Flash messages and the offline banner */
+  .flash {
+    @apply mb-5 flex items-start gap-3 rounded-box border px-4 py-3 text-sm;
+    @apply border-base-300 bg-base-100;
+    &.success { @apply border-green-600/25 bg-green-50 text-green-800; }
+    &.error { @apply border-red-600/25 bg-red-50 text-red-800; }
+    .icon { @apply mt-0.5 size-4; }
+  }
+  .offline { @apply sticky top-3 z-30 shadow-sm; }
+
+  /* Empty states */
+  .empty {
+    @apply flex flex-col items-center rounded-box border border-dashed border-base-300 bg-base-100 px-6 py-12 text-center;
+    > .icon { @apply mb-3 size-9 rounded-full bg-base-200 p-2 text-subtle; }
+    > strong { @apply font-semibold; }
+    > p { @apply mt-1 max-w-sm text-sm text-muted; }
+  }
+
+  /* Tables */
+  .table-card { @apply overflow-x-auto rounded-box border border-base-300 bg-base-100; }
+  table { @apply w-full text-left text-sm; }
+  thead th { @apply border-b border-base-300 bg-base-200/60 px-4 py-2.5 text-xs font-medium tracking-wide whitespace-nowrap text-subtle uppercase; }
+  thead th a.sort {
+    @apply inline-flex items-center gap-1 hover:text-base-content;
+    .icon { @apply size-3.5; }
+  }
+  thead th[aria-sort] { @apply text-base-content; }
+  tbody td { @apply border-b border-base-300 px-4 py-3 align-middle; }
+  tbody tr:last-child td { @apply border-b-0; }
+  /* Rows made clickable by app.js; a stretched link would escape the row in Safari */
+  tr.row-link {
+    @apply cursor-pointer transition-colors hover:bg-base-200/60;
+    .row-target { @apply font-medium text-base-content no-underline hover:underline; }
+  }
+
+  /* Waits */
+  .wait { @apply inline-flex items-center gap-1 text-sm tabular-nums whitespace-nowrap text-muted; }
+  .wait:is(.late, .very-late) { @apply rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset; }
+  .wait.late { @apply bg-amber-50 text-amber-800 ring-amber-600/25; }
+  .wait.very-late { @apply bg-red-50 text-red-700 ring-red-600/20; }
+
+  /* App bar, examiner tabs, account menu */
+  .appbar { @apply sticky top-0 z-20 border-b border-base-300 bg-base-100/95 backdrop-blur; }
+  .brand { @apply flex items-center gap-2 font-semibold whitespace-nowrap text-base-content; }
+  .brand-mark { @apply grid size-8 place-items-center rounded-lg bg-primary text-white; .icon { @apply size-5; } }
+  .crumb-sep { @apply text-base-300; }
+  .avatar-button {
+    @apply grid size-8 cursor-pointer place-items-center rounded-full bg-base-200 text-xs font-semibold text-muted ring-1 ring-base-300 hover:bg-base-300/60;
+  }
+  .tabs-nav {
+    @apply -mb-px flex gap-6 overflow-x-auto;
+    > a { @apply flex items-center gap-2 border-b-2 border-transparent py-3 text-sm font-medium whitespace-nowrap text-muted hover:text-base-content; }
+    > a[aria-current=page] { @apply border-primary text-base-content; }
+  }
+  .chip-button {
+    @apply inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-base-300 bg-base-100 px-3 text-sm font-medium whitespace-nowrap hover:bg-base-200;
+    .icon { @apply size-4 text-subtle; }
+  }
+
+  /* Dialogs */
+  .modal-body > p, .modal-body > small { @apply m-0 text-sm text-muted; }
+  .modal-body > :is(label, .field) { @apply mb-0; }
+
+  /* Seat tiles, striped by state */
+  .seat-grid { @apply mb-6 grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2.5; }
+  .seat-card {
+    @apply relative flex flex-col items-start gap-1.5 overflow-hidden rounded-lg border border-base-300 bg-base-100 py-3 pr-3 pl-4 transition hover:border-gray-400 hover:shadow-sm;
+    &::before { content: ""; @apply absolute inset-y-0 left-0 w-1 bg-blue-600; }
+    > strong { @apply text-lg leading-tight font-semibold tabular-nums; }
+    &:is(.state-open, .state-to-read-out)::before { @apply bg-amber-500; }
+    &.state-delivered::before { @apply bg-green-600; }
+    &.done { @apply text-subtle; &::before { @apply bg-base-300; } }
+    &.claimed { @apply bg-base-200/70; &::before { @apply bg-blue-300; } }
+  }
+  .seat-claim { @apply inline-flex max-w-full items-center gap-1 text-xs text-muted; .icon { @apply size-3.5 shrink-0; } }
+  .seat-state {
+    @apply inline-flex items-center gap-1 text-xs font-medium tabular-nums;
+    &:is(.state-open, .state-to-read-out) { @apply text-amber-700; }
+    &.state-to-deliver { @apply text-blue-700; }
+    &.state-delivered { @apply text-green-700; }
+  }
+  .venue-heading { @apply mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-muted; }
+
+  /* Invigilator seat page */
+  .clarification {
+    @apply mb-3 rounded-box border border-base-300 bg-base-100;
+    > summary { @apply flex cursor-pointer list-none items-center gap-3 px-4 py-3.5; }
+    > summary::-webkit-details-marker { display: none; }
+    > summary .chevron { @apply ml-auto size-4 text-subtle transition-transform; }
+    &[open] > summary .chevron { @apply rotate-180; }
+    > .clarification-body { @apply border-t border-base-300 p-4; }
+    &.done > summary { @apply text-subtle; }
+  }
+  .show-panel { @apply mb-4 rounded-lg bg-base-200 px-5 py-6 text-3xl leading-tight font-semibold tracking-tight text-pretty whitespace-pre-wrap; }
+
+  /* Report step 2 matches */
+  .match {
+    @apply mb-2.5 flex w-full items-start gap-3 rounded-box border border-base-300 bg-base-100 p-4 text-left;
+    &:is(a, button) { @apply cursor-pointer transition hover:border-gray-400 hover:shadow-sm; }
+    > .chevron { @apply mt-0.5 ml-auto size-4 shrink-0 text-subtle; }
+  }
+  /* A match the seat already asked, with a button to delete its report */
+  .match-group {
+    @apply mb-2.5 overflow-hidden rounded-box border border-base-300 bg-base-100;
+    > .match { @apply mb-0 rounded-none border-0; }
+    > footer { @apply flex items-center justify-end border-t border-base-300 bg-base-200/50 px-4 py-2 text-[13px] text-subtle; }
+  }
+
+  /* Announcement alert above the tab bar */
+  .invigilator-alert {
+    @apply fixed inset-x-0 z-10 mx-auto max-w-2xl px-4 pb-3;
+    bottom: calc(4rem + env(safe-area-inset-bottom));
+    > div { @apply rounded-box border border-amber-600/25 bg-amber-50 p-4 shadow-lg; }
+  }
+  body:has(.invigilator-alert) main { @apply pb-72; }
+
+  .qr { @apply block shrink-0 rounded-lg border border-base-300 bg-white p-2; > svg { @apply size-full; } }
+  .copy-field {
+    @apply flex min-w-0 items-center gap-2 rounded-field border border-base-300 bg-base-200/60 py-1 pr-1 pl-3 font-mono text-[13px];
+    > span { @apply min-w-0 flex-1 truncate text-muted; }
+  }
+  .danger-zone { @apply rounded-box border border-red-600/25 bg-base-100; }
+  .metric { @apply flex flex-col; > strong { @apply text-2xl font-semibold tracking-tight tabular-nums; } > span { @apply text-[13px] text-subtle; } }
+  blockquote { @apply rounded-lg border-l-4 border-base-300 bg-base-200/60 px-4 py-3 text-sm; }
+  blockquote footer { @apply mt-1 text-[13px] text-subtle; }
+
+  /* Tom Select, styled from scratch instead of with its stylesheet */
+  .ts-wrapper { @apply relative w-full; }
+  .ts-control {
+    @apply flex min-h-10 w-full cursor-text flex-wrap items-center gap-1 rounded-field border border-base-300 bg-base-100 px-3 py-1 text-sm shadow-xs;
+    > input { @apply h-6 min-w-16 flex-1 bg-transparent outline-none; }
+  }
+  .ts-wrapper.multi .ts-control {
+    @apply px-2;
+    .item { @apply flex items-center rounded-md bg-base-200 py-0.5 pl-2 text-xs font-medium ring-1 ring-base-300 ring-inset; }
+    .remove { @apply cursor-pointer px-1.5 text-muted no-underline hover:text-base-content; }
+  }
+  /* Single select */
+  .ts-wrapper.single .ts-control {
+    @apply cursor-pointer flex-nowrap pr-9;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.75rem center / 1rem;
+    .item { @apply truncate; }
+  }
+  .ts-wrapper.input-hidden .ts-control > input { @apply absolute -left-[10000px] opacity-0; }
+  .ts-wrapper.focus .ts-control { @apply border-primary ring-3 ring-primary/15; }
+  .filters .ts-control { @apply min-h-9; }
+  .ts-dropdown {
+    @apply absolute inset-x-0 top-full z-30 mt-1 rounded-box border border-base-300 bg-base-100 p-1 text-sm shadow-lg;
+    .ts-dropdown-content { @apply max-h-60 overflow-y-auto; }
+    .option, .create { @apply cursor-pointer rounded-md px-3 py-1.5; }
+    .active { @apply bg-base-200; }
+    .no-results { @apply px-3 py-1.5 text-muted; }
+  }
+  .ts-hidden-accessible { @apply sr-only!; } /* beats daisyUI's select, a layer above */
+}
+
+/* daisyUI nests its classes in sublayers of `utilities`, where they beat `components`. Our
+   changes to daisyUI classes sit directly in `utilities`, which beats its sublayers. */
+@layer utilities {
+  .btn { @apply gap-2 font-medium shadow-none; }
+  .btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .btn-outline {
+    @apply border-base-300 bg-base-100 text-base-content shadow-xs hover:border-base-300 hover:bg-base-200 hover:text-base-content;
+  }
+  .btn-danger {
+    @apply border-base-300 bg-base-100 text-error shadow-xs hover:border-error/30 hover:bg-red-50 hover:text-error;
+  }
+  .btn-ghost { @apply text-muted hover:bg-base-200 hover:text-base-content; }
+  .btn-ghost.btn-danger { @apply border-transparent bg-transparent shadow-none text-error hover:bg-red-50 hover:text-error; }
+  .btn .icon { @apply size-4; }
+  .btn-lg .icon { @apply size-5; }
+  .btn[aria-busy=true]::before { content: ""; @apply loading loading-spinner loading-sm; }
+  input:not([type=checkbox], [type=radio], [type=hidden], [type=file], .ts-control > *) {
+    @apply input w-full text-base-content;
+  }
+  select { @apply select w-full; }
+  textarea { @apply textarea w-full text-[15px] leading-6; }
+  :is(input:not([type=checkbox], [type=radio], [type=file], .ts-control > *), select, textarea, .input, .select, .textarea) {
+    @apply border-base-300 shadow-xs;
+  }
+  :is(input:not([type=checkbox], [type=radio], [type=file], .ts-control > *), select, textarea, .input, .select, .textarea):is(:focus, :focus-within) {
+    @apply border-primary ring-3 ring-primary/15;
+    outline: none;
+  }
+  [aria-invalid=true] { @apply border-error; }
+  /* Badges; states add `state-{{ state|slugify }}`, or pick a colour. */
+  .badge {
+    @apply inline-flex h-auto items-center gap-1 rounded-md border-0 bg-gray-50 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-gray-700 ring-1 ring-gray-500/15 ring-inset;
+    .icon { @apply size-3.5; }
+    &.state-open, &.state-to-read-out, &.amber { @apply bg-amber-50 text-amber-800 ring-amber-600/25; }
+    &.state-to-deliver, &.blue { @apply bg-blue-50 text-blue-700 ring-blue-700/15; }
+    &.state-delivered, &.state-read-out, &.state-answered, &.green { @apply bg-green-50 text-green-700 ring-green-600/20; }
+    &.closed, &.state-announced, &.state-merged { @apply bg-gray-100 text-gray-600 ring-gray-500/15; }
+  }
+  .menu-panel {
+    @apply menu w-56 rounded-box border border-base-300 bg-base-100 p-1.5 text-sm shadow-lg;
+    /* A popover below its button's right edge. */
+    inset: auto;
+    margin: 0.5rem 0 0;
+    position-area: bottom span-left;
+    position-try-fallbacks: flip-block;
+    &:not(:popover-open) { display: none; }
+    li > :is(a, button) { @apply rounded-md px-3 py-2; }
+    .menu-title { @apply px-3 pt-2 pb-1 text-xs font-medium text-subtle normal-case; }
+  }
+  .modal-box { @apply max-w-md rounded-2xl p-6 shadow-xl; }
+  .modal-box.full-screen { @apply h-dvh max-h-none w-full max-w-none rounded-none; }
+  .modal-box:has(.ts-wrapper) { @apply overflow-visible; } /* its menu may reach past the box */
+  .modal-box > h2 { @apply mb-1 text-lg; }
+  .modal-action { @apply mt-6 gap-2; }
+  .modal-backdrop { @apply bg-gray-900/40; }
+  .dock {
+    @apply border-t border-base-300 bg-base-100/95 backdrop-blur;
+    > * { @apply relative text-subtle; }
+    > [aria-current=page] { @apply text-primary; }
+    > [aria-current=page]::after { display: none; }
+    .icon { @apply size-6; }
+    .dock-label { @apply text-[11px] font-medium; }
+    .count { @apply absolute top-1 left-[calc(50%+.35rem)] h-[1.1rem] min-w-[1.1rem] px-1 text-[11px] ring-2 ring-base-100; }
+  }
+}

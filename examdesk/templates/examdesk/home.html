@@ -1,0 +1,39 @@
+{% extends "examdesk/base.html" %}
+{% block content %}
+<div class="page-header">
+  <h1>Exams</h1>
+  {% if user.is_authenticated %}
+    <button type="button" class="btn btn-primary" commandfor="create-dialog" command="show-modal"><c-icon name="plus" />Create exam</button>
+  {% endif %}
+</div>
+{% if user.is_authenticated %}
+  <c-dialog id="create-dialog" title="New exam" action="{% url 'create_exam' %}" submit="Create exam">
+    <label>Exam name
+      <input name="name" placeholder="e.g. CS2109S Final" maxlength="200" required autocomplete="off" autofocus>
+    </label>
+  </c-dialog>
+{% endif %}
+{% if cards %}
+<div class="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-4">
+  {% for exam, open_count, to_deliver in cards %}
+    {# The title link covers the whole card. #}
+    <article class="relative flex flex-col gap-4 transition hover:border-gray-400 hover:shadow-sm has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-primary">
+      <div class="flex items-start justify-between gap-3">
+        <a href="{% url 'exam' exam.pk %}" class="font-semibold after:absolute after:inset-0 focus:outline-none">{{ exam.name }}</a>
+        <c-exam-status :exam="exam" />
+      </div>
+      <div class="flex gap-8">
+        <div class="metric"><strong>{{ open_count }}</strong><span>open clarification{{ open_count|pluralize }}</span></div>
+        <div class="metric"><strong>{{ to_deliver }}</strong><span>seat{{ to_deliver|pluralize }} to deliver</span></div>
+      </div>
+      <p class="meta border-t border-base-300 pt-3">Created {{ exam.created_at|date:"j M Y" }}</p>
+    </article>
+  {% endfor %}
+</div>
+{% else %}
+  <c-empty icon="inbox" title="No exams yet" />
+{% endif %}
+{% if not user.is_authenticated %}
+  <p class="mt-6 text-center text-sm text-muted">Examiner? <a href="{% url 'account_login' %}">Sign in</a> to create an exam.</p>
+{% endif %}
+{% endblock %}

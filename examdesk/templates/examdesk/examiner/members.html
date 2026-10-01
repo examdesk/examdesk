@@ -1,0 +1,38 @@
+{% extends "examdesk/base.html" %}
+{% block content %}
+<div class="page-header">
+  <h1>Members</h1>
+</div>
+{% partialdef live inline %}
+<c-live>
+  {% for venue, people in venues %}
+    <section class="mb-6">
+      <c-venue-heading :venue="venue" />
+      <div class="table-card">
+        <table>
+          <thead><tr><th>Name</th><th class="w-32">Role</th><th class="w-40">Status</th><th class="w-16"><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody>
+            {% for person in people %}
+              <tr>
+                <td><span class="font-medium">{{ person.name }}</span></td>
+                <td class="text-muted">{{ person.get_role_display }}</td>
+                <td>{% if person.online %}<span class="badge green"><span class="live-dot"></span>Online</span>{% else %}<span class="text-sm text-muted">Last seen {{ person.last_seen|time:"H:i" }}</span>{% endif %}</td>
+                <td>
+                  {% if person != member %}
+                    <button type="button" class="btn btn-ghost btn-danger btn-sm btn-square float-right" commandfor="remove-member-{{ person.pk }}" command="show-modal"
+                            aria-label="Remove {{ person.name }}" title="Remove"><c-icon name="user-minus" /></button>
+                    <c-dialog id="remove-member-{{ person.pk }}" title="Remove {{ person.name }}?" action="{% url 'examiner:remove_member' member.exam.pk person.pk %}" submit="Remove" danger>
+                      <p>Their devices lose access. They can rejoin with the current {{ person.get_role_display }} link.</p>
+                    </c-dialog>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endfor %}
+</c-live>
+{% endpartialdef %}
+{% endblock %}

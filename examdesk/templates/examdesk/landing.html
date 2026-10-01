@@ -1,0 +1,40 @@
+{% extends "examdesk/base.html" %}
+{% block appbar %}<a href="{% url 'account_login' %}" class="btn btn-ghost btn-sm">Sign in</a>{% endblock %}
+{% block content %}
+<section class="mx-auto flex max-w-2xl flex-col items-center pt-16 pb-12 text-center sm:pt-24">
+  <h1 class="text-4xl leading-tight font-semibold tracking-tight text-balance sm:text-5xl">Quiet halls, quick answers</h1>
+  <p class="mt-4 max-w-xl text-lg text-muted">Exam Desk brings clarifications from every venue to one place, and sends the answers back to the right seats.</p>
+  <div class="mt-8 flex flex-wrap justify-center gap-3">
+    {% if config.registration %}
+      <a href="{% url 'account_signup' %}" class="btn btn-primary btn-lg">Create an account</a>
+      <a href="{% url 'account_login' %}" class="btn btn-outline btn-lg">Sign in</a>
+    {% else %}
+      <a href="{% url 'account_login' %}" class="btn btn-primary btn-lg">Sign in</a>
+    {% endif %}
+  </div>
+  <p class="mt-10 text-sm text-subtle">Invigilating? Open the exam link or scan the code you were given.</p>
+</section>
+<ol class="mx-auto grid max-w-4xl gap-4 pb-8 text-center sm:grid-cols-3">
+  <li class="card-box">
+    <c-icon name="smartphone" class="size-6 text-primary" />
+    <h2 class="mt-3">Report</h2>
+    <p class="mt-1 text-sm text-muted">Invigilators enter the question, or a photo of it, with the seat.</p>
+  </li>
+  <li class="card-box">
+    <c-icon name="message-square-reply" class="size-6 text-primary" />
+    <h2 class="mt-3">Answer</h2>
+    <p class="mt-1 text-sm text-muted">Examiners answer from one list. Repeat questions are grouped.</p>
+  </li>
+  <li class="card-box">
+    <c-icon name="send" class="size-6 text-primary" />
+    <h2 class="mt-3">Deliver</h2>
+    <p class="mt-1 text-sm text-muted">Invigilators see which seats are waiting and read the answer out.</p>
+  </li>
+</ol>
+{% endblock %}
+{% block after_main %}
+<footer class="mx-auto max-w-6xl border-t border-base-300 px-4 py-8 text-center text-[13px] leading-6 text-subtle sm:px-6">
+  <p>© {% now "Y" %} Exam Desk. Built by educators for educators.</p>
+  <p>Part of <a href="https://edfab.org" class="font-medium text-muted underline decoration-base-300 underline-offset-2 hover:text-base-content hover:decoration-current">EdFab — Education Fabrication Lab</a></p>
+</footer>
+{% endblock %}

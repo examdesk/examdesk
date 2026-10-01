@@ -1,0 +1,13 @@
+{% if member.is_examiner %}
+  {% with pk=member.exam.pk here=request.resolver_match.url_name %}
+  <div class="mx-auto flex max-w-6xl items-center gap-6 px-4 sm:px-6">
+    <nav class="tabs-nav" aria-label="Examiner">
+      <a href="{% url 'examiner:clarifications' pk %}" {% if here == "clarifications" or here == "clarification" %}aria-current="page"{% endif %}>Clarifications{% partialdef clarifications_badge inline %}<c-live as="span" id="clarifications-badge" load="{% if not clarifications_badge %}{% url 'examiner:clarifications_badge' member.exam.pk %}?v={% endif %}">{% if clarifications_badge %}<span class="count action" title="Open clarifications" data-open-count="{{ clarifications_badge.open }}"{% if not clarifications_badge.open %} hidden{% endif %}>{{ clarifications_badge.open }}</span>{% endif %}</c-live>{% endpartialdef %}</a>
+      <a href="{% url 'examiner:announcements' pk %}" {% if here == "announcements" %}aria-current="page"{% endif %}>Announcements{% partialdef announcements_badge inline %}<c-live as="span" id="announcements-badge" load="{% if not announcements_badge %}{% url 'examiner:announcements_badge' member.exam.pk %}?v={% endif %}">{% if announcements_badge.missing %}<span class="count" title="Not read out in every venue yet">{{ announcements_badge.missing }}</span>{% endif %}</c-live>{% endpartialdef %}</a>
+      <a href="{% url 'examiner:seats' pk %}" {% if here == "seats" or here == "seat" %}aria-current="page"{% endif %}>Seats</a>
+      <a href="{% url 'examiner:members' pk %}" {% if here == "members" %}aria-current="page"{% endif %}>Members</a>
+      <a href="{% url 'examiner:settings' pk %}" {% if here == "settings" %}aria-current="page"{% endif %}>Settings</a>
+    </nav>
+  </div>
+  {% endwith %}
+{% endif %}

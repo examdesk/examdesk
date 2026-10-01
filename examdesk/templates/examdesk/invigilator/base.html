@@ -1,0 +1,75 @@
+{% extends "examdesk/base.html" %}
+{% block appbar %}
+  {% if member.is_examiner %}<a href="{% url 'examiner:clarifications' member.exam.pk %}" class="btn btn-ghost btn-sm max-sm:hidden">Examiner view</a>{% endif %}
+  <button type="button" class="chip-button" commandfor="venue-dialog" command="show-modal" title="Change my venue"
+          aria-label="Venue: {{ member.venue|default:'All venues' }}"><c-icon name="map-pin" />{{ member.venue|default:"All venues" }}</button>
+{% endblock %}
+{% block nav %}{% endblock %}
+
+{% block after_main %}
+{% partialdef tab_bar inline %}
+{% with pk=member.exam.pk %}
+<c-live id="tab-bar" load="{% if not counts %}{% url 'invigilator:tab_bar' pk %}?tab={{ tab }}&here={{ request.get_full_path|urlencode }}&v={% endif %}">
+{% if alert %}
+  <div class="invigilator-alert" role="alert" data-alert="{{ alert_key }}">
+    <div>
+      <p class="flex items-center gap-2 text-sm font-semibold text-amber-800">
+        <c-icon name="megaphone" />New announcement
+        {% if counts.announcements > 1 %}<a class="ml-auto font-medium underline underline-offset-2" href="{% url 'invigilator:announcements' pk %}">{{ counts.announcements|add:"-1" }} more</a>{% endif %}
+      </p>
+      <p class="prose-answer mt-1.5 mb-3 text-lg leading-snug font-medium text-gray-900">{{ alert.text }}</p>
+      <div class="flex gap-2">
+        <div class="flex-1">
+          {% if member.venue %}
+            <c-read-out-button :announcement="alert" :member="member" next="{{ here }}" />
+          {% else %}
+            <a class="btn btn-block btn-outline" href="{% url 'invigilator:announcements' pk %}">Open Announcements</a>
+          {% endif %}
+        </div>
+        <form method="post" action="{% url 'invigilator:snooze_announcement' pk alert.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ here }}">
+          <button class="btn btn-outline">Remind me later</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endif %}
+<nav class="dock" aria-label="Invigilator">
+  <a href="{% url 'invigilator:report' pk %}" {% if tab == "report" %}aria-current="page"{% endif %}>
+    <c-icon name="pen-line" /><span class="dock-label">Report</span>
+  </a>
+  <a href="{% url 'invigilator:open_clarifications' pk %}" {% if tab == "open_clarifications" %}aria-current="page"{% endif %}>
+    <c-icon name="clock" /><span class="dock-label">Open</span>
+    {% if counts.open_clarifications %}<span class="count" title="Open clarifications">{{ counts.open_clarifications }}</span>{% endif %}
+  </a>
+  <a href="{% url 'invigilator:to_deliver' pk %}" {% if tab == "to_deliver" %}aria-current="page"{% endif %}>
+    <c-icon name="send" /><span class="dock-label">Deliver</span>
+    {% if counts.to_deliver %}<span class="count action" title="Seats to deliver">{{ counts.to_deliver }}</span>{% endif %}
+  </a>
+  <a href="{% url 'invigilator:announcements' pk %}" {% if tab == "announcements" %}aria-current="page"{% endif %}>
+    <c-icon name="megaphone" /><span class="dock-label">Announce</span>
+    {% if counts.announcements %}<span class="count urgent" title="To read out">{{ counts.announcements }}</span>{% endif %}
+  </a>
+</nav>
+</c-live>
+{% endwith %}
+{% endpartialdef %}
+
+<c-dialog id="venue-dialog" title="Which venue are you in?" action="{% url 'invigilator:choose_venue' member.exam.pk %}" submit="Save" :autoopen="ask_venue">
+  <input type="hidden" name="next" value="{{ request.path }}">
+  {% if venues %}
+    <div class="flex flex-wrap gap-2">
+      {% for venue in venues %}<button class="btn btn-outline" form="venue-pick" name="pick" value="{{ venue }}"{% if venue == member.venue %} aria-pressed="true"{% endif %}>{{ venue }}</button>{% endfor %}
+    </div>
+  {% endif %}
+  <input name="venue" value="{{ member.venue|default:"" }}" list="venues" aria-label="My venue" placeholder="{% if venues %}Another venue, e.g. LT19{% else %}e.g. LT19{% endif %}"
+         autocapitalize="characters" autocomplete="off">
+  <div><button class="link-button text-sm" form="venue-pick" name="all" value="1">I move between venues</button></div>
+</c-dialog>
+{# Separate form for the quick picks, so Enter in the text field submits the dialog. #}
+<form method="post" action="{% url 'invigilator:choose_venue' member.exam.pk %}" id="venue-pick" hidden>
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.path }}">
+</form>
+{% endblock %}

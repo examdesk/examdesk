@@ -1,0 +1,2 @@
+{% load examdesk_tags %}{# A clarification or report state. Content replaces the label. #}<c-vars state class /><span
+  class="badge state-{{ state|slugify }}{% if class %} {{ class }}{% endif %}"><c-icon name="{{ state|state_icon }}" />{% if slot %}{{ slot }}{% else %}{{ state.label }}{% endif %}</span>

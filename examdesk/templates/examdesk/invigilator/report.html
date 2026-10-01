@@ -1,0 +1,115 @@
+{% extends "examdesk/invigilator/base.html" %}
+{% load examdesk_tags %}
+{% block content %}
+{% with pk=member.exam.pk %}
+
+{% partialdef hidden %}
+  <input type="hidden" name="client_key" value="{{ client_key }}">
+  <input type="hidden" name="venue" value="{{ start_form.cleaned_data.venue }}">
+  <input type="hidden" name="seat" value="{{ start_form.cleaned_data.seat }}">
+  <input type="hidden" name="label" value="{{ start_form.cleaned_data.label }}">
+{% endpartialdef %}
+{% partialdef new_clarification %}
+  <form method="post" enctype="multipart/form-data" id="new-clarification" class="card-box">
+    {% csrf_token %}
+    {% partial hidden %}
+    {% if report_form %}<c-error>{{ report_form|form_errors }}</c-error>{% endif %}
+    <div class="mb-4 flex items-start gap-3" data-preview hidden>
+      <img class="max-h-32 rounded-lg border border-base-300" alt="Photo to send">
+      <button type="button" class="btn btn-danger btn-sm" data-clear aria-label="Remove photo"><c-icon name="x" />Remove</button>
+    </div>
+    <div class="flex flex-col gap-2.5">
+      <label class="btn btn-outline mb-0 flex-row">
+        <c-icon name="camera" />Take photo (optional)
+        <input type="file" name="photo" accept="image/*" capture="environment" data-photo hidden>
+      </label>
+      <button class="btn btn-primary btn-block">Save clarification</button>
+    </div>
+  </form>
+{% endpartialdef %}
+
+{% partialdef match %}
+  <span class="min-w-0 flex-1">
+    <span class="mb-1 flex flex-wrap items-center gap-1.5">
+      <span class="badge">{{ clarification.label }}</span>
+      {% if clarification.current_answer %}<span class="badge green"><c-icon name="check" />Answered</span>{% else %}<span class="badge amber"><c-icon name="clock" />Open</span>{% endif %}
+      {% if asked_here %}<span class="badge blue"><c-icon name="user" />Asked from this seat</span>{% endif %}
+      {% if similarity is not None %}<span class="meta">{{ similarity }}% alike</span>{% endif %}
+    </span>
+    <span class="block">{{ clarification.summary }}</span>
+    {% if clarification.photo_report_id %}<img class="mt-2 max-h-24 rounded-md border border-base-300" src="{% url 'photo' pk clarification.photo_report_id %}" alt="Question paper">{% endif %}
+  </span>
+{% endpartialdef %}
+
+{% partialdef offer %}
+  {% if asked_here %}
+    <div class="match-group">
+      {% if clarification.current_answer %}
+        <a class="match" href="{% seat_url 'invigilator:deliver_seat' pk asked_here.venue asked_here.seat report=asked_here.pk back='report' %}">{% partial match %}<c-icon name="chevron-right" class="chevron" /></a>
+      {% else %}
+        <div class="match">{% partial match %}</div>
+      {% endif %}
+      <footer><button type="button" class="link-button text-error" commandfor="delete-report-{{ asked_here.pk }}" command="show-modal">Delete this seat's report</button></footer>
+    </div>
+    <c-delete-report-dialog :report="asked_here" next="{{ request.get_full_path }}" />
+  {% else %}
+    <form method="post">
+      {% csrf_token %}
+      {% partial hidden %}
+      <input type="hidden" name="clarification" value="{{ clarification.pk }}">
+      <button class="match">{% partial match %}<c-icon name="chevron-right" class="chevron" /></button>
+    </form>
+  {% endif %}
+{% endpartialdef %}
+
+{% if matching %}
+  {% with seat=start_form.cleaned_data %}
+  <div class="mb-5 flex items-center gap-3">
+    <c-back href="?venue={{ seat.venue|urlencode }}&amp;seat={{ seat.seat|urlencode }}&amp;label={{ seat.label|urlencode }}&amp;edit=1" label="Back to step 1" square />
+    <div class="min-w-0 flex-1">
+      <p class="eyebrow">Step 2 of 2</p>
+      <h1 class="tabular-nums">{{ seat.venue }} {{ seat.seat }} · {{ seat.label }}</h1>
+    </div>
+  </div>
+  <label class="mb-5">What is the student asking?
+    <textarea name="text" maxlength="{{ config.text_max }}" rows="2" form="new-clarification" placeholder="In the student's words"
+              hx-get="{% url 'invigilator:report' pk %}?venue={{ seat.venue|urlencode }}&amp;seat={{ seat.seat|urlencode }}&amp;label={{ seat.label|urlencode }}"
+              hx-trigger="input changed delay:300ms" hx-target="#matches" hx-swap="outerHTML" hx-sync="this:replace">{{ text }}</textarea>
+  </label>
+  {% endwith %}
+  {% partialdef matches inline %}
+  {% with pk=member.exam.pk %}
+  <div id="matches">
+    {% for heading, matches in groups %}{% if matches %}
+      <h2 class="eyebrow mb-2">{{ heading }}</h2>
+      <div class="mb-5">{% for match in matches %}{% with clarification=match.clarification asked_here=match.asked_here similarity=match.similarity %}{% partial offer %}{% endwith %}{% endfor %}</div>
+    {% endif %}{% endfor %}
+  </div>
+  {% endwith %}
+  {% endpartialdef %}
+  {% if any_match %}
+    <details{% if report_form.errors %} open{% endif %} class="group">
+      <summary class="btn btn-outline btn-block mb-3 list-none group-open:hidden"><c-icon name="plus" />New clarification</summary>
+      {% partial new_clarification %}
+    </details>
+  {% else %}
+    {% partial new_clarification %}
+  {% endif %}
+{% else %}
+  <div class="mb-5">
+    <p class="eyebrow">Step 1 of 2</p>
+    <h1>Report a question</h1>
+  </div>
+  <form method="get" action="{% url 'invigilator:report' pk %}" class="card-box">
+    {% if member.venue %}
+      <input type="hidden" name="venue" value="{{ start_form.venue.value|default:member.venue }}">
+    {% else %}
+      <div class="field">{{ start_form.venue.as_field_group }}</div>
+    {% endif %}
+    <div class="field">{{ start_form.seat.as_field_group }}</div>
+    <div class="field">{{ start_form.label.as_field_group }}</div>
+    <button class="btn btn-primary btn-block mt-2">Next<c-icon name="chevron-right" /></button>
+  </form>
+{% endif %}
+{% endwith %}
+{% endblock %}

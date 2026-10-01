@@ -1,0 +1,16 @@
+{% load examdesk_tags %}
+{% if member or user.is_authenticated %}
+  {% firstof member.name user.get_full_name user.get_username as who %}
+  <button type="button" class="avatar-button" popovertarget="account-menu" style="anchor-name: --account-menu" aria-label="Account: {{ who }}" title="{{ who }}">{{ who|initials }}</button>
+  <ul class="menu-panel" id="account-menu" popover style="position-anchor: --account-menu">
+    <li class="menu-title">Signed in as <strong class="text-base-content">{{ who }}</strong></li>
+    {% if member %}
+      <li><a href="{% url 'home' %}">All exams</a></li>
+      <li><a href="{% url 'rename_member' member.exam.pk %}?next={{ request.get_full_path|urlencode }}">Change name</a></li>
+      <li><button form="leave-exam">Leave this exam</button></li>
+    {% endif %}
+    {% if user.is_authenticated %}<li><button form="sign-out">Sign out</button></li>{% endif %}
+  </ul>
+  {% if member %}<form method="post" action="{% url 'leave_exam' member.exam.pk %}" id="leave-exam" hidden>{% csrf_token %}</form>{% endif %}
+  {% if user.is_authenticated %}<form method="post" action="{% url 'account_logout' %}" id="sign-out" hidden>{% csrf_token %}</form>{% endif %}
+{% endif %}

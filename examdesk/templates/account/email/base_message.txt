@@ -1,0 +1,3 @@
+{% autoescape off %}{# Without allauth's greeting, which names the site by its host name. #}{% block content %}{% endblock content %}
+
+— Exam Desk{% endautoescape %}

@@ -1,0 +1,7 @@
+{# Marks an announcement as read out in the member's venue, then returns to `next`. #}
+<c-vars announcement member next />
+<form method="post" action="{% url 'invigilator:mark_read_out' member.exam.pk announcement.pk %}">
+  {% csrf_token %}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  <button class="btn btn-outline btn-block"><c-icon name="check" />Read out in {{ member.venue }}</button>
+</form>

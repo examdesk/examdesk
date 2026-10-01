@@ -1,0 +1,31 @@
+{# A join link with its QR code. Content goes above the link, e.g. a warning. #}
+<c-vars link exam />
+{% with role=link.role id=link.role.value %}
+<section class="card-box">
+  <div class="card-header"><h2>{{ role.label }} link</h2>{% if role == "invigilator" and not exam.is_live %}<span class="badge closed">Off while closed</span>{% endif %}</div>
+  {% if slot %}<div class="mb-4">{{ slot }}</div>{% endif %}
+  <div class="flex flex-wrap items-center gap-6">
+    <span class="qr size-40">{{ link.qr }}</span>
+    <div class="flex min-w-60 flex-1 flex-col gap-3">
+      <div class="copy-field"><span><a href="{{ link.url }}" class="text-muted">{{ link.url }}</a></span>
+        <button class="btn btn-ghost btn-xs" data-copy="{{ link.url }}" aria-label="Copy {{ role.label }} link"><c-icon name="copy" />Copy</button></div>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" class="btn btn-primary" commandfor="{{ id }}-qr" command="show-modal"><c-icon name="qr-code" />Show full screen</button>
+        <button type="button" class="btn btn-danger" commandfor="reset-{{ id }}-link" command="show-modal"><c-icon name="rotate-ccw" />Reset link</button>
+      </div>
+    </div>
+  </div>
+</section>
+<c-dialog id="reset-{{ id }}-link" title="Reset {{ role.label }} link?" action="{% url 'examiner:reset_link' exam.pk %}" submit="Reset link" danger>
+  <input type="hidden" name="role" value="{{ id }}">
+  <p>The current link and QR code stop working. {{ role.label }}s already on the exam stay.</p>
+</c-dialog>
+<dialog id="{{ id }}-qr" class="modal" aria-labelledby="{{ id }}-qr-title">
+  <div class="modal-box full-screen flex flex-col items-center justify-center gap-6 text-center">
+    <p class="eyebrow">{{ exam.name }}</p>
+    <h2 id="{{ id }}-qr-title" class="text-3xl font-semibold tracking-tight">{{ role.label }}s: scan to join</h2>
+    <span class="qr size-[min(70dvh,90vw)] border-0">{{ link.qr }}</span>
+    <button type="button" class="btn btn-outline" commandfor="{{ id }}-qr" command="close"><c-icon name="x" />Close</button>
+  </div>
+</dialog>
+{% endwith %}

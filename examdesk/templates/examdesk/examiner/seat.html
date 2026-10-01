@@ -1,0 +1,37 @@
+{% extends "examdesk/base.html" %}
+{% load examdesk_tags %}
+{% block content %}
+{% partialdef live inline %}
+<c-live>
+{% with pk=member.exam.pk %}
+<c-back href="{% url 'examiner:seats' pk %}" label="Seats" />
+<div class="page-header">
+  <h1>{{ seat }} <span class="ml-1 text-base font-normal text-muted"><c-icon name="map-pin" />{{ venue }}</span></h1>
+</div>
+<div class="vstack max-w-3xl">
+{% for report in reports %}
+  <article>
+    <header class="flex items-start justify-between gap-3">
+      <a href="{% url 'examiner:clarification' pk report.clarification_id %}" class="hover:underline"><strong>{{ report.clarification.label }}</strong> <span class="font-normal">{{ report.clarification.summary }}</span></a>
+      <c-state-badge :state="report.state" class="shrink-0">{% if report.current_delivery and report.state == "delivered" %}Delivered by {{ report.current_delivery.member.name }} at {{ report.current_delivery.created_at|time:"H:i" }}{% endif %}</c-state-badge>
+    </header>
+    <p class="meta flex flex-wrap gap-x-3">
+      <span class="inline-flex items-center gap-1"><c-icon name="pen-line" title="Reported by" />{{ report.member.name }}</span>
+      <span class="num inline-flex items-center gap-1"><c-icon name="clock" title="Asked at" />{{ report.created_at|time:"H:i" }}</span>
+    </p>
+    {% if report.clarification.current_answer %}<p class="prose-answer mt-3 rounded-lg bg-base-200 px-4 py-3 text-sm">{{ report.clarification.current_answer.text|linebreaksbr }}</p>{% endif %}
+    {% for delivery in report.superseded_deliveries %}
+      <div class="mt-3 border-l-2 border-base-300 pl-3">
+        <p class="text-sm text-muted"><s>{{ delivery.answer.text|linebreaksbr }}</s></p>
+        <small>Delivered by {{ delivery.member.name }} at {{ delivery.created_at|time:"H:i" }}, since corrected</small>
+      </div>
+    {% endfor %}
+  </article>
+{% empty %}
+  <c-empty icon="user" title="This seat has not asked anything" />
+{% endfor %}
+</div>
+{% endwith %}
+</c-live>
+{% endpartialdef %}
+{% endblock %}

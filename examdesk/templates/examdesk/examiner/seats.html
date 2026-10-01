@@ -1,0 +1,42 @@
+{% extends "examdesk/base.html" %}
+{% load examdesk_tags %}
+{% block content %}
+<div class="page-header">
+  <h1>Seats</h1>
+</div>
+<div class="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+  <label class="relative mb-0 block w-60">
+    <c-icon name="search" class="pointer-events-none absolute top-1/2 left-3 z-10 -translate-y-1/2 text-subtle" />
+    <input type="search" class="h-9 pl-9 text-sm" data-seat-filter placeholder="Find a seat, e.g. B14" aria-label="Find a seat" autocapitalize="characters" autocomplete="off">
+  </label>
+  <p class="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted" aria-label="Legend">
+    <span class="inline-flex items-center gap-1.5"><span class="h-3 w-1 rounded-full bg-amber-500"></span>Open</span>
+    <span class="inline-flex items-center gap-1.5"><span class="h-3 w-1 rounded-full bg-blue-600"></span>To deliver</span>
+    <span class="inline-flex items-center gap-1.5"><span class="h-3 w-1 rounded-full bg-green-600"></span>Delivered or read out</span>
+  </p>
+</div>
+{% partialdef live inline %}
+<c-live>
+  {% for venue, tiles in venues %}
+    <section data-venue>
+    <c-venue-heading :venue="venue" />
+    <div class="seat-grid">
+      {% for tile in tiles %}
+        <a class="seat-card state-{{ tile.least|slugify }}" data-seat="{{ tile.seat }}" href="{% seat_url 'examiner:seat' member.exam.pk venue tile.seat %}"
+           aria-label="{{ venue }} {{ tile.seat }}:{% for state, count in tile.tally %} {{ count }} {{ state.label|lower }}{% if not forloop.last %},{% endif %}{% endfor %}">
+          <strong>{{ tile.seat }}</strong>
+          <span class="flex flex-wrap gap-x-2.5">
+            {% for state, count in tile.tally %}
+              <span class="seat-state state-{{ state|slugify }}"><c-icon name="{{ state|state_icon }}" title="{{ state.label }}" />{{ count }}</span>
+            {% endfor %}
+          </span>
+        </a>
+      {% endfor %}
+    </div>
+    </section>
+  {% empty %}
+    <c-empty icon="users" title="No seat has asked anything yet" />
+  {% endfor %}
+</c-live>
+{% endpartialdef %}
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "examdesk/base.html" %}
+{% block nav %}{% endblock %}
+{% block content %}
+<c-centered-card icon="user" title="Change your name">
+  <form method="post">
+    {% csrf_token %}
+    <div class="field">{{ form.name.as_field_group }}</div>
+    <button class="btn btn-primary btn-block">Save</button>
+  </form>
+</c-centered-card>
+{% endblock %}

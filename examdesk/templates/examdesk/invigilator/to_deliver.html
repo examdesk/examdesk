@@ -1,0 +1,36 @@
+{% extends "examdesk/invigilator/base.html" %}
+{% load examdesk_tags %}
+{% block content %}
+<h1 class="mb-5">Deliver answers</h1>
+{% partialdef live inline %}
+<c-live>
+{% with pk=member.exam.pk %}
+  {% for venue, tiles in undelivered %}
+    {% partial venue %}
+  {% empty %}
+    <c-empty icon="circle-check" title="Nothing to deliver{% if member.venue %} in {{ member.venue }}{% endif %}" class="mb-6" />
+  {% endfor %}
+  {% if delivered %}
+    <details id="delivered" class="group">
+      <summary class="mb-3 flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-muted"><c-icon name="chevron-right" class="transition-transform group-open:rotate-90" />Recently delivered ({{ delivered_count }})</summary>
+      {% for venue, tiles in delivered %}{% partial venue %}{% endfor %}
+    </details>
+  {% endif %}
+{% endwith %}
+</c-live>
+{% endpartialdef %}
+
+{% partialdef venue %}
+{% if not member.venue %}<c-venue-heading :venue="venue" />{% endif %}
+<div class="seat-grid">
+  {% for tile in tiles %}
+    <a class="seat-card{% if not tile.to_deliver %} done{% elif tile.claim %} claimed{% endif %}" href="{% seat_url 'invigilator:deliver_seat' pk tile.venue tile.seat %}"
+       aria-label="{{ tile.venue }} {{ tile.seat }}: {% if tile.to_deliver %}{{ tile.to_deliver }} to deliver{% if tile.claim %}, with {{ tile.claim.member.name }}{% endif %}{% else %}all delivered{% endif %}">
+      <strong>{{ tile.seat }}</strong>
+      {% if tile.to_deliver %}<span class="seat-state state-to-deliver"><c-icon name="send" />{{ tile.to_deliver }} to deliver</span>{% else %}<span class="seat-state state-delivered"><c-icon name="check" />Delivered</span>{% endif %}
+      {% if tile.claim %}<span class="seat-claim"><c-icon name="users" /><span class="truncate">{{ tile.claim.member.name }}</span></span>{% endif %}
+    </a>
+  {% endfor %}
+</div>
+{% endpartialdef %}
+{% endblock %}

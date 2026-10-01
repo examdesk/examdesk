@@ -1,0 +1,13 @@
+<c-vars id title action submit danger autoopen />
+<dialog id="{{ id }}" class="modal"{% if autoopen %} data-autoopen{% endif %} aria-labelledby="{{ id }}-title">
+  <form method="post" action="{{ action }}" class="modal-box">
+    {% csrf_token %}
+    <h2 id="{{ id }}-title">{{ title }}</h2>
+    <div class="modal-body mt-3 flex flex-col gap-3">{{ slot }}</div>
+    <div class="modal-action">
+      <button type="button" class="btn btn-outline" commandfor="{{ id }}" command="close">Cancel</button>
+      <button class="btn {% if danger %}btn-error{% else %}btn-primary{% endif %}">{{ submit }}</button>
+    </div>
+  </form>
+  <form method="dialog" class="modal-backdrop"><button>Close</button></form>
+</dialog>

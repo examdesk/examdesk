@@ -1,0 +1,2 @@
+{% url 'account_email_verification_sent' as action_url %}
+{% include "account/confirm_code.html" with action_url=action_url submit="Create account" %}

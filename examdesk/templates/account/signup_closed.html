@@ -1,0 +1,7 @@
+{% extends "examdesk/base.html" %}
+{% block title %}Sign up · Exam Desk{% endblock %}
+{% block content %}
+<c-centered-card icon="lock" title="Sign up is closed">
+  <a class="btn btn-block" href="{% url 'account_login' %}">Sign in</a>
+</c-centered-card>
+{% endblock %}

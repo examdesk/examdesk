@@ -1,0 +1,2 @@
+{# An error banner; nothing if the content is empty. #}
+{% if slot.strip %}<div class="flash error" role="alert"><c-icon name="circle-alert" /><span>{{ slot }}</span></div>{% endif %}

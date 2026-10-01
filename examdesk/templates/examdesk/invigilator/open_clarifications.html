@@ -1,0 +1,33 @@
+{% extends "examdesk/invigilator/base.html" %}
+{% load examdesk_tags %}
+{% block content %}
+<h1 class="mb-5">Open clarifications</h1>
+{% partialdef live inline %}
+<c-live>
+  {% for label, clarifications in groups %}
+    <section class="mb-5">
+      <h2 class="group-heading">{{ label }}</h2>
+      <div class="vstack">
+      {% for clarification, reports in clarifications %}
+        <article class="tight">
+          <div class="flex items-start justify-between gap-3">
+            <p class="font-medium">{{ clarification.summary|truncatechars:80 }}</p>
+            <span class="wait {{ reports.0.created_at|wait_level }} shrink-0"><c-icon name="clock" />{{ reports.0.created_at|wait }}</span>
+          </div>
+          {% regroup reports|dictsort:"venue" by venue as venues %}
+          {% for venue in venues %}
+            <p class="mt-2 flex flex-wrap items-center gap-1.5">
+              {% if not member.venue %}<span class="mr-1 inline-flex items-center gap-1 text-[13px] font-medium whitespace-nowrap text-muted"><c-icon name="map-pin" />{{ venue.grouper }}</span>{% endif %}
+              {% for report in venue.list %}<span class="badge state-open">{{ report.seat }}</span>{% endfor %}
+            </p>
+          {% endfor %}
+        </article>
+      {% endfor %}
+      </div>
+    </section>
+  {% empty %}
+    <c-empty icon="circle-check" title="No open clarifications in {{ member.venue|default:'any venue' }}" />
+  {% endfor %}
+</c-live>
+{% endpartialdef %}
+{% endblock %}

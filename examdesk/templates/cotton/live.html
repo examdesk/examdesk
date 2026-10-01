@@ -1,0 +1,3 @@
+{# Polls while no dialog is open; morphs, keeping focus and open <details>. `load` fetches once instead. #}
+<c-vars as="div" id="live" class load />
+<{{ as }} id="{{ id }}" hx-get="{% if load %}{{ load|force_escape }}{% else %}{{ poll_url }}{% endif %}" hx-trigger="{% if load %}load{% else %}every {{ config.poll_every }}s [!document.querySelector('dialog[open]')]{% endif %}" hx-swap="outerMorph"{% if class %} class="{{ class }}"{% endif %}>{{ slot }}</{{ as }}>

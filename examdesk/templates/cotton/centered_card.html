@@ -1,0 +1,10 @@
+{# A page with a single card, such as sign-in. `lead` may be a named slot. #}
+<c-vars icon title lead />
+<div class="mx-auto mt-6 max-w-sm sm:mt-12">
+  <div class="card-box">
+    <div class="brand-mark mb-4 size-10"><c-icon name="{{ icon }}" /></div>
+    <h1>{{ title }}</h1>
+    {% if lead %}<p class="mt-1 text-sm text-muted">{{ lead }}</p>{% endif %}
+    <div class="mt-5">{{ slot }}</div>
+  </div>
+</div>
