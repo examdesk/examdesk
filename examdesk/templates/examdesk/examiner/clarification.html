@@ -25,8 +25,9 @@
       {% if editable %}<button type="button" class="btn btn-ghost btn-sm shrink-0" commandfor="wording-dialog" command="show-modal">Edit</button>{% endif %}
     </div>
     {% if asked %}
-      <h2 class="eyebrow mt-5 mb-3">What students asked</h2>
-      <ul class="flex flex-col gap-4">
+      <details class="group mt-5">
+      <summary class="eyebrow flex w-fit cursor-pointer list-none items-center gap-1.5"><c-icon name="chevron-right" class="transition-transform group-open:rotate-90" />What students asked ({{ asked|length }})</summary>
+      <ul class="mt-3 flex flex-col gap-4">
         {% for report in asked %}
           <li class="flex gap-3">
             <span class="badge h-fit shrink-0">{{ report.venue }} {{ report.seat }}</span>
@@ -40,6 +41,7 @@
           </li>
         {% endfor %}
       </ul>
+      </details>
     {% endif %}
   </section>
 
