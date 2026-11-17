@@ -8,6 +8,7 @@ license-files = ["LICENSE", "THIRD_PARTY_LICENSES"]
 authors = [{ name = "Muhammad Rizki Aulia Rahman Maulana" }]
 requires-python = ">=3.14"
 dependencies = [
+    "cryptography>=50.0.2",
     "dj-database-url>=3.1.2",
     "django>=6.1.1,<6.2",
     "django-allauth>=65.19",
@@ -18,6 +19,7 @@ dependencies = [
     "lucide>=1.1.4",
     "numpy>=2.5.3",
     "onnxruntime>=1.30.0",
+    "openai>=3.52.0",
     "pillow>=12.3.0",
     "segno>=1.6.6",
     "tokenizers>=0.23.2",
@@ -36,8 +38,11 @@ dev = [
 ]
 
 [project.optional-dependencies]
-# Deployment only: the WSGI server and one database driver.
-server = ["gunicorn>=26.2.0"]
+# Deployment only: the ASGI server and one database driver.
+server = [
+    "gunicorn>=26.2.0",
+    "uvicorn-worker>=0.4.0",
+]
 postgres = ["psycopg[binary]>=3.3.6"]
 mysql = ["mysqlclient>=2.3.0"]
 

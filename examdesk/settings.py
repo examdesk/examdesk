@@ -39,7 +39,6 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "examdesk.urls"
-WSGI_APPLICATION = "examdesk.wsgi.application"
 
 TEMPLATES = [
     {
@@ -56,11 +55,8 @@ TEMPLATES = [
     },
 ]
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}", conn_max_age=60, conn_health_checks=True
-    )
-}
+# No persistent connections: Django advises against them under ASGI.
+DATABASES = {"default": dj_database_url.config(default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")}
 if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
     DATABASES["default"]["OPTIONS"] = {"transaction_mode": "IMMEDIATE"}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -178,6 +174,7 @@ EXAMDESK_MODEL_FILES = _list(
     "EXAMDESK_MODEL_FILES", "onnx/model_quantized.onnx,tokenizer.json", sep=","
 )
 EXAMDESK_MODEL_MAX_TOKENS = _int("EXAMDESK_MODEL_MAX_TOKENS", 256)
+EXAMDESK_AI_TIMEOUT = _seconds("EXAMDESK_AI_TIMEOUT", 60)
 EXAMDESK_PHOTO_MAX_SIDE = _int("EXAMDESK_PHOTO_MAX_SIDE", 1600)
 EXAMDESK_PHOTO_MAX_BYTES = _int("EXAMDESK_PHOTO_MAX_BYTES", 200_000)
 EXAMDESK_PHOTO_UPLOAD_MAX_BYTES = _int("EXAMDESK_PHOTO_UPLOAD_MAX_BYTES", 10_000_000)

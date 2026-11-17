@@ -27,6 +27,7 @@ class ExamAdmin(admin.ModelAdmin):
     search_fields = ["name", "owner__email"]
     autocomplete_fields = ["owner"]
     readonly_fields = ["version", "created_at"]
+    exclude = ["ai_api_key"]
     inlines = [MemberInline]
 
 

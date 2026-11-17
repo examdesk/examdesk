@@ -19,6 +19,7 @@ from django.views.decorators.http import require_GET, require_POST
 from .. import services, session
 from ..access import HtmxRequest, exam_view
 from ..forms import (
+    AIServiceForm,
     AnswerForm,
     ClarificationFilterForm,
     DeleteExamForm,
@@ -453,7 +454,10 @@ def exam_settings(request: HtmxRequest, member: Member) -> HttpResponse:
 
 
 def settings_page(
-    request: HtmxRequest, member: Member, delete_form: DeleteExamForm | None = None
+    request: HtmxRequest,
+    member: Member,
+    delete_form: DeleteExamForm | None = None,
+    ai_form: AIServiceForm | None = None,
 ) -> HttpResponse:
     """A bound `delete_form` reopens the delete dialog with its errors."""
     links = []
@@ -462,9 +466,27 @@ def settings_page(
         qr = mark_safe(segno.make(url, error="m").svg_inline(scale=5, omitsize=True))
         links.append({"role": role, "url": url, "qr": qr})
     delete_form = delete_form or DeleteExamForm(exam_name=member.exam.name)
-    context = {"member": member, "links": links, "delete_form": delete_form}
+    ai_form = ai_form or AIServiceForm(exam=member.exam)
+    context = {"member": member, "links": links, "delete_form": delete_form, "ai_form": ai_form}
     template = "examdesk/examiner/settings.html"
-    return render(request, template, context, status=400 if delete_form.errors else 200)
+    status = 400 if delete_form.errors or ai_form.errors else 200
+    return render(request, template, context, status=status)
+
+
+@require_POST
+@exam_view(examiner_only=True)
+def ai_service(request: HtmxRequest, member: Member) -> HttpResponse:
+    """Save the exam's AI service, or remove it with `remove`."""
+    if "remove" in request.POST:
+        services.set_ai_service(member.exam, base_url="", model="", api_key="")
+        messages.success(request, "Removed the AI service.")
+    else:
+        form = AIServiceForm(request.POST, exam=member.exam)
+        if not form.is_valid():
+            return settings_page(request, member, ai_form=form)
+        services.set_ai_service(member.exam, **form.cleaned_data)
+        messages.success(request, "Saved the AI service.")
+    return redirect("examiner:settings", member.exam.pk)
 
 
 @require_POST

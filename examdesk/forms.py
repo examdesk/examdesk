@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.http import HttpRequest
 
 from .labels import normalize_label, normalize_name, normalize_place
-from .models import Clarification
+from .models import Clarification, Exam
 
 
 def form_errors(form: forms.Form) -> str:
@@ -99,17 +99,57 @@ class ReportStartForm(BaseForm):
     )
 
 
-class ReportForm(ReportStartForm):
-    client_key = forms.UUIDField()
-    clarification = forms.IntegerField(required=False)
-    text = forms.CharField(required=False, max_length=settings.EXAMDESK_TEXT_MAX)
-    photo = forms.ImageField(required=False)
+class PhotoForm(BaseForm):
+    photo = forms.ImageField()
 
     def clean_photo(self) -> UploadedFile[bytes] | None:
         photo: UploadedFile[bytes] | None = self.cleaned_data["photo"]
         if photo and (photo.size or 0) > settings.EXAMDESK_PHOTO_UPLOAD_MAX_BYTES:
             raise forms.ValidationError("That photo is too large.")
         return photo
+
+
+class ReportForm(ReportStartForm, PhotoForm):
+    client_key = forms.UUIDField()
+    clarification = forms.IntegerField(required=False)
+    text = forms.CharField(required=False, max_length=settings.EXAMDESK_TEXT_MAX)
+    photo = forms.ImageField(required=False)
+
+
+class AIServiceForm(BaseForm):
+    base_url = forms.URLField(
+        label="API base URL",
+        assume_scheme="https",
+        widget=forms.URLInput(attrs={"placeholder": "https://…/v1"}),
+    )
+    model = forms.CharField(max_length=200, label="Model")
+    api_key = forms.CharField(
+        label="API key",
+        required=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "off"}),
+    )
+
+    def __init__(self, *args: Any, exam: Exam, **kwargs: Any) -> None:
+        initial = {"base_url": exam.ai_base_url, "model": exam.ai_model}
+        super().__init__(*args, initial=initial, **kwargs)
+        self.exam = exam
+        if exam.ai_api_key:
+            self.fields["api_key"].widget.attrs["placeholder"] = "Saved; leave blank to keep"
+
+    def clean_base_url(self) -> str:
+        url: str = self.cleaned_data["base_url"]
+        if not url.startswith("https://"):
+            raise forms.ValidationError("Use an https:// address.")
+        return url
+
+    def clean(self) -> dict[str, Any]:
+        """A blank key keeps the saved one, for the same address only."""
+        data = super().clean() or {}
+        if not data.get("api_key") and data.get("base_url") == self.exam.ai_base_url:
+            data["api_key"] = self.exam.ai_api_key
+        if not data.get("api_key"):
+            self.add_error("api_key", "Enter the API key.")
+        return data
 
 
 class ClarificationFilterForm(BaseForm):

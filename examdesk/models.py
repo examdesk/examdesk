@@ -9,6 +9,8 @@ from django.db.models import Exists, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Lower
 from django.utils import timezone
 
+from .fields import EncryptedTextField
+
 
 def new_token() -> str:
     return secrets.token_urlsafe(24)
@@ -25,11 +27,18 @@ class Exam(models.Model):
     examiner_token = models.CharField(max_length=64, unique=True, default=new_token)
     invigilator_token = models.CharField(max_length=64, unique=True, default=new_token)
     is_live = models.BooleanField(default=True)
+    ai_base_url = models.URLField("API base URL", blank=True)
+    ai_model = models.CharField("model", max_length=200, blank=True)
+    ai_api_key = EncryptedTextField("API key", blank=True)
     version = models.PositiveBigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def has_ai_service(self) -> bool:
+        return bool(self.ai_base_url and self.ai_model)
 
     @staticmethod
     def token_field(role: Role) -> str:

@@ -34,7 +34,7 @@
               {{ report.text }}
               {% if report.photo %}
                 {% url 'photo' pk report.pk as photo %}
-                <a href="{{ photo }}" target="_blank" class="mt-1 block w-fit"><img class="max-h-88 rounded-lg border border-base-300" src="{{ photo }}" alt="Question paper, {{ report.venue }} {{ report.seat }}"></a>
+                <a href="{{ photo }}" target="_blank" class="mt-1 block w-fit"><img class="max-h-88 rounded-lg border border-base-300" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}"></a>
               {% endif %}
             </div>
           </li>

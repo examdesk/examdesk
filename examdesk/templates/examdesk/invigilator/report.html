@@ -14,17 +14,7 @@
     {% csrf_token %}
     {% partial hidden %}
     {% if report_form %}<c-error>{{ report_form|form_errors }}</c-error>{% endif %}
-    <div class="mb-4 flex items-start gap-3" data-preview hidden>
-      <img class="max-h-32 rounded-lg border border-base-300" alt="Photo to send">
-      <button type="button" class="btn btn-danger btn-sm" data-clear aria-label="Remove photo"><c-icon name="x" />Remove</button>
-    </div>
-    <div class="flex flex-col gap-2.5">
-      <label class="btn btn-outline mb-0 flex-row">
-        <c-icon name="camera" />Take photo (optional)
-        <input type="file" name="photo" accept="image/*" capture="environment" data-photo hidden>
-      </label>
-      <button class="btn btn-primary btn-block">Save clarification</button>
-    </div>
+    <button class="btn btn-primary btn-block">Save clarification</button>
   </form>
 {% endpartialdef %}
 
@@ -37,7 +27,7 @@
       {% if similarity is not None %}<span class="meta">{{ similarity }}% alike</span>{% endif %}
     </span>
     <span class="block">{{ clarification.summary }}</span>
-    {% if clarification.photo_report_id %}<img class="mt-2 max-h-24 rounded-md border border-base-300" src="{% url 'photo' pk clarification.photo_report_id %}" alt="Question paper">{% endif %}
+    {% if clarification.photo_report_id %}<img class="mt-2 max-h-24 rounded-md border border-base-300" src="{% url 'photo' pk clarification.photo_report_id %}" alt="Photo">{% endif %}
   </span>
 {% endpartialdef %}
 
@@ -71,11 +61,22 @@
       <h1 class="tabular-nums">{{ seat.venue }} {{ seat.seat }} · {{ seat.label }}</h1>
     </div>
   </div>
-  <label class="mb-5">What is the student asking?
+  <label>What is the student asking?
     <textarea name="text" maxlength="{{ config.text_max }}" rows="2" form="new-clarification" placeholder="In the student's words"
               hx-get="{% url 'invigilator:report' pk %}?venue={{ seat.venue|urlencode }}&amp;seat={{ seat.seat|urlencode }}&amp;label={{ seat.label|urlencode }}"
               hx-trigger="input changed delay:300ms" hx-target="#matches" hx-swap="outerHTML" hx-sync="this:replace">{{ text }}</textarea>
   </label>
+  <div class="mb-5 mt-2.5" data-photo-field{% if member.exam.has_ai_service %} data-transcribe="{% url 'invigilator:transcribe_photo' pk %}"{% endif %}>
+    <div class="mb-2.5 flex items-start gap-3" data-preview hidden>
+      <img class="max-h-32 rounded-lg border border-base-300" alt="Photo to send">
+      <button type="button" class="btn btn-danger btn-sm" data-clear aria-label="Remove photo"><c-icon name="x" />Remove</button>
+    </div>
+    <label class="btn btn-outline btn-block mb-0 flex-row">
+      <c-icon name="camera" />Take photo (optional)
+      <input type="file" name="photo" form="new-clarification" accept="image/*" capture="environment" data-photo hidden>
+    </label>
+    <p class="meta mt-1" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>
+  </div>
   {% endwith %}
   {% partialdef matches inline %}
   {% with pk=member.exam.pk %}

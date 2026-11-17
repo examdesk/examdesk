@@ -412,9 +412,9 @@ def test_reset_link_needs_a_known_role(examiner: Client, exam: Exam) -> None:
 
 
 def test_server_refuses_to_start_without_a_secret_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delitem(sys.modules, "examdesk.wsgi", raising=False)
+    monkeypatch.delitem(sys.modules, "examdesk.asgi", raising=False)
     monkeypatch.delenv("DJANGO_SECRET_KEY", raising=False)
     with pytest.raises(ImproperlyConfigured):
-        importlib.import_module("examdesk.wsgi")
+        importlib.import_module("examdesk.asgi")
     monkeypatch.setenv("DJANGO_SECRET_KEY", "x" * 50)
-    importlib.import_module("examdesk.wsgi")
+    importlib.import_module("examdesk.asgi")

@@ -318,6 +318,11 @@ def reopen_exam(exam: Exam) -> None:
     _set_live(exam, live=True)
 
 
+def set_ai_service(exam: Exam, *, base_url: str, model: str, api_key: str) -> None:
+    exam.ai_base_url, exam.ai_model, exam.ai_api_key = base_url, model, api_key
+    exam.save(update_fields=["ai_base_url", "ai_model", "ai_api_key"])
+
+
 def reset_link(exam: Exam, role: Role) -> None:
     """Replace the role's link. Members who joined with the old one stay."""
     field = Exam.token_field(role)

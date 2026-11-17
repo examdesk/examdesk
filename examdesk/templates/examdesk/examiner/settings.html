@@ -11,6 +11,21 @@
   <c-join-link-card :link="link" :exam="member.exam">{% if link.role == "examiner" %}<div class="flash error"><c-icon name="circle-alert" /><span>Full control of the exam. Don't share it with invigilators.</span></div>{% endif %}</c-join-link-card>
 {% endfor %}
 
+<section class="card-box">
+  <div class="card-header"><h2>AI service</h2></div>
+  <p class="mb-4 text-sm text-muted">Transcribes photos of students' questions. Any OpenAI-compatible API with a model that takes images.</p>
+  <form method="post" action="{% url 'examiner:ai_service' pk %}">
+    {% csrf_token %}
+    <div class="field">{{ ai_form.base_url.as_field_group }}</div>
+    <div class="field">{{ ai_form.model.as_field_group }}</div>
+    <div class="field">{{ ai_form.api_key.as_field_group }}</div>
+    <div class="flex flex-wrap gap-2">
+      <button class="btn btn-primary">Save</button>
+      {% if member.exam.has_ai_service %}<button name="remove" class="btn btn-danger" formnovalidate>Remove</button>{% endif %}
+    </div>
+  </form>
+</section>
+
 {% if member.exam.is_live %}
   <section class="danger-zone">
     <div class="flex flex-wrap items-center justify-between gap-4 p-5">

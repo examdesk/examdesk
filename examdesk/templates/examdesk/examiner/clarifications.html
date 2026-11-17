@@ -33,7 +33,7 @@
           <td class="font-medium whitespace-nowrap max-sm:hidden">{{ clarification.label }}</td>
           <td>
             <div class="flex items-center gap-3">
-              {% if clarification.photo_report_id %}<img class="size-10 shrink-0 rounded-md border border-base-300 object-cover" src="{% url 'photo' pk clarification.photo_report_id %}" alt="Question paper">{% endif %}
+              {% if clarification.photo_report_id %}<img class="size-10 shrink-0 rounded-md border border-base-300 object-cover" src="{% url 'photo' pk clarification.photo_report_id %}" alt="Photo">{% endif %}
               <div class="min-w-0">
                 <a href="{% url 'examiner:clarification' pk clarification.pk %}" class="row-target">{{ clarification.summary|truncatechars:90 }}</a>
                 <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted sm:hidden">

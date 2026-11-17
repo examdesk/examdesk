@@ -80,7 +80,7 @@ const handleButtons = (event) => {
   if (copy) {
     navigator.clipboard.writeText(copy.dataset.copy).then(() => (copy.lastChild.textContent = "Copied"));
   } else if (target.closest("[data-clear]")) {
-    const input = target.closest("form").querySelector("[data-photo]");
+    const input = target.closest("[data-photo-field]").querySelector("[data-photo]");
     input.value = "";
     input.dispatchEvent(new Event("change", { bubbles: true }));
   } else if (toggle) {
@@ -102,7 +102,7 @@ const followRow = (event) => {
 };
 // Downscale and re-encode photos before upload; this also strips EXIF location.
 const shrinkPhoto = async (input) => {
-  const preview = input.form.querySelector("[data-preview]");
+  const preview = input.closest("[data-photo-field]").querySelector("[data-preview]");
   preview.hidden = !input.files.length;
   if (!input.files.length) return;
   const submit = input.form.querySelector("button:not([type=button])");
@@ -127,6 +127,27 @@ const shrinkPhoto = async (input) => {
     submit.removeAttribute("aria-busy");
     submit.disabled = false;
     preview.querySelector("img").src = URL.createObjectURL(input.files[0]);
+  }
+};
+// Fill in the question from the photo, unless the invigilator has typed one.
+const transcribePhoto = async (input) => {
+  const field = input.closest("[data-photo-field]");
+  const question = input.form.elements.text;
+  const failed = field.querySelector("[data-transcribe-failed]");
+  failed.hidden = true;
+  if (!field.dataset.transcribe || !input.files.length || question.value.trim()) return;
+  const button = input.closest("label");
+  const body = new FormData();
+  body.append("photo", input.files[0]);
+  button.setAttribute("aria-busy", "true");
+  const headers = { "X-CSRFToken": input.form.elements.csrfmiddlewaretoken.value };
+  const response = await fetch(field.dataset.transcribe, { method: "POST", body, headers }).catch(() => null);
+  const text = response?.ok ? await response.text() : "";
+  button.removeAttribute("aria-busy");
+  failed.hidden = Boolean(text);
+  if (text && !question.value.trim()) {
+    question.value = text;
+    question.dispatchEvent(new Event("input", { bubbles: true }));
   }
 };
 // Tom Select for selects and datalist inputs. In a form[data-autosubmit], a multi-select
@@ -194,6 +215,6 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", submitOnCtrlEnter);
 document.addEventListener("change", (event) => {
   const field = event.target;
-  if (field.matches("[data-photo]")) shrinkPhoto(field);
+  if (field.matches("[data-photo]")) shrinkPhoto(field).then(() => transcribePhoto(field));
   else if (field.form?.hasAttribute("data-autosubmit") && field.name && !field.classList.contains("tomselected")) field.form.requestSubmit();
 });

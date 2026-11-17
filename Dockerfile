@@ -23,4 +23,4 @@ ENV HF_HUB_OFFLINE=1
 VOLUME /data
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate --no-input && python manage.py createcachetable && exec gunicorn examdesk.wsgi --bind 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-3} --access-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --no-input && python manage.py createcachetable && exec gunicorn examdesk.asgi --worker-class uvicorn_worker.UvicornWorker --bind 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-3} --access-logfile -"]
