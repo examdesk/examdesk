@@ -12,19 +12,66 @@
 {% endfor %}
 
 <section class="card-box">
-  <div class="card-header"><h2>AI service</h2></div>
-  <p class="mb-4 text-sm text-muted">Transcribes photos of students' questions. Any OpenAI-compatible API with a model that takes images.</p>
-  <form method="post" action="{% url 'examiner:ai_service' pk %}">
-    {% csrf_token %}
-    <div class="field">{{ ai_form.base_url.as_field_group }}</div>
-    <div class="field">{{ ai_form.model.as_field_group }}</div>
-    <div class="field">{{ ai_form.api_key.as_field_group }}</div>
-    <div class="flex flex-wrap gap-2">
-      <button class="btn btn-primary">Save</button>
-      {% if member.exam.has_ai_service %}<button name="remove" class="btn btn-danger" formnovalidate>Remove</button>{% endif %}
+  <div class="card-header"><h2>AI service</h2>{% if member.exam.ai_base_url %}<span class="badge green">Connected</span>{% endif %}</div>
+  {% if member.exam.ai_base_url %}
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <span class="min-w-0 truncate text-sm text-muted">{{ member.exam.ai_base_url }}</span>
+      <form method="post" action="{% url 'examiner:disconnect_ai_service' pk %}">
+        {% csrf_token %}
+        <button class="btn btn-outline btn-sm">Disconnect</button>
+      </form>
     </div>
+  {% else %}
+    <form method="post" action="{% url 'examiner:connect_ai_service' pk %}">
+      {% csrf_token %}
+      <div class="field">{{ connect_form.base_url.as_field_group }}</div>
+      <div class="field">{{ connect_form.api_key.as_field_group }}</div>
+      <button class="btn btn-primary">Connect</button>
+    </form>
+  {% endif %}
+</section>
+
+{% if member.exam.ai_base_url %}
+<section class="card-box">
+  <div class="card-header"><h2>Models</h2></div>
+  <form method="post" action="{% url 'examiner:choose_ai_models' pk %}">
+    {% csrf_token %}
+    <div class="field">{{ models_form.vision_model.as_field_group }}</div>
+    <div class="field">{{ models_form.text_model.as_field_group }}</div>
+    <button class="btn btn-primary">Save</button>
   </form>
 </section>
+{% endif %}
+
+{% if member.exam.has_ai_service %}
+<section class="card-box">
+  <div class="card-header"><h2>Files for the AI</h2></div>
+  {% if files %}
+    <ul class="mb-4 divide-y divide-base-300 border-y border-base-300">
+      {% for file in files %}{% with unread=file.unread %}
+        <li class="flex items-center gap-3 py-2"{% if unread %} data-read-pages="{% for page in unread %}{% url 'examiner:read_page' pk file.pk page.number %} {% endfor %}"{% endif %}>
+          <c-icon name="file-text" class="shrink-0" />
+          <a href="{% url 'examiner:file' pk file.pk %}" class="min-w-0 flex-1 truncate text-sm hover:underline">{{ file.name }}</a>
+          {% if unread %}
+            <span class="meta flex shrink-0 items-center gap-1.5" role="status" data-reading><span class="loading loading-spinner loading-xs"></span><span>Reading · {{ unread|length }} page{{ unread|length|pluralize }} left</span></span>
+            <button type="button" class="btn btn-outline btn-xs" data-retry hidden>Retry</button>
+          {% endif %}
+          <form method="post" action="{% url 'examiner:delete_file' pk file.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-ghost btn-danger btn-xs" aria-label="Delete {{ file.name }}">Delete</button>
+          </form>
+        </li>
+      {% endwith %}
+      {% endfor %}
+    </ul>
+  {% endif %}
+  <form method="post" action="{% url 'examiner:add_file' pk %}" enctype="multipart/form-data" data-autosubmit>
+    {% csrf_token %}
+    <label class="btn btn-outline"><c-icon name="upload" />Upload file<input type="file" name="file" accept=".pdf,.txt,.md" hidden></label>
+    {{ file_form.file.errors }}
+  </form>
+</section>
+{% endif %}
 
 {% if member.exam.is_live %}
   <section class="danger-zone">

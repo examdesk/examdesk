@@ -65,6 +65,17 @@
   small, .meta { @apply text-[13px] leading-5 text-subtle; }
   p { @apply text-pretty; }
   .prose-answer { @apply text-pretty whitespace-pre-wrap; }
+  /* Markdown read from a file's page */
+  .markdown { @apply flex flex-col gap-3 break-words; }
+  .markdown :is(h1, h2, h3, h4) { @apply text-sm font-semibold; }
+  .markdown :is(ul, ol) { @apply flex flex-col gap-1 pl-5; }
+  .markdown ul { @apply list-disc; }
+  .markdown ol { @apply list-decimal; }
+  .markdown table { @apply block overflow-x-auto text-xs; }
+  .markdown :is(th, td) { @apply border border-base-300 px-2 py-1 text-left normal-case; }
+  .markdown pre { @apply overflow-x-auto rounded-lg bg-base-200 p-3 text-xs; }
+  .markdown hr { @apply border-base-300; }
+  .markdown math[display="block"] { @apply my-1; }
   kbd { @apply rounded border border-base-300 bg-base-100 px-1 font-sans text-xs text-muted; }
   .num { @apply tabular-nums; }
 

@@ -9,18 +9,22 @@ Django, [htmx 4](https://four.htmx.org/), [daisyUI](https://daisyui.com/) via
 [django-cotton](https://django-cotton.com/), [Lucide](https://lucide.dev/) and
 [Tom Select](https://tom-select.js.org/). A sentence-embedding model on the server flags
 duplicate questions. An exam can add its own AI service to transcribe photos of students'
-questions.
+questions and draft answers from the exam paper. File pages render Markdown with
+[markdown-it-py](https://markdown-it-py.readthedocs.io/) and maths as MathML with
+[latex2mathml](https://github.com/roniemartinez/latex2mathml).
 
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `examdesk/models.py` | Exam, Clarification, Answer, Report, Delivery, SeatClaim, Announcement, Readout, Member |
+| `examdesk/models.py` | Exam, ExamFile, FilePage, Clarification, Answer, Report, Delivery, SeatClaim, Announcement, Readout, Member |
 | `examdesk/services.py` | One function per action |
 | `examdesk/labels.py` | Normalizing question labels, venues and names; natural sort |
 | `examdesk/similarity.py` | Sentence-embedding similarity |
 | `examdesk/matching.py` | Finding clarifications that ask the same thing |
-| `examdesk/transcription.py` | Transcribing a photographed question with the exam's AI service |
+| `examdesk/ai.py` | Transcribing photos and drafting answers with the exam's AI service |
+| `examdesk/pdf.py` | Counting and rendering PDF pages with PDFium |
+| `examdesk/templatetags/` | Template filters, including Markdown with MathML maths |
 | `examdesk/fields.py` | Encrypted text field, for AI service keys |
 | `examdesk/forms.py` | Input parsing |
 | `examdesk/accounts.py` | Sign-up rules for django-allauth's emailed-code sign-in |
@@ -70,7 +74,7 @@ The Playwright test needs a browser: `uv run playwright install chromium`.
 | `DJANGO_DEFAULT_FROM_EMAIL` | `Exam Desk <examdesk@localhost>` | Sender of sign-in codes |
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated host names |
 | `DATABASE_URL` | `sqlite:///db.sqlite3` | e.g. `postgres://user:password@host/examdesk` |
-| `EXAMDESK_MEDIA_ROOT` | `media/` | Photos, under `exams/<exam id>/` |
+| `EXAMDESK_MEDIA_ROOT` | `media/` | Photos and PDFs, under `exams/<exam id>/` |
 | `EXAMDESK_STATIC_ROOT` | `static/` | Target of `collectstatic` |
 | `HF_HOME` | `~/.cache/huggingface` | Where `download_model` puts the model |
 | `EXAMDESK_POLL_EVERY` | `2` | Seconds between polls of a page's live part |
@@ -87,11 +91,12 @@ The Playwright test needs a browser: `uv run playwright install chromium`.
 | `EXAMDESK_MODEL_REVISION` | pinned commit | Model revision |
 | `EXAMDESK_MODEL_FILES` | `onnx/model_quantized.onnx,tokenizer.json` | ONNX model and tokenizer files |
 | `EXAMDESK_MODEL_MAX_TOKENS` | `256` | Model input limit, in tokens |
-| `EXAMDESK_AI_TIMEOUT` | `60` | Seconds to wait for an exam's AI service to transcribe a photo |
+| `EXAMDESK_AI_TIMEOUT` | `60` | Seconds to wait for an exam's AI service |
 | `EXAMDESK_PHOTO_MAX_SIDE` | `1600` | Longest photo side after phone resizing, in pixels |
 | `EXAMDESK_PHOTO_MAX_BYTES` | `200000` | Target photo size after phone re-encoding |
 | `EXAMDESK_PHOTO_UPLOAD_MAX_BYTES` | `10000000` | Largest photo the server accepts |
-| `EXAMDESK_PHOTO_CACHE_FOR` | `86400` | Seconds browsers cache a photo |
+| `EXAMDESK_FILE_UPLOAD_MAX_BYTES` | `10000000` | Largest file examiners can upload for the AI |
+| `EXAMDESK_PHOTO_CACHE_FOR` | `86400` | Seconds browsers cache a photo or PDF page |
 | `EXAMDESK_REGISTRATION` | on | `0` stops people signing up; only accounts added in the admin can sign in |
 | `EXAMDESK_REGISTRATION_DOMAINS` | empty | Comma-separated email domains that may sign up; empty allows any |
 | `EXAMDESK_PROXY_COUNT` | `1`, or `0` with `DJANGO_DEBUG` | Proxies in front that append to `X-Forwarded-For`; sign-in rate limits go by the client address before them |
@@ -103,13 +108,26 @@ With `DJANGO_DEBUG` off, cookies are secure-only and `X-Forwarded-Proto` is trus
 
 ## AI service
 
-Exam Desk has no AI service of its own. Examiners can add one in an exam's settings: any
-OpenAI-compatible API over HTTPS with a model that takes images. Photos taken while reporting
-are then sent to it, and its transcription fills in the question for the invigilator to correct.
-A model without reasoning answers in about 2 seconds; a reasoning model can take 20.
+Exam Desk has no AI service of its own. Examiners connect one in an exam's settings: any
+OpenAI-compatible API over HTTPS. Connecting lists the service's models; Disconnect forgets the
+address, key and models.
 
-API keys are encrypted with `DJANGO_SECRET_KEY`. After changing it, examiners enter their keys
-again.
+Examiners then pick two models. The vision model transcribes photos taken while reporting and
+reads PDF pages; a transcription fills in the question for the invigilator to correct. The text
+model drafts answers. A model without reasoning answers in about 2 seconds; a reasoning model can
+take 20.
+
+Examiners can also upload the paper and its errata as PDF or text files. The vision model reads
+each PDF page as an image, which keeps formulas and scanned pages. Pages are read four at a time
+while the exam's settings are open; any left unread are read the next time they open. Opening a
+file shows each page beside its text.
+
+Draft with AI sends the files' text and the student's question to the text model. Its reply
+replaces the answer for the examiner to check and send. The AI is told to quote the paper or reply
+with a canned answer, and never to use answers in the files.
+
+API keys are encrypted with `DJANGO_SECRET_KEY`. After changing it, examiners disconnect and
+connect again.
 
 ## Deployment
 
@@ -118,7 +136,7 @@ again.
 Each push to `main` publishes `ghcr.io/examdesk/examdesk:latest` (and `:<version>` for `v*`
 tags) for amd64 and arm64. The image has the stylesheet, static files and model built in,
 serves static files itself, runs migrations on start and listens on port 8000. It includes
-the PostgreSQL driver; keep `/data` on a volume for photos.
+the PostgreSQL driver; keep `/data` on a volume for photos and PDFs.
 
 On [Dokploy](https://dokploy.com/):
 
@@ -152,7 +170,7 @@ uv run manage.py collectstatic --no-input
 uv run gunicorn examdesk.asgi --worker-class uvicorn_worker.UvicornWorker --bind 127.0.0.1:8000 --workers 3
 ```
 
-Photos go through the app, so don't expose the media folder:
+Photos and PDFs go through the app, so don't expose the media folder:
 
 ```caddy
 examdesk.example.com {

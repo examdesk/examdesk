@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any
 
 from django import forms
@@ -7,6 +8,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import UploadedFile
 from django.http import HttpRequest
 
+from . import pdf
 from .labels import normalize_label, normalize_name, normalize_place
 from .models import Clarification, Exam
 
@@ -116,25 +118,15 @@ class ReportForm(ReportStartForm, PhotoForm):
     photo = forms.ImageField(required=False)
 
 
-class AIServiceForm(BaseForm):
+class AIConnectForm(BaseForm):
     base_url = forms.URLField(
         label="API base URL",
         assume_scheme="https",
         widget=forms.URLInput(attrs={"placeholder": "https://…/v1"}),
     )
-    model = forms.CharField(max_length=200, label="Model")
     api_key = forms.CharField(
-        label="API key",
-        required=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "off"}),
+        label="API key", widget=forms.PasswordInput(attrs={"autocomplete": "off"})
     )
-
-    def __init__(self, *args: Any, exam: Exam, **kwargs: Any) -> None:
-        initial = {"base_url": exam.ai_base_url, "model": exam.ai_model}
-        super().__init__(*args, initial=initial, **kwargs)
-        self.exam = exam
-        if exam.ai_api_key:
-            self.fields["api_key"].widget.attrs["placeholder"] = "Saved; leave blank to keep"
 
     def clean_base_url(self) -> str:
         url: str = self.cleaned_data["base_url"]
@@ -142,14 +134,44 @@ class AIServiceForm(BaseForm):
             raise forms.ValidationError("Use an https:// address.")
         return url
 
-    def clean(self) -> dict[str, Any]:
-        """A blank key keeps the saved one, for the same address only."""
-        data = super().clean() or {}
-        if not data.get("api_key") and data.get("base_url") == self.exam.ai_base_url:
-            data["api_key"] = self.exam.ai_api_key
-        if not data.get("api_key"):
-            self.add_error("api_key", "Enter the API key.")
-        return data
+
+class AIModelsForm(BaseForm):
+    vision_model = forms.ChoiceField(label="Vision")
+    text_model = forms.ChoiceField(label="Text")
+
+    def __init__(self, *args: Any, exam: Exam, **kwargs: Any) -> None:
+        initial = {"vision_model": exam.ai_vision_model, "text_model": exam.ai_text_model}
+        super().__init__(*args, initial=initial, **kwargs)
+        choices = [("", "Pick a model…"), *((model, model) for model in exam.ai_models)]
+        for name in ("vision_model", "text_model"):
+            self.fields[name].choices = choices  # type: ignore[attr-defined]
+
+
+class ExamFileForm(BaseForm):
+    file = forms.FileField()
+
+    def clean_file(self) -> UploadedFile[bytes]:
+        upload: UploadedFile[bytes] = self.cleaned_data["file"]
+        if (upload.size or 0) > settings.EXAMDESK_FILE_UPLOAD_MAX_BYTES:
+            raise forms.ValidationError("That file is too large.")
+        data = upload.read()
+        upload.seek(0)
+        match Path(upload.name or "").suffix.lower():
+            case ".pdf":
+                try:
+                    pdf.page_count(data)
+                except pdf.PdfError as error:
+                    raise forms.ValidationError("Couldn't read that PDF.") from error
+            case ".txt" | ".md":
+                try:
+                    text = data.decode()
+                except UnicodeDecodeError as error:
+                    raise forms.ValidationError("Save the file as UTF-8 text.") from error
+                if not text.strip():
+                    raise forms.ValidationError("That file has no text.")
+            case _:
+                raise forms.ValidationError("Upload a PDF or a text file.")
+        return upload
 
 
 class ClarificationFilterForm(BaseForm):

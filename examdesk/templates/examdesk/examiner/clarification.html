@@ -71,11 +71,13 @@
       {% csrf_token %}
       <input type="hidden" name="expected_answer" value="{{ form.expected_answer.value|default_if_none:'' }}">
       <div class="mb-2 flex flex-wrap gap-1.5">
+        {% if member.exam.has_ai_service %}<button type="button" class="btn btn-outline btn-xs" data-draft="{% url 'examiner:draft_answer' pk clarification.pk %}"><c-icon name="sparkles" />Draft with AI</button>{% endif %}
         {% for text in canned %}
           <button type="button" class="btn btn-outline btn-xs font-normal" onclick="this.form.text.value = this.textContent">{{ text }}</button>
         {% endfor %}
       </div>
       <textarea name="text" maxlength="{{ config.text_max }}" id="answer-text" rows="4" required aria-label="Answer" aria-describedby="send-hint"{% if not clarification.current_answer or correcting %} autofocus{% endif %}>{{ form.text.value|default:"" }}</textarea>
+      {% if member.exam.has_ai_service %}<p class="meta mt-1" role="status" data-draft-failed hidden>Couldn't draft an answer.</p>{% endif %}
       <div class="card-footer justify-between">
         <small id="send-hint" class="max-sm:hidden"><kbd>Ctrl</kbd> <kbd>Enter</kbd> or <kbd>⌘</kbd> <kbd>Enter</kbd> sends</small>
         <div class="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">

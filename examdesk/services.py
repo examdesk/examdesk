@@ -10,12 +10,15 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
+from . import pdf
 from .models import (
     Announcement,
     Answer,
     Clarification,
     Delivery,
     Exam,
+    ExamFile,
+    FilePage,
     Member,
     Readout,
     Report,
@@ -318,9 +321,44 @@ def reopen_exam(exam: Exam) -> None:
     _set_live(exam, live=True)
 
 
-def set_ai_service(exam: Exam, *, base_url: str, model: str, api_key: str) -> None:
-    exam.ai_base_url, exam.ai_model, exam.ai_api_key = base_url, model, api_key
-    exam.save(update_fields=["ai_base_url", "ai_model", "ai_api_key"])
+def connect_ai_service(exam: Exam, *, base_url: str, api_key: str, models: list[str]) -> None:
+    exam.ai_base_url, exam.ai_api_key, exam.ai_models = base_url, api_key, models
+    exam.ai_vision_model = exam.ai_text_model = ""
+    fields = ["ai_base_url", "ai_api_key", "ai_models", "ai_vision_model", "ai_text_model"]
+    exam.save(update_fields=fields)
+
+
+def disconnect_ai_service(exam: Exam) -> None:
+    connect_ai_service(exam, base_url="", api_key="", models=[])
+
+
+def choose_ai_models(exam: Exam, *, vision_model: str, text_model: str) -> None:
+    exam.ai_vision_model, exam.ai_text_model = vision_model, text_model
+    exam.save(update_fields=["ai_vision_model", "ai_text_model"])
+
+
+@transaction.atomic
+def add_file(exam: Exam, upload: UploadedFile[bytes]) -> ExamFile:
+    name = upload.name or ""
+    data = upload.read()
+    upload.seek(0)
+    if name.lower().endswith(".pdf"):
+        file = exam.files.create(name=name, pdf=upload)
+        pages = [FilePage(file=file, number=n) for n in range(1, pdf.page_count(data) + 1)]
+    else:
+        file = exam.files.create(name=name)
+        pages = [FilePage(file=file, number=1, text=data.decode(), is_read=True)]
+    FilePage.objects.bulk_create(pages)
+    return file
+
+
+@transaction.atomic
+def delete_file(file: ExamFile) -> None:
+    """Delete a file, and its PDF after commit."""
+    pdf_name = file.pdf.name
+    file.delete()
+    if pdf_name:
+        transaction.on_commit(partial(file.pdf.storage.delete, pdf_name))
 
 
 def reset_link(exam: Exam, role: Role) -> None:

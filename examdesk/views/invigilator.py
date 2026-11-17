@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
-from .. import services, session, transcription
+from .. import ai, services, session
 from ..access import HtmxRequest, admit, exam_view
 from ..forms import PhotoForm, ReportForm, ReportStartForm, VenueForm, form_errors
 from ..labels import natural, top_level
@@ -238,7 +238,7 @@ async def transcribe_photo(request: HtmxRequest, exam_id: int) -> HttpResponseBa
         return HttpResponse(form_errors(form), status=400)
     photo = form.cleaned_data["photo"]
     try:
-        text = await transcription.transcribe(member.exam, photo.read(), photo.content_type)
+        text = await ai.transcribe(member.exam, photo.read(), photo.content_type)
     except openai.APIError as error:
         logger.warning("Couldn't transcribe a photo: %s", error)
         return HttpResponse(status=502)

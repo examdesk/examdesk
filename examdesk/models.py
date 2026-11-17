@@ -28,8 +28,10 @@ class Exam(models.Model):
     invigilator_token = models.CharField(max_length=64, unique=True, default=new_token)
     is_live = models.BooleanField(default=True)
     ai_base_url = models.URLField("API base URL", blank=True)
-    ai_model = models.CharField("model", max_length=200, blank=True)
+    ai_vision_model = models.CharField("vision model", max_length=200, blank=True)
+    ai_text_model = models.CharField("text model", max_length=200, blank=True)
     ai_api_key = EncryptedTextField("API key", blank=True)
+    ai_models = models.JSONField("models", default=list, blank=True)
     version = models.PositiveBigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -38,7 +40,7 @@ class Exam(models.Model):
 
     @property
     def has_ai_service(self) -> bool:
-        return bool(self.ai_base_url and self.ai_model)
+        return bool(self.ai_vision_model and self.ai_text_model)
 
     @staticmethod
     def token_field(role: Role) -> str:
@@ -47,6 +49,53 @@ class Exam(models.Model):
     def token(self, role: Role) -> str:
         token: str = getattr(self, self.token_field(role))
         return token
+
+
+def file_path(file: ExamFile, filename: str) -> str:
+    return f"exams/{file.exam_id}/files/{filename}"
+
+
+class ExamFile(models.Model):
+    """A file the AI drafts answers from."""
+
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="files")
+    name = models.CharField(max_length=255)
+    pdf = models.FileField(upload_to=file_path, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def text(self) -> str:
+        """The pages read so far. Requires the pages prefetched."""
+        return "\n\n".join(page.text for page in self.pages.all() if page.is_read)
+
+    @property
+    def unread(self) -> list[FilePage]:
+        """Requires the pages prefetched."""
+        return [page for page in self.pages.all() if not page.is_read]
+
+
+class FilePage(models.Model):
+    """Text files have one page, read on upload."""
+
+    file = models.ForeignKey(ExamFile, on_delete=models.CASCADE, related_name="pages")
+    number = models.PositiveIntegerField()
+    text = models.TextField(blank=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["file", "number"], name="one_page_per_number")
+        ]
+        ordering = ["number"]
+
+    def __str__(self) -> str:
+        return f"{self.file} page {self.number}"
 
 
 class ClarificationQuerySet(models.QuerySet["Clarification"]):

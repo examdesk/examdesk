@@ -4,7 +4,14 @@ import pytest
 from django.utils import timezone
 
 from examdesk.models import Clarification, Report
-from examdesk.templatetags.examdesk_tags import icon, seat_url, state_icon, wait, wait_level
+from examdesk.templatetags.examdesk_tags import (
+    icon,
+    markdown,
+    seat_url,
+    state_icon,
+    wait,
+    wait_level,
+)
 
 
 def test_wait_in_minutes_and_its_level() -> None:
@@ -32,3 +39,15 @@ def test_seat_url_leaves_out_empty_params() -> None:
 def test_icon_is_decorative_unless_titled() -> None:
     assert 'class="icon size-4" aria-hidden="true">' in icon("clock", css="size-4")
     assert 'role="img"><title>Asked &lt;at&gt;</title>' in icon("clock", "Asked <at>")
+
+
+def test_markdown_renders_maths_as_mathml_and_escapes_html() -> None:
+    html = markdown("## 1B\n\nThe state is $(r, k)$.\n\n$$\nx_1\n$$\n\n<script>x</script>")
+    assert "<h2>1B</h2>" in html
+    assert '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline">' in html
+    assert 'display="block"' in html
+    assert "&lt;script&gt;" in html
+
+
+def test_markdown_shows_unparsable_latex_as_code() -> None:
+    assert "<code>x_1_2</code>" in markdown("$x_1_2$")

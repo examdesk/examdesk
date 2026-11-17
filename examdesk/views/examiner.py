@@ -1,35 +1,51 @@
 """The examiner's screens (laptop)."""
 
+import logging
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+import openai
 import segno
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
+from django.db import connections
 from django.db.models import Prefetch
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET, require_POST
 
-from .. import services, session
-from ..access import HtmxRequest, exam_view
+from .. import ai, pdf, services, session
+from ..access import HtmxRequest, admit, exam_view
 from ..forms import (
-    AIServiceForm,
+    AIConnectForm,
+    AIModelsForm,
     AnswerForm,
     ClarificationFilterForm,
     DeleteExamForm,
+    ExamFileForm,
     LabelForm,
     TextForm,
     form_errors,
 )
 from ..labels import covers, natural, top_level
 from ..matching import rank_similar, same_question, similar_enough
-from ..models import Announcement, Clarification, Exam, Member, Readout, Report, Role
+from ..models import (
+    Announcement,
+    Clarification,
+    Exam,
+    ExamFile,
+    FilePage,
+    Member,
+    Readout,
+    Report,
+    Role,
+)
 from ..seats import seat_from
 from .common import (
     flash_errors,
@@ -39,6 +55,8 @@ from .common import (
     suggestions,
 )
 from .live import nav_badge, polled, render_live
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -219,6 +237,35 @@ def answer_clarification(
         except services.ServiceError as error:
             messages.error(request, str(error))
     return clarification_page(request, member, clarification_id, form)
+
+
+def to_draft(member: Member, clarification_id: int) -> tuple[Clarification, list[ExamFile]]:
+    if not member.exam.has_ai_service:
+        raise Http404
+    clarifications = member.exam.clarifications.prefetch_related("reports")
+    files = member.exam.files.prefetch_related("pages")
+    return get_object_or_404(clarifications, pk=clarification_id), list(files)
+
+
+@require_POST
+async def draft_answer(
+    request: HtmxRequest, exam_id: int, clarification_id: int
+) -> HttpResponseBase:
+    """A drafted answer, as plain text.
+
+    Async, and without a database connection while it waits on the AI service.
+    """
+    member = await sync_to_async(admit)(request, exam_id, examiner_only=True, live_only=True)
+    if not isinstance(member, Member):
+        return member
+    clarification, files = await sync_to_async(to_draft)(member, clarification_id)
+    await sync_to_async(connections.close_all)()
+    try:
+        text = await ai.draft_answer(member.exam, clarification, files)
+    except openai.APIError as error:
+        logger.warning("Couldn't draft an answer: %s", error)
+        return HttpResponse(status=502)
+    return HttpResponse(text, content_type="text/plain")
 
 
 @require_POST
@@ -457,36 +504,141 @@ def settings_page(
     request: HtmxRequest,
     member: Member,
     delete_form: DeleteExamForm | None = None,
-    ai_form: AIServiceForm | None = None,
+    connect_form: AIConnectForm | None = None,
+    models_form: AIModelsForm | None = None,
+    file_form: ExamFileForm | None = None,
 ) -> HttpResponse:
     """A bound `delete_form` reopens the delete dialog with its errors."""
+    exam = member.exam
     links = []
     for role in Role:
-        url = request.build_absolute_uri(reverse("join", args=[member.exam.token(role)]))
+        url = request.build_absolute_uri(reverse("join", args=[exam.token(role)]))
         qr = mark_safe(segno.make(url, error="m").svg_inline(scale=5, omitsize=True))
         links.append({"role": role, "url": url, "qr": qr})
-    delete_form = delete_form or DeleteExamForm(exam_name=member.exam.name)
-    ai_form = ai_form or AIServiceForm(exam=member.exam)
-    context = {"member": member, "links": links, "delete_form": delete_form, "ai_form": ai_form}
+    delete_form = delete_form or DeleteExamForm(exam_name=exam.name)
+    connect_form = connect_form or AIConnectForm()
+    models_form = models_form or AIModelsForm(exam=exam)
+    file_form = file_form or ExamFileForm()
+    context = {
+        "member": member,
+        "links": links,
+        "delete_form": delete_form,
+        "connect_form": connect_form,
+        "models_form": models_form,
+        "file_form": file_form,
+        "files": exam.files.prefetch_related("pages"),
+    }
     template = "examdesk/examiner/settings.html"
-    status = 400 if delete_form.errors or ai_form.errors else 200
+    forms = (delete_form, connect_form, models_form, file_form)
+    status = 400 if any(form.errors for form in forms) else 200
     return render(request, template, context, status=status)
 
 
 @require_POST
 @exam_view(examiner_only=True)
-def ai_service(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Save the exam's AI service, or remove it with `remove`."""
-    if "remove" in request.POST:
-        services.set_ai_service(member.exam, base_url="", model="", api_key="")
-        messages.success(request, "Removed the AI service.")
-    else:
-        form = AIServiceForm(request.POST, exam=member.exam)
-        if not form.is_valid():
-            return settings_page(request, member, ai_form=form)
-        services.set_ai_service(member.exam, **form.cleaned_data)
-        messages.success(request, "Saved the AI service.")
+def connect_ai_service(request: HtmxRequest, member: Member) -> HttpResponse:
+    form = AIConnectForm(request.POST)
+    if form.is_valid():
+        try:
+            models = ai.list_models(**form.cleaned_data)
+        except openai.AuthenticationError:
+            form.add_error("api_key", "The service refused that key.")
+        except openai.APIError:
+            form.add_error("base_url", "No API answered at that address.")
+        else:
+            services.connect_ai_service(member.exam, **form.cleaned_data, models=models)
+            return redirect("examiner:settings", member.exam.pk)
+    return settings_page(request, member, connect_form=form)
+
+
+@require_POST
+@exam_view(examiner_only=True)
+def disconnect_ai_service(request: HtmxRequest, member: Member) -> HttpResponse:
+    services.disconnect_ai_service(member.exam)
     return redirect("examiner:settings", member.exam.pk)
+
+
+@require_POST
+@exam_view(examiner_only=True)
+def choose_ai_models(request: HtmxRequest, member: Member) -> HttpResponse:
+    form = AIModelsForm(request.POST, exam=member.exam)
+    if not form.is_valid():
+        return settings_page(request, member, models_form=form)
+    services.choose_ai_models(member.exam, **form.cleaned_data)
+    messages.success(request, "Saved the models.")
+    return redirect("examiner:settings", member.exam.pk)
+
+
+@require_POST
+@exam_view(examiner_only=True)
+def add_file(request: HtmxRequest, member: Member) -> HttpResponse:
+    form = ExamFileForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return settings_page(request, member, file_form=form)
+    file = services.add_file(member.exam, form.cleaned_data["file"])
+    messages.success(request, f"Added {file.name}.")
+    return redirect("examiner:settings", member.exam.pk)
+
+
+@require_POST
+@exam_view(examiner_only=True)
+def delete_file(request: HtmxRequest, member: Member, file_id: int) -> HttpResponse:
+    file = get_object_or_404(member.exam.files, pk=file_id)
+    services.delete_file(file)
+    messages.success(request, f"Deleted {file.name}.")
+    return redirect("examiner:settings", member.exam.pk)
+
+
+@require_GET
+@exam_view(examiner_only=True)
+def exam_file(request: HtmxRequest, member: Member, file_id: int) -> HttpResponse:
+    """Each page with the text the AI read from it."""
+    file = get_object_or_404(member.exam.files.prefetch_related("pages"), pk=file_id)
+    return render(request, "examdesk/examiner/file.html", {"member": member, "file": file})
+
+
+def pdf_page(member: Member, file_id: int, number: int) -> tuple[FilePage, bytes]:
+    """The page and its file's PDF."""
+    pages = FilePage.objects.filter(file__exam=member.exam).exclude(file__pdf="")
+    page = get_object_or_404(pages.select_related("file"), file_id=file_id, number=number)
+    with page.file.pdf.open("rb") as document:
+        return page, document.read()
+
+
+@require_GET
+@exam_view(examiner_only=True)
+def page_image(request: HtmxRequest, member: Member, file_id: int, number: int) -> HttpResponse:
+    """A PDF page as the AI sees it."""
+    _, document = pdf_page(member, file_id, number)
+    response = HttpResponse(pdf.render_page(document, number), content_type="image/png")
+    max_age = int(settings.EXAMDESK_PHOTO_CACHE_FOR.total_seconds())
+    response["Cache-Control"] = f"private, max-age={max_age}"
+    return response
+
+
+def page_to_read(member: Member, file_id: int, number: int) -> tuple[FilePage, bytes]:
+    if not member.exam.has_ai_service:
+        raise Http404
+    return pdf_page(member, file_id, number)
+
+
+@require_POST
+async def read_page(
+    request: HtmxRequest, exam_id: int, file_id: int, number: int
+) -> HttpResponseBase:
+    """Async, and without a database connection while it waits on the AI service."""
+    member = await sync_to_async(admit)(request, exam_id, examiner_only=True)
+    if not isinstance(member, Member):
+        return member
+    page, document = await sync_to_async(page_to_read)(member, file_id, number)
+    await sync_to_async(connections.close_all)()
+    try:
+        text = await ai.read_page(member.exam, document, number)
+    except openai.APIError as error:
+        logger.warning("Couldn't read a PDF page: %s", error)
+        return HttpResponse(status=502)
+    await FilePage.objects.filter(pk=page.pk).aupdate(text=text, is_read=True)
+    return HttpResponse(status=204)
 
 
 @require_POST

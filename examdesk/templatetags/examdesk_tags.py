@@ -1,20 +1,40 @@
 from collections.abc import Iterable
 from datetime import datetime
+from typing import Any
 
 from django import template
 from django.conf import settings
 from django.contrib.messages.storage.base import Message
 from django.forms import BoundField, Form
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import escape, format_html
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.text import Truncator
+from latex2mathml.converter import convert as latex_to_mathml
 from lucide.templatetags.lucide import lucide
+from markdown_it import MarkdownIt
+from mdit_py_plugins.dollarmath import dollarmath_plugin
 
 from .. import forms, seats
 from ..models import Clarification
 
 register = template.Library()
+
+
+def _mathml(latex: str, options: dict[str, Any]) -> str:
+    """MathML, or the LaTeX as code if it doesn't parse."""
+    try:
+        return latex_to_mathml(latex, display="block" if options["display_mode"] else "inline")
+    except Exception:  # latex2mathml's errors share no base class
+        return f"<code>{escape(latex)}</code>"
+
+
+# Raw HTML is escaped: the text comes from the AI.
+MARKDOWN = (
+    MarkdownIt("commonmark", {"html": False})
+    .enable("table")
+    .use(dollarmath_plugin, renderer=_mathml)
+)
 
 STATE_ICONS = {
     # Clarification.State and Report.State
@@ -103,3 +123,10 @@ def titled(clarification: Clarification, length: int = 60) -> str:
 def with_placeholder(field: BoundField, placeholder: str) -> SafeString:
     """For forms from libraries, such as allauth, whose placeholders we don't set."""
     return field.as_widget(attrs={"placeholder": placeholder})
+
+
+@register.filter
+def markdown(text: str) -> SafeString:
+    """Markdown with $LaTeX$ maths."""
+    html: str = MARKDOWN.render(text)
+    return mark_safe(html)

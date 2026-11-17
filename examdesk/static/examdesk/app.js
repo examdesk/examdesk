@@ -72,12 +72,19 @@ document.addEventListener("command", (event) => {
   });
 }, true);
 document.querySelectorAll("dialog[data-autoopen]").forEach((dialog) => dialog.showModal());
-// data-copy, data-clear (the photo) and data-show/data-hide buttons.
+// data-draft, data-retry, data-copy, data-clear (the photo) and data-show/data-hide buttons.
 const handleButtons = (event) => {
   const target = event.target;
   const copy = target.closest("[data-copy]");
   const toggle = target.closest("[data-show], [data-hide]");
-  if (copy) {
+  const draft = target.closest("[data-draft]");
+  const retry = target.closest("[data-retry]");
+  if (draft) {
+    draftAnswer(draft);
+  } else if (retry) {
+    retry.hidden = true;
+    readPages(retry.closest("[data-read-pages]"));
+  } else if (copy) {
     navigator.clipboard.writeText(copy.dataset.copy).then(() => (copy.lastChild.textContent = "Copied"));
   } else if (target.closest("[data-clear]")) {
     const input = target.closest("[data-photo-field]").querySelector("[data-photo]");
@@ -129,6 +136,12 @@ const shrinkPhoto = async (input) => {
     preview.querySelector("img").src = URL.createObjectURL(input.files[0]);
   }
 };
+// POST to one of the AI service views: its text, or null if it failed.
+const askAI = async (url, form, body) => {
+  const headers = { "X-CSRFToken": form.elements.csrfmiddlewaretoken.value };
+  const response = await fetch(url, { method: "POST", body, headers }).catch(() => null);
+  return response?.ok ? await response.text() : null;
+};
 // Fill in the question from the photo, unless the invigilator has typed one.
 const transcribePhoto = async (input) => {
   const field = input.closest("[data-photo-field]");
@@ -142,15 +155,48 @@ const transcribePhoto = async (input) => {
   const placeholder = question.placeholder;
   button.setAttribute("aria-busy", "true");
   question.placeholder = "Reading the photo…";
-  const headers = { "X-CSRFToken": input.form.elements.csrfmiddlewaretoken.value };
-  const response = await fetch(field.dataset.transcribe, { method: "POST", body, headers }).catch(() => null);
-  const text = response?.ok ? await response.text() : "";
+  const text = await askAI(field.dataset.transcribe, input.form, body);
   button.removeAttribute("aria-busy");
   question.placeholder = placeholder;
   failed.hidden = Boolean(text);
   if (text && !question.value.trim()) {
     question.value = text;
     question.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+};
+// Read a PDF's unread pages four at a time, then reload.
+const readPages = async (row) => {
+  const urls = row.dataset.readPages.trim().split(/\s+/);
+  const status = row.querySelector("[data-reading]");
+  const failed = [];
+  let left = urls.length;
+  const readNext = async () => {
+    for (let url; (url = urls.shift()); ) {
+      if ((await askAI(url, row.querySelector("form"))) === null) failed.push(url);
+      else status.lastChild.textContent = `Reading · ${--left} page${left === 1 ? "" : "s"} left`;
+    }
+  };
+  await Promise.all(Array.from({ length: 4 }, readNext));
+  if (!failed.length) return location.reload();
+  row.dataset.readPages = failed.join(" ");
+  status.lastChild.textContent = `Couldn't read ${failed.length} page${failed.length === 1 ? "" : "s"}.`;
+  row.querySelector("[data-retry]").hidden = false;
+};
+document.querySelectorAll("[data-read-pages]").forEach(readPages);
+// Replace the answer with the AI's draft.
+const draftAnswer = async (button) => {
+  const answer = button.form.elements.text;
+  const failed = button.form.querySelector("[data-draft-failed]");
+  failed.hidden = true;
+  button.setAttribute("aria-busy", "true");
+  button.disabled = true;
+  const text = await askAI(button.dataset.draft, button.form);
+  button.removeAttribute("aria-busy");
+  button.disabled = false;
+  failed.hidden = Boolean(text);
+  if (text) {
+    answer.value = text;
+    answer.focus();
   }
 };
 // Tom Select for selects and datalist inputs. In a form[data-autosubmit], a multi-select
@@ -219,5 +265,8 @@ document.addEventListener("keydown", submitOnCtrlEnter);
 document.addEventListener("change", (event) => {
   const field = event.target;
   if (field.matches("[data-photo]")) shrinkPhoto(field).then(() => transcribePhoto(field));
-  else if (field.form?.hasAttribute("data-autosubmit") && field.name && !field.classList.contains("tomselected")) field.form.requestSubmit();
+  else if (field.form?.hasAttribute("data-autosubmit") && field.name && !field.classList.contains("tomselected")) {
+    field.closest(".btn")?.setAttribute("aria-busy", "true");
+    field.form.requestSubmit();
+  }
 });
