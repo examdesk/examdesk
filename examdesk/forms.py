@@ -59,7 +59,7 @@ class ExamForm(BaseForm):
 
 class NameForm(BaseForm):
     name = forms.CharField(
-        max_length=100, widget=forms.TextInput(attrs={"autofocus": True, "autocomplete": "name"})
+        max_length=100, widget=forms.TextInput(attrs={"autofocus": True, "autocomplete": "off"})
     )
 
     def clean_name(self) -> str:
