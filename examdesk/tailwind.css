@@ -331,6 +331,7 @@
   .modal-backdrop { @apply bg-gray-900/40; }
   .dock {
     @apply border-t border-base-300 bg-base-100/95 backdrop-blur;
+    padding-inline: max(0.5rem, (100% - var(--container-2xl)) / 2 + 1rem);
     > * { @apply relative text-subtle; }
     > [aria-current=page] { @apply text-primary; }
     > [aria-current=page]::after { display: none; }
