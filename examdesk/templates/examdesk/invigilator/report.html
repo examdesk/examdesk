@@ -61,21 +61,28 @@
       <h1 class="tabular-nums">{{ seat.venue }} {{ seat.seat }} · {{ seat.label }}</h1>
     </div>
   </div>
-  <label>What is the student asking?
-    <textarea name="text" maxlength="{{ config.text_max }}" rows="2" form="new-clarification" placeholder="In the student's words"
-              hx-get="{% url 'invigilator:report' pk %}?venue={{ seat.venue|urlencode }}&amp;seat={{ seat.seat|urlencode }}&amp;label={{ seat.label|urlencode }}"
-              hx-trigger="input changed delay:300ms" hx-target="#matches" hx-swap="outerHTML" hx-sync="this:replace">{{ text }}</textarea>
-  </label>
-  <div class="mb-5 mt-2.5" data-photo-field{% if member.exam.has_ai_service %} data-transcribe="{% url 'invigilator:transcribe_photo' pk %}"{% endif %}>
-    <div class="mb-2.5 flex items-start gap-3" data-preview hidden>
-      <img class="max-h-32 rounded-lg border border-base-300" alt="Photo to send">
-      <button type="button" class="btn btn-danger btn-sm" data-clear aria-label="Remove photo"><c-icon name="x" />Remove</button>
-    </div>
-    <label class="btn btn-outline btn-block mb-0 flex-row">
-      <c-icon name="camera" />Take photo (optional)
-      <input type="file" name="photo" form="new-clarification" accept="image/*" capture="environment" data-photo hidden>
+  <div class="group/question">
+    <label>What is the student asking?
+      <textarea name="text" maxlength="{{ config.text_max }}" rows="2" form="new-clarification" placeholder="In the student's words"
+                hx-get="{% url 'invigilator:report' pk %}?venue={{ seat.venue|urlencode }}&amp;seat={{ seat.seat|urlencode }}&amp;label={{ seat.label|urlencode }}"
+                hx-trigger="input changed delay:300ms" hx-target="#matches" hx-swap="outerHTML" hx-sync="this:replace">{{ text }}</textarea>
     </label>
-    <p class="meta mt-1" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>
+    <div class="mb-5 mt-2.5" data-photo-field{% if member.exam.has_ai_service %} data-transcribe="{% url 'invigilator:transcribe_photo' pk %}"{% endif %}>
+      <div class="mb-2.5 flex items-start gap-3" data-preview hidden>
+        <img class="max-h-32 rounded-lg border border-base-300" alt="Photo to send">
+        <button type="button" class="btn btn-danger btn-sm" data-clear aria-label="Remove photo"><c-icon name="x" />Remove</button>
+      </div>
+      <label class="btn btn-outline btn-block mb-0 flex-row">
+        <c-icon name="camera" />
+        <span class="group-has-[[data-preview]:not([hidden])]/question:hidden">
+          {% if member.exam.has_ai_service %}<span class="hidden group-has-[textarea:placeholder-shown]/question:inline">Fill in from photo</span>{% endif %}
+          <span{% if member.exam.has_ai_service %} class="group-has-[textarea:placeholder-shown]/question:hidden"{% endif %}>Take photo (optional)</span>
+        </span>
+        <span class="hidden group-has-[[data-preview]:not([hidden])]/question:inline">Retake photo</span>
+        <input type="file" name="photo" form="new-clarification" accept="image/*" capture="environment" data-photo hidden>
+      </label>
+      <p class="meta mt-1" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>
+    </div>
   </div>
   {% endwith %}
   {% partialdef matches inline %}

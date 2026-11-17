@@ -139,11 +139,14 @@ const transcribePhoto = async (input) => {
   const button = input.closest("label");
   const body = new FormData();
   body.append("photo", input.files[0]);
+  const placeholder = question.placeholder;
   button.setAttribute("aria-busy", "true");
+  question.placeholder = "Reading the photo…";
   const headers = { "X-CSRFToken": input.form.elements.csrfmiddlewaretoken.value };
   const response = await fetch(field.dataset.transcribe, { method: "POST", body, headers }).catch(() => null);
   const text = response?.ok ? await response.text() : "";
   button.removeAttribute("aria-busy");
+  question.placeholder = placeholder;
   failed.hidden = Boolean(text);
   if (text && !question.value.trim()) {
     question.value = text;
