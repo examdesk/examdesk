@@ -63,7 +63,7 @@ def create_exam(request: StaffRequest) -> HttpResponse:
     owner = services.add_member(exam, name=staff_name(request), role=Role.EXAMINER)
     session.remember(request.session, owner)
     messages.success(request, f"Created {exam.name}.")
-    return redirect("examiner:settings", exam.pk)
+    return redirect("examiner:members", exam.pk)
 
 
 def suggested_name(request: HttpRequest) -> str:

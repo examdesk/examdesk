@@ -7,10 +7,6 @@
 </div>
 
 <div class="flex flex-col gap-6">
-{% for link in links %}
-  <c-join-link-card :link="link" :exam="member.exam">{% if link.role == "examiner" %}<div class="flash error"><c-icon name="circle-alert" /><span>Full control of the exam. Don't share it with invigilators.</span></div>{% endif %}</c-join-link-card>
-{% endfor %}
-
 <section class="card-box">
   <div class="card-header"><h2>AI service</h2>{% if member.exam.ai_base_url %}<span class="badge green">Connected</span>{% endif %}</div>
   {% if member.exam.ai_base_url %}

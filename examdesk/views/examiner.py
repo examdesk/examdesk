@@ -481,8 +481,13 @@ def members(request: HtmxRequest, member: Member) -> HttpResponse:
     """
     people = sorted(member.exam.members.active(), key=lambda m: (not m.online, m.name.casefold()))
     venues = group_by_venue((person.venue or "", person) for person in people)
+    links = []
+    for role in Role:
+        url = request.build_absolute_uri(reverse("join", args=[member.exam.token(role)]))
+        qr = mark_safe(segno.make(url, error="m").svg_inline(scale=5, omitsize=True))
+        links.append({"role": role, "url": url, "qr": qr})
     template = "examdesk/examiner/members.html"
-    return render_live(request, member, template, {"venues": venues})
+    return render_live(request, member, template, {"venues": venues, "links": links})
 
 
 @require_POST
@@ -510,18 +515,12 @@ def settings_page(
 ) -> HttpResponse:
     """A bound `delete_form` reopens the delete dialog with its errors."""
     exam = member.exam
-    links = []
-    for role in Role:
-        url = request.build_absolute_uri(reverse("join", args=[exam.token(role)]))
-        qr = mark_safe(segno.make(url, error="m").svg_inline(scale=5, omitsize=True))
-        links.append({"role": role, "url": url, "qr": qr})
     delete_form = delete_form or DeleteExamForm(exam_name=exam.name)
     connect_form = connect_form or AIConnectForm()
     models_form = models_form or AIModelsForm(exam=exam)
     file_form = file_form or ExamFileForm()
     context = {
         "member": member,
-        "links": links,
         "delete_form": delete_form,
         "connect_form": connect_form,
         "models_form": models_form,
@@ -648,7 +647,7 @@ def reset_link(request: HtmxRequest, member: Member) -> HttpResponse:
         return HttpResponse("Unknown role.", status=400)
     services.reset_link(member.exam, Role(role))
     messages.success(request, f"Reset the {Role(role).label} link.")
-    return redirect("examiner:settings", member.exam.pk)
+    return redirect("examiner:members", member.exam.pk)
 
 
 @require_POST

@@ -115,14 +115,14 @@ def test_wording_may_be_cleared(examiner: Client, exam: Exam) -> None:
     assert clarification.wording == ""
 
 
-def test_settings_page_shows_the_invigilator_link_then_the_examiner_link_with_a_warning(
+def test_members_page_shows_the_invigilator_link_then_the_examiner_link_with_a_warning(
     examiner: Client, exam: Exam
 ) -> None:
-    html = examiner.get(url("examiner:settings", exam)).content.decode()
+    html = examiner.get(url("examiner:members", exam)).content.decode()
     invigilator_link = reverse("join", args=[exam.invigilator_token])
     examiner_link = reverse("join", args=[exam.examiner_token])
     warning = "Full control of the exam."
-    assert html.index(invigilator_link) < html.index(warning) < html.index(examiner_link)
+    assert html.index(invigilator_link) < html.index(examiner_link) < html.index(warning)
     assert html.count(warning) == 1
     assert 'commandfor="invigilator-qr" command="show-modal"' in html
     assert 'commandfor="examiner-qr" command="show-modal"' in html

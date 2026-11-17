@@ -74,7 +74,7 @@ def test_creating_an_exam_requires_staff(client: Client, staff: User) -> None:
     client.force_login(staff)
     response = client.post(reverse("create_exam"), {"name": "CS1231S Final"})
     exam = Exam.objects.get()
-    assert response["Location"] == url("examiner:settings", exam)
+    assert response["Location"] == url("examiner:members", exam)
     assert exam.owner == staff
     assert (exam.members.get().name, exam.members.get().role) == ("lee", "examiner")
     assert client.get(response["Location"]).status_code == 200
@@ -223,7 +223,7 @@ def test_every_page_and_fragment_renders_with_data(
     matched = invigilator.get(pages[0][1]).content.decode()
     assert '<button class="match">' in matched
     assert "C1" in invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
-    assert "<svg" in examiner.get(url("examiner:settings", exam)).content.decode()
+    assert "<svg" in examiner.get(url("examiner:members", exam)).content.decode()
 
 
 @pytest.mark.parametrize(("first_name", "expected"), [("Lee Wei", "Lee Wei"), ("", "lee")])
@@ -393,7 +393,7 @@ def test_reset_link_stops_the_old_link_and_keeps_members(
 ) -> None:
     old = exam.invigilator_token
     response = examiner.post(url("examiner:reset_link", exam), {"role": "invigilator"})
-    assert response["Location"] == url("examiner:settings", exam)
+    assert response["Location"] == url("examiner:members", exam)
     exam.refresh_from_db()
     assert exam.invigilator_token != old
     assert Client().get(reverse("join", args=[old])).status_code == 404
