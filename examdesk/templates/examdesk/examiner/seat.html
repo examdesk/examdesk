@@ -1,7 +1,6 @@
 {% extends "examdesk/base.html" %}
 {% load examdesk_tags %}
 {% block content %}
-{% partialdef live inline %}
 <c-live>
 {% with pk=member.exam.pk %}
 <c-back href="{% url 'examiner:seats' pk %}" label="Seats" />
@@ -33,5 +32,4 @@
 </div>
 {% endwith %}
 </c-live>
-{% endpartialdef %}
 {% endblock %}

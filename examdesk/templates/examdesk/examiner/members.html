@@ -3,14 +3,13 @@
 <div class="page-header">
   <h1>Members</h1>
 </div>
+<c-live :refresh_in="presence_update_in">
 <section class="list-card mb-8" aria-labelledby="links-title">
   <h2 class="px-4 py-3" id="links-title">Join links</h2>
   {% for link in links %}
     <c-join-link-row :link="link" :exam="member.exam" />
   {% endfor %}
 </section>
-{% partialdef live inline %}
-<c-live :refresh_in="presence_update_in">
   {% for venue, people in venues %}
     <section class="mb-6">
       <c-venue-heading :venue="venue" />
@@ -40,5 +39,4 @@
     </section>
   {% endfor %}
 </c-live>
-{% endpartialdef %}
 {% endblock %}

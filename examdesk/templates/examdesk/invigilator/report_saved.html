@@ -9,7 +9,6 @@
     <h1 class="tabular-nums">{{ report.venue }} {{ report.seat }} · {{ clarification.label }}</h1>
   </div>
 </div>
-{% partialdef live inline %}
 <c-live>
   <article class="tight mb-5">
     <c-state-badge :state="report.state" class="mb-2" />
@@ -21,7 +20,6 @@
     <a class="btn btn-outline btn-block mb-2.5" href="{% seat_url 'invigilator:deliver_seat' member.exam.pk report.venue report.seat report=report.pk back='report' %}"><c-icon name="send" />Show the answer</a>
   {% endif %}
 </c-live>
-{% endpartialdef %}
 <a class="btn btn-primary btn-block" href="{% url 'invigilator:report' pk %}"><c-icon name="plus" />Report another question</a>
 <p class="mt-5 text-center"><button type="button" class="link-button text-error text-sm" commandfor="delete-report-{{ report.pk }}" command="show-modal">Delete this report</button></p>
 <c-delete-report-dialog :report="report" next="{% url 'invigilator:report' pk %}" />

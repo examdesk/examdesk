@@ -3,6 +3,7 @@
 {% block content %}
 {% with pk=member.exam.pk editable=member.exam.is_live label=clarification.label %}
 <c-back href="{% url 'examiner:clarifications' pk %}" label="Clarifications" />
+<c-live id="clarification">
 <div class="page-header">
   <div>
     <h1 class="flex flex-wrap items-center gap-2.5">{{ label }} <c-state-badge :state="clarification.state" /></h1>
@@ -145,9 +146,6 @@
   </section>
 {% endwith %}{% endif %}{% endpartialdef %}
 
-{% partialdef live inline %}
-<c-live>
-{% with pk=member.exam.pk editable=member.exam.is_live %}
 <section class="list-card">
   <div class="flex items-center justify-between px-4 py-3"><h2>Seats</h2><span class="count">{{ reports|length }}</span></div>
   {% for report in reports %}
@@ -173,13 +171,13 @@
     </div>
   {% endfor %}
 </section>
-{% endwith %}
-</c-live>
-{% endpartialdef %}
 
 {% if editable and not clarification.closed_reason %}
   {% if member.exam.has_ai_service %}
-    <p class="meta flex items-center gap-2" role="status" hx-get="{% url 'examiner:clarification_duplicates' pk clarification.pk %}" hx-trigger="load" hx-swap="outerHTML"><span class="loading loading-spinner loading-xs"></span>Finding duplicates</p>
+    {# Keeps what it found through morphs; finds again, in place, when the exam changes. #}
+    <div id="duplicates" hx-morph-skip-children hx-get="{% url 'examiner:clarification_duplicates' pk clarification.pk %}?version={{ member.exam.version }}" hx-trigger="load" hx-swap="innerMorph" hx-sync="this:queue last">
+      <p class="meta flex items-center gap-2" role="status"><span class="loading loading-spinner loading-xs"></span>Finding duplicates</p>
+    </div>
   {% else %}
     {% partial duplicates %}
   {% endif %}
@@ -210,5 +208,6 @@
     </select>
   </c-dialog>
 {% endif %}
+</c-live>
 {% endwith %}
 {% endblock %}

@@ -7,7 +7,7 @@
   <h1 class="min-w-0 truncate">{{ file.name }}</h1>
 </div>
 
-<div class="flex flex-col gap-6">
+<c-live id="pages" class="flex flex-col gap-6">
 {% for page in file.pages.all %}
   <section class="card-box"{% if file.pdf %} aria-labelledby="page-{{ page.number }}"{% endif %}>
     {% if file.pdf %}<div class="card-header"><h2 id="page-{{ page.number }}">Page {{ page.number }}</h2></div>{% endif %}
@@ -21,6 +21,6 @@
     </div>
   </section>
 {% endfor %}
-</div>
+</c-live>
 {% endwith %}
 {% endblock %}

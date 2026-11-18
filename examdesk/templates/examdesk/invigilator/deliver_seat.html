@@ -2,7 +2,6 @@
 {% block content %}
 {# Outside the live part so refreshes don't clear it. #}
 {% if taken_from %}<div class="flash" role="status"><c-icon name="users" /><span><strong>{{ taken_from.member.name }}</strong> was delivering to this seat. It's yours now.</span></div>{% endif %}
-{% partialdef live inline %}
 <c-live>
 {% with pk=member.exam.pk %}
 <div class="mb-5 flex items-center gap-3">
@@ -50,5 +49,4 @@
 {% endif %}
 {% endwith %}
 </c-live>
-{% endpartialdef %}
 {% endblock %}

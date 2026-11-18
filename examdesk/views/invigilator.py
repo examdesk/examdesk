@@ -59,10 +59,8 @@ def invigilator_page(
     page: str,
     context: dict[str, Any],
     tab: str = "",
-    partial: str | None = "live",
 ) -> HttpResponse:
-    """Render `invigilator/<page>.html` with the tab `tab` (by default `page`) active. See
-    `render_live` for `partial`.
+    """Render `invigilator/<page>.html` with the tab `tab` (by default `page`) active.
 
     Asks for a venue once per exam, and releases the member's seat claim on any other
     page than `deliver_seat`.
@@ -70,7 +68,7 @@ def invigilator_page(
     exam = member.exam
     if page != "deliver_seat" and not is_refresh(request):
         services.release_seat(member)
-    ask_venue = member.venue is None and not request.htmx
+    ask_venue = member.venue is None and not is_refresh(request)
     if ask_venue:
         services.set_venue(member, "")
     context |= {
@@ -80,7 +78,7 @@ def invigilator_page(
         **suggestions(exam),
     }
     template = f"examdesk/invigilator/{page}.html"
-    return render_live(request, member, template, context, partial=partial)
+    return render_live(request, member, template, context)
 
 
 def deliver_seat_url(member: Member, report: Report, back: str = "") -> str:
@@ -186,11 +184,11 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
         )
         groups.append(("Under another question", elsewhere))
         context |= {"matching": True, "text": text, "any_match": bool(here), "groups": groups}
-        if request.htmx:  # typing in the question re-ranks the matches
+        if request.htmx.request_type == "partial":  # typing in the question re-ranks the matches
             context |= {"member": member, "start_form": start_form}
             return render(request, "examdesk/invigilator/report.html#matches", context)
     context |= {"start_form": start_form}
-    return invigilator_page(request, member, "report", context, partial=None)
+    return invigilator_page(request, member, "report", context)
 
 
 @require_POST

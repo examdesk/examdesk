@@ -13,7 +13,6 @@
 
 {% partialdef sortable %}{% if sort.order %} aria-sort="{{ sort.order }}"{% endif %}><a href="{% querystring sort=sort.sort page=None %}" class="sort">{{ label }}{% if sort.order %}<c-icon name="chevron-{% if sort.order == 'ascending' %}up{% else %}down{% endif %}" />{% endif %}</a>{% endpartialdef %}
 
-{% partialdef live inline %}
 <c-live>
 {% with pk=member.exam.pk %}
   {% if page_obj.object_list %}
@@ -67,6 +66,5 @@
   {% endif %}
 {% endwith %}
 </c-live>
-{% endpartialdef %}
 {% endwith %}
 {% endblock %}

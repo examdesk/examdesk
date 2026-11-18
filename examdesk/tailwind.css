@@ -50,7 +50,7 @@
   html { -webkit-tap-highlight-color: transparent; }
   body { @apply bg-base-200 font-sans text-[15px] leading-6 text-base-content antialiased; }
   /* Phones: 16px text avoids zoom on focus; 44px touch targets. */
-  body.invigilator { @apply text-base; --size-field: 0.275rem; }
+  body:has(> main.invigilator) { @apply text-base; --size-field: 0.275rem; }
   :focus-visible { @apply outline-2 outline-offset-2 outline-primary; }
   ::selection { @apply bg-primary/15; }
 }
@@ -138,6 +138,14 @@
     .icon { @apply mt-0.5 size-4; }
   }
   .offline { @apply sticky top-3 z-30 shadow-sm; }
+  /* Messages float over the page, so an action doesn't move it. An error stays until dismissed. */
+  .toast { @apply pointer-events-none; }
+  .toast > .alert {
+    @apply text-sm shadow-lg;
+    &.success { @apply alert-success; }
+    &.error { @apply pointer-events-auto alert-error; }
+    .icon { @apply size-4; }
+  }
 
   /* Empty states */
   .empty {
@@ -300,7 +308,24 @@
   .btn-ghost.btn-danger { @apply border-transparent bg-transparent shadow-none text-error hover:bg-red-50 hover:text-error; }
   .btn .icon { @apply size-4; }
   .btn-lg .icon { @apply size-5; }
-  .btn[aria-busy=true]::before { content: ""; @apply loading loading-spinner loading-sm; }
+  .btn[aria-busy=true]::before, form.htmx-request .btn:not([type=button])::before { content: ""; @apply loading loading-spinner loading-sm; }
+  /* While a link's page loads (app.js): <main> dims after 100 ms, and a bar at the top eases towards 90%,
+     completes when the page arrives, then fades. Transitions, not keyframes, so each state continues
+     from the current width. */
+  main[aria-busy=true] { @apply opacity-50 transition-opacity delay-100 duration-200; }
+  #page-loading-bar {
+    @apply pointer-events-none fixed inset-x-0 top-0 z-60 h-0.5 origin-left bg-primary opacity-0;
+    transform: scaleX(0);
+    &[data-state="loading"] {
+      @apply opacity-100;
+      transform: scaleX(0.9);
+      transition: transform 10s cubic-bezier(0.05, 0.7, 0.1, 1);
+    }
+    &[data-state="done"] {
+      transform: scaleX(1);
+      transition: transform 200ms ease-out, opacity 300ms ease 200ms;
+    }
+  }
   input:not([type=checkbox], [type=radio], [type=hidden], [type=file], .ts-control > *) {
     @apply input w-full text-base-content;
   }
@@ -351,3 +376,10 @@
     .count { @apply absolute top-1 left-[calc(50%+.35rem)] h-[1.1rem] min-w-[1.1rem] px-1 text-[11px] ring-2 ring-base-100; }
   }
 }
+
+/* Outside the layers: daisyUI's toast styles sit in a layer after utilities. A success enters as
+   daisyUI's do, then fades after 4 s (app.js then removes it). On invigilator screens toasts sit
+   above the tab bar. */
+.toast > .alert.success { animation: toast 250ms ease-out, fade-out 300ms 4s forwards; }
+body:has(> main.invigilator) > .toast { bottom: calc(var(--spacing) * 24); }
+@keyframes fade-out { to { opacity: 0; visibility: hidden; } }

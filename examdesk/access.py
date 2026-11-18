@@ -57,7 +57,7 @@ def admit(
     """
     exam, member = find_member(request, exam_id)
     if member is None:
-        if request.htmx:
+        if request.htmx.request_type == "partial":
             return HttpResponseClientRefresh()
         if exam and exam.owner_id == request.user.pk:
             join = reverse("join", args=[exam.examiner_token])
@@ -66,7 +66,7 @@ def admit(
     if examiner_only and not member.is_examiner:
         return forbidden(request, "Only examiners can do this.")
     if not member.exam.is_live and (live_only or not member.is_examiner):
-        if request.htmx:
+        if request.htmx.request_type == "partial":
             return HttpResponseClientRefresh()
         return forbidden(request, "This exam is closed.")
     note_presence(member)

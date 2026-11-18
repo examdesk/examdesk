@@ -50,7 +50,8 @@ def open_link(client: Client, token: str, name: str = "Ann") -> None:
     assert response.status_code == 302
 
 
-HTMX = {"HX-Request": "true"}
+HTMX = {"HX-Request": "true", "HX-Request-Type": "partial"}
+"""Headers of an htmx request for part of a page."""
 REFRESH = HTMX | {"HX-Source": "div#refresh"}
 """Headers of a refresh of a page's live parts."""
 

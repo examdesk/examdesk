@@ -109,11 +109,13 @@
     <h1>Report a question</h1>
   </div>
   <form method="get" action="{% url 'invigilator:report' pk %}" class="card-box">
+    <c-live id="report-venue">
     {% if member.venue %}
       <input type="hidden" name="venue" value="{{ start_form.venue.value|default:member.venue }}">
     {% else %}
       <div class="field">{{ start_form.venue.as_field_group }}</div>
     {% endif %}
+    </c-live>
     <div class="field">{{ start_form.seat.as_field_group }}</div>
     <div class="field">{{ start_form.label.as_field_group }}</div>
     <button class="btn btn-primary btn-block mt-2">Next<c-icon name="chevron-right" /></button>

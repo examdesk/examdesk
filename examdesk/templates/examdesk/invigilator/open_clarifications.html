@@ -2,7 +2,6 @@
 {% load examdesk_tags %}
 {% block content %}
 <h1 class="mb-5">Open clarifications</h1>
-{% partialdef live inline %}
 <c-live>
   {% for label, clarifications in groups %}
     <section class="mb-5">
@@ -29,5 +28,4 @@
     <c-empty icon="circle-check" title="No open clarifications in {{ member.venue|default:'any venue' }}" />
   {% endfor %}
 </c-live>
-{% endpartialdef %}
 {% endblock %}

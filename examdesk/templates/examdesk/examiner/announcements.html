@@ -17,7 +17,6 @@
   </form>
 {% endif %}
 
-{% partialdef live inline %}
 <c-live class="min-w-0">
   <div class="vstack">
   {% for announcement, missing in page_obj %}
@@ -45,7 +44,6 @@
   </div>
   <c-pagination :page_obj="page_obj" />
 </c-live>
-{% endpartialdef %}
 </div>
 {% endwith %}
 {% endblock %}

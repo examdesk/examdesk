@@ -1,4 +1,4 @@
-"""The stream of exam versions each page listens to, and the refreshes of its live parts."""
+"""The stream of exam versions each page listens to, and rendering the pages that listen."""
 
 import asyncio
 import math
@@ -11,9 +11,9 @@ from django.conf import settings
 from django.db import connections
 from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
 from django.shortcuts import render
-from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
+from django_htmx.http import replace_url
 
 from .. import session
 from ..access import HtmxRequest, find_member
@@ -34,27 +34,21 @@ def render_live(
     member: Member,
     template: str,
     context: dict[str, Any],
-    partial: str | None = "live",
     path: str | None = None,
 ) -> HttpResponse:
-    """Render the page, or for a refresh only its live parts: `partial` (None for a page without
-    one) and the tab bar or nav badges.
+    """Render an exam page, whose live parts the browser swaps in on a refresh.
 
-    `path` sets the page's URL when a POST re-renders it.
+    `path` is the page's URL when a POST shows it again with errors.
     """
-    refresh = is_refresh(request)
     context |= {
         "member": member,
         "page_url": path or request.get_full_path(),
-        "is_refresh": refresh,
-        "live_partial": f"{template}#{partial}" if partial else None,
+        "is_refresh": is_refresh(request),
         **navigation(request, member, context),
     }
-    if refresh:
-        response = render(request, "examdesk/includes/refresh.html", context)
-    else:
-        response = render(request, template, context)
-    patch_vary_headers(response, ["HX-Request"])  # caches the page and its refresh apart
+    response = render(request, template, context)
+    if request.method == "POST":
+        replace_url(response, context["page_url"])
     return response
 
 

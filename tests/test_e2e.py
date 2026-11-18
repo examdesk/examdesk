@@ -13,7 +13,7 @@ from playwright.sync_api import Browser, Page, expect
 from pytest_django.fixtures import Settings
 
 from examdesk import services
-from tests.helpers import report
+from tests.helpers import named, report
 
 # Playwright's sync API runs an event loop; the ORM calls here are still synchronous.
 os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
@@ -175,3 +175,90 @@ def test_find_a_seat_as_you_type(
     expect(search).to_have_value("b1")
     expect(prof.get_by_role("link", name=re.compile("^LT19 B14:"))).to_be_visible()
     expect(prof.get_by_role("link", name=re.compile("^LT19 B2:"))).to_be_hidden()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_send_updates_only_what_changed(server: str, browser: Browser, staff: User) -> None:
+    exam = services.create_exam(name="CS2109S Final", owner=staff)
+    first = report(exam)
+    for n in range(12):
+        report(exam, seat=f"C{n}", clarification=first.clarification)
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
+    prof.set_viewport_size({"width": 1000, "height": 500})
+    prof.get_by_role("link", name="Is x an integer?").click()
+    answer = prof.get_by_label("Answer")
+    expect(answer).to_be_visible()
+    prof.evaluate("document.querySelector('header').kept = true")  # lost if it's replaced
+    answer.fill("Draft not sent")
+    prof.get_by_role("button", name="Edit", exact=True).click()
+    prof.get_by_role("textbox", name="Wording").fill("Is x a whole number?")
+    prof.get_by_role("button", name="Save").click()
+    expect(prof.get_by_text("Is x a whole number?").first).to_be_visible()
+    expect(prof.locator("dialog[open]")).to_have_count(0)
+    expect(answer).to_have_value("Draft not sent")
+    # Sending from partway down leaves the page where it was.
+    answer.fill("Yes.")
+    prof.evaluate("document.getElementById('answer-form').scrollIntoView({block: 'center'})")
+    scrolled = prof.evaluate("scrollY")
+    assert scrolled > 0
+    prof.get_by_role("button", name="Send", exact=True).click()
+    expect(prof.get_by_role("status").filter(has_text="Sent.")).to_be_visible()
+    expect(prof.get_by_role("paragraph").filter(has_text="Yes.")).to_be_visible()
+    assert abs(prof.evaluate("scrollY") - scrolled) <= 1  # sub-pixel rounding
+    assert prof.evaluate("document.querySelector('header').kept")
+    # The sends replaced the page's history entry.
+    prof.go_back()
+    expect(prof).to_have_url(re.compile(r"/examiner/clarifications/$"))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_changes_by_others_show_live_around_unsent_text(
+    server: str, browser: Browser, staff: User
+) -> None:
+    exam = services.create_exam(name="CS2109S Final", owner=staff)
+    first = report(exam)
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
+    prof.get_by_role("link", name="Is x an integer?").click()
+    expect(prof.get_by_label("Answer")).to_be_visible()
+    services.answer_clarification(
+        first.clarification, text="Yes.", member=named(exam, "Prof Two"), expected_answer=None
+    )
+    expect(prof.get_by_role("paragraph").filter(has_text="Yes.")).to_be_visible()
+    prof.get_by_role("button", name="Correct the answer").click()
+    prof.get_by_label("Answer").fill("Yes, a whole number.")
+    report(exam, seat="C1", clarification=first.clarification)
+    expect(prof.get_by_role("link", name="LT19 C1")).to_be_visible()
+    expect(prof.get_by_label("Answer")).to_have_value("Yes, a whole number.")
+    expect(prof.get_by_label("Answer")).to_be_visible()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_pages_open_at_the_top_and_keep_the_exam_stream(
+    server: str, browser: Browser, staff: User
+) -> None:
+    exam = services.create_exam(name="CS2109S Final", owner=staff)
+    first = report(exam)
+    for n in range(12):
+        report(exam, seat=f"C{n}", clarification=first.clarification)
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
+    prof.set_viewport_size({"width": 1000, "height": 500})
+    expect(prof).to_have_title("(1) CS2109S Final · Exam Desk")
+    requested: list[str] = []
+    prof.on("request", lambda request: requested.append(request.url))
+    prof.get_by_role("link", name="Is x an integer?").click()
+    expect(prof.get_by_label("Answer")).to_be_visible()
+    prof.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    prof.evaluate("document.querySelector('a[href$=\"/examiner/members/\"]').click()")
+    expect(prof.get_by_role("heading", name="Members")).to_be_visible()
+    assert prof.evaluate("scrollY") == 0
+    assert not [url for url in requested if "/events/" in url]  # the exam's pages share one stream
+    prof.go_back()
+    expect(prof.get_by_label("Answer")).to_be_visible()
+    # A send that can't reach the server keeps its text and says so.
+    prof.route(
+        "**/*", lambda route: route.abort() if route.request.method == "POST" else route.continue_()
+    )
+    prof.get_by_label("Answer").fill("Yes.")
+    prof.get_by_role("button", name="Send", exact=True).click()
+    expect(prof.get_by_text("Not sent.")).to_be_visible()
+    expect(prof.get_by_label("Answer")).to_have_value("Yes.")

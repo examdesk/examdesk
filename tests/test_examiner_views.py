@@ -55,6 +55,9 @@ def test_clarification_filters_come_back_on_the_plain_url(examiner: Client, exam
     response = examiner.get(page)
     assert response.status_code == 302
     assert response["Location"] == page + "?state=all&label=Q3&sort=-seats"
+    # Going back to the plain URL shows it as it was.
+    back = examiner.get(page, headers={"HX-Request": "true", "HX-History-Restore-Request": "true"})
+    assert back.status_code == 200
 
 
 def test_a_saved_filter_forgets_a_label_that_is_gone(examiner: Client, exam: Exam) -> None:

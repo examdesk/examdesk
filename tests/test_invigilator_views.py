@@ -269,7 +269,7 @@ def test_tab_bar_badges_count_my_venue(invigilator: Client, exam: Exam) -> None:
     assert '<span class="count urgent" title="To read out">1</span>' in html
     assert re.search(r'href="[^"]+/open/" aria-current="page"', html)
     refresh = invigilator.get(url("invigilator:report", exam), headers=REFRESH)
-    assert '<div id="tab-bar" hx-swap-oob="outerMorph">' in refresh.content.decode()
+    assert '<div id="tab-bar" data-live>' in refresh.content.decode()
 
 
 def test_tab_bar_alerts_newest_unread_announcement(invigilator: Client, exam: Exam) -> None:
@@ -525,7 +525,9 @@ def test_opening_a_seat_to_deliver_shows_other_tas_it_is_taken(
     html = ben.get(url("invigilator:to_deliver", exam)).content.decode()
     assert taken.format("Ann") in html
     assert 'class="seat-card claimed"' in html
-    assert re.search(r'<div id="live" data-refresh-in="([1-9]\d*)"', html)  # when the claim expires
+    assert re.search(
+        r'<div id="live" data-live data-refresh-in="([1-9]\d*)"', html
+    )  # when the claim expires
     # Ben opening it anyway takes it over, and is told.
     assert "<strong>Ann</strong> was delivering to this seat" in ben.get(seat).content.decode()
     assert "was delivering" not in ben.get(seat).content.decode()  # now Ben's
@@ -588,7 +590,9 @@ def test_snooze_puts_off_the_alert_on_this_device(
     html = invigilator.get(page).content.decode()
     assert "data-alert" not in html
     assert '<span class="count urgent" title="To read out">1</span>' in html
-    assert re.search(r'<div id="tab-bar" data-refresh-in="[1-9]\d*"', html)  # when it returns
+    assert re.search(
+        r'<div id="tab-bar" data-live data-refresh-in="[1-9]\d*"', html
+    )  # when it returns
     # Once the delay is over it returns, under a new key so that it vibrates again.
     settings.EXAMDESK_SNOOZE_FOR = timedelta(0)
     invigilator.post(later)

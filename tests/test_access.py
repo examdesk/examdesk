@@ -1,7 +1,6 @@
 """Joining, roles, names, refreshes, and pages across both roles."""
 
 import importlib
-import re
 import sys
 from pathlib import Path
 from urllib.parse import urlencode
@@ -135,23 +134,17 @@ def test_only_examiners_answer(invigilator: Client, examiner: Client, exam: Exam
     assert Clarification.objects.get().current_answer is not None
 
 
-def test_pages_carry_csrf_header_for_htmx(examiner: Client, exam: Exam) -> None:
-    html = examiner.get(url("examiner:clarifications", exam)).content.decode()
-    assert re.search(r"<body[^>]*hx-headers:inherited='\{\"X-CSRFToken\": \"\w+\"\}'", html)
-
-
-def test_a_refresh_sends_the_live_part_and_badges_to_swap_in(examiner: Client, exam: Exam) -> None:
+def test_a_refresh_gets_the_page_with_its_live_parts_marked(examiner: Client, exam: Exam) -> None:
     report(exam)
     page = url("examiner:clarifications", exam) + "?sort=question"
-    assert f'<div id="refresh" hidden hx-get="{page}"' in examiner.get(page).content.decode()
+    assert '<div id="refresh" hidden hx-get="" ' in examiner.get(page).content.decode()
     report(exam, label="Q7")
     html = examiner.get(page, headers=REFRESH).content.decode()
-    assert "<html" not in html
+    assert "<title>(2) CS2109S Final · Exam Desk</title>" in html
+    assert '<div id="live" data-live>' in html
     assert "Q7" in html
-    assert '<div id="live" hx-swap-oob="outerMorph">' in html
-    badge = '<span id="clarifications-badge" hx-swap-oob="outerMorph"><span class="count action"'
+    badge = '<span id="clarifications-badge" data-live><span class="count action"'
     assert f'{badge} title="Open clarifications" data-open-count="2">2</span>' in html
-    assert '<span id="announcements-badge" hx-swap-oob="outerMorph"></span>' in html
 
 
 def test_pages_subscribe_to_their_exam_version(

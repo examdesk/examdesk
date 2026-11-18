@@ -1,17 +1,99 @@
-// A morph would strip Tom Select's markup; htmx.onLoad below rebuilds it.
-document.addEventListener("htmx:before:swap", (event) => {
-  event.target.querySelectorAll(".tomselected").forEach((field) => field.tomselect.destroy());
+// Boosted responses. A full page for the current URL (a refresh, or a POST that redirects back)
+// swaps in only its live parts ([data-live]) and new toasts, and replaces the history entry. The
+// same path with another query morphs the page: from a link (a sort, a page) at the top, from a
+// form (a filter, a step) at the same scroll position. A POST that redirects back resets its form
+// and closes the open dialog. Other pages replace <body>.
+document.addEventListener("htmx:after:request", (event) => {
+  const { ctx } = event.detail;
+  const url = new URL(ctx.response.raw.url);
+  const isFullPage = ctx.text.startsWith("<!doctype html>") && ctx.response.status < 400;
+  const isPost = ctx.request.method !== "GET";
+  const isRedirectAfterPost = isPost && ctx.response.raw.redirected;
+  if (!isFullPage || (isPost && !isRedirectAfterPost) || url.pathname !== location.pathname) return;
+  if (ctx.request.headers["HX-History-Restore-Request"]) return;
+  if (url.search === location.search) {
+    ctx.swap = "none";
+    ctx.selectOOB = "[data-live]:outerMorph, #toasts:beforeend";
+    ctx.replace = "true";
+  } else if (ctx.request.headers["HX-Request-Type"] === "full") {
+    ctx.swap = ctx.sourceElement.localName === "a" ? "innerMorph show:top" : "innerMorph show:none";
+  } else {
+    return; // a refresh of the page's previous query
+  }
+  if (!isRedirectAfterPost) return;
+  ctx.sourceElement.reset();
+  document.querySelector("dialog[open]")?.close();
 });
-// Open clarification count in the tab title, and a screen reader announcement for new ones.
-const news = document.getElementById("news");
-const baseTitle = document.title;
+// After a POST, the element it came from (the submit button, a dialog's opener, else its nearest
+// visible ancestor) stays at the same screen position.
+const scrollAnchors = new WeakMap(); // POST request → [element, top] for the anchor and its visible ancestors
+document.addEventListener("htmx:before:request", (event) => {
+  const { ctx } = event.detail;
+  if (event.defaultPrevented || ctx.request.method === "GET") return;
+  const submitter = ctx.sourceEvent?.submitter ?? ctx.sourceElement;
+  const dialog = submitter.closest("dialog");
+  const anchorTops = [];
+  let element = dialog ? document.querySelector(`[commandfor="${dialog.id}"]`) : submitter;
+  for (; element && element !== document.body; element = element.parentElement) {
+    if (element.getClientRects().length) anchorTops.push([element, element.getBoundingClientRect().top]);
+  }
+  scrollAnchors.set(ctx, anchorTops);
+});
+document.addEventListener("htmx:after:swap", (event) => {
+  const [element, top] = scrollAnchors.get(event.detail.ctx)?.find(([element]) => element.isConnected && element.getClientRects().length) ?? [];
+  if (element) scrollBy(0, element.getBoundingClientRect().top - top);
+});
+// A form re-rendered by a POST (its errors, a prompt) morphs into the page at the same scroll
+// position. Another error page replaces <body>, as a browser would show it.
+document.addEventListener("htmx:before:swap", (event) => {
+  const { ctx, tasks } = event.detail;
+  const isFormRerender = ctx.request.method !== "GET" && !ctx.response.raw.redirected;
+  if (!ctx.request.headers["HX-Boosted"] || !(isFormRerender || ctx.response.status >= 400)) return;
+  for (const task of tasks.filter(({ type }) => type === "main")) {
+    task.swapSpec.style = isFormRerender ? "innerMorph" : "innerHTML";
+    if (isFormRerender) delete task.swapSpec.show;
+  }
+});
+// Swapped-in live parts leave focus where it is, and Tom Select is rebuilt in them (a morph would
+// strip its markup; htmx.onLoad below rebuilds it).
+document.addEventListener("htmx:before:swap", (event) => {
+  for (const task of event.detail.tasks) {
+    if (task.swapSpec.style === "none") continue;
+    task.target.querySelectorAll(".tomselected").forEach((field) => field.tomselect.destroy());
+    if (task.type === "oob") task.fragment.querySelectorAll("[autofocus]").forEach((field) => field.removeAttribute("autofocus"));
+  }
+});
+// A morph doesn't hide a part with unsent text in it, such as an answer being corrected.
+htmx.registerExtension("keep-unsent-text-visible", {
+  htmx_before_morph_attr: (element, { attrName }) =>
+    attrName !== "hidden" || ![...element.querySelectorAll("input, textarea")].some((field) => field.value !== field.defaultValue),
+});
+// While a link's page loads, a bar at the top runs and <main> is marked busy, which tailwind.css
+// dims after 100 ms. A newer page load aborts it (`hx-sync` on <body>).
+const isLinkNavigation = ({ sourceEvent, request }) => sourceEvent?.type === "click" && request.headers["HX-Boosted"];
+document.documentElement.insertAdjacentHTML("beforeend", '<div id="page-loading-bar" aria-hidden="true"></div>');
+const loadingBar = document.getElementById("page-loading-bar");
+document.addEventListener("htmx:before:request", (event) => {
+  if (event.defaultPrevented || !isLinkNavigation(event.detail.ctx)) return;
+  delete loadingBar.dataset.state;
+  loadingBar.offsetWidth; // forces a reflow, so the transition restarts from 0
+  loadingBar.dataset.state = "loading";
+  document.querySelector("main").setAttribute("aria-busy", "true");
+});
+document.addEventListener("htmx:finally:request", (event) => {
+  const { ctx } = event.detail;
+  if (!isLinkNavigation(ctx) || ctx.request.signal.aborted) return;
+  loadingBar.dataset.state = "done";
+  document.querySelector("main").removeAttribute("aria-busy");
+});
+document.addEventListener("animationend", (event) => event.animationName === "fade-out" && event.target.remove());
+// A screen reader announcement for new clarifications.
 let openCount = null;
-const countOpen = () => {
+const announceNewClarifications = () => {
   const badge = document.querySelector("[data-open-count]");
   if (!badge) return;
   const count = Number(badge.dataset.openCount);
-  document.title = count ? `(${count}) ${baseTitle}` : baseTitle;
-  if (openCount !== null && count > openCount) news.textContent = `New clarification. ${count} open.`;
+  if (openCount !== null && count > openCount) document.getElementById("news").textContent = `New clarification. ${count} open.`;
   openCount = count;
 };
 const submitOnCtrlEnter = (event) => {
@@ -30,32 +112,47 @@ const buzz = () => {
   navigator.vibrate?.(200);
 };
 // Each new exam version refreshes the live parts. With a dialog open, the refresh waits until it
-// closes, since a morph would remove it. A stream silent for longer than `offlineAfter` has
-// dropped: the page shows the offline banner and reconnects.
-const refreshElement = document.getElementById("refresh");
-const offline = document.getElementById("offline");
+// closes, since a morph would remove it. The pages of an exam share its stream. A stream silent for
+// longer than `offlineAfter` has dropped: the page shows the offline banner and reconnects. A
+// request that couldn't reach the server shows it too, until one does.
 const offlineAfter = Number(document.body.dataset.offlineAfter) * 1000;
 let eventSource;
-let version = refreshElement?.dataset.version;
+let streamUrl;
+let version;
 let lastMessageAt = Date.now();
 let connectedAt = 0;
+let requestFailed = false;
 let refreshPending = false;
 const refresh = () => {
   if (document.querySelector("dialog[open]")) refreshPending = true;
-  else htmx.trigger(refreshElement, "exam-changed");
+  else htmx.trigger("#refresh", "exam-changed");
+};
+const onStreamMessage = () => {
+  lastMessageAt = Date.now();
+  requestFailed = false;
 };
 const connect = () => {
   eventSource?.close();
   connectedAt = Date.now();
-  eventSource = new EventSource(`${refreshElement.dataset.stream}?version=${version}`);
-  eventSource.onmessage = () => (lastMessageAt = Date.now());
+  eventSource = new EventSource(`${streamUrl}?version=${version}`);
+  eventSource.onmessage = onStreamMessage;
   eventSource.addEventListener("changed", (event) => {
-    lastMessageAt = Date.now();
+    onStreamMessage();
     version = event.lastEventId;
     refresh();
   });
 };
-if (refreshElement) connect();
+// Opens the stream of the page's exam, keeps it across that exam's pages, and closes it on a page
+// without one.
+const syncEventSource = () => {
+  const refreshElement = document.getElementById("refresh");
+  if (refreshElement?.dataset.stream === streamUrl) return;
+  eventSource?.close();
+  eventSource = undefined;
+  streamUrl = refreshElement?.dataset.stream;
+  version = refreshElement?.dataset.version;
+  if (refreshElement) connect();
+};
 document.addEventListener("close", () => {
   if (!refreshPending) return;
   refreshPending = false;
@@ -67,18 +164,39 @@ document.addEventListener("visibilitychange", () => {
   lastMessageAt = Date.now();
   connect();
 });
+const offlineBanner = () => document.getElementById("offline");
 const showOffline = () => {
+  const offline = offlineBanner();
   offline.querySelector("time").textContent = new Date(lastMessageAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   offline.hidden = false;
+};
+const showNotSent = () => {
+  const offline = offlineBanner();
+  if (offline.hidden) showOffline();
+  offline.querySelector("[data-unsent]").hidden = false;
+  offline.scrollIntoView({ block: "nearest" });
 };
 setInterval(() => {
   const heartbeatMissed = eventSource && Date.now() - lastMessageAt > offlineAfter;
   if (heartbeatMissed && Date.now() - connectedAt > offlineAfter) connect();
-  const isOffline = heartbeatMissed || !navigator.onLine;
+  const offline = offlineBanner();
+  if (!offline) return; // an error page without the app's layout
+  const isOffline = heartbeatMissed || requestFailed || !navigator.onLine;
   if (isOffline && offline.hidden) showOffline();
   if (!isOffline) offline.querySelector("[data-unsent]").hidden = true;
   offline.hidden = !isOffline;
 }, 1000);
+document.addEventListener("htmx:after:request", (event) => {
+  if (event.detail.ctx.response) requestFailed = false;
+});
+// On a network error the page stays as it was, typed text included; a form shows "Not sent."
+document.addEventListener("htmx:error", (event) => {
+  const { ctx, error } = event.detail;
+  if (!ctx || ctx.response || error?.name === "AbortError") return;
+  requestFailed = true;
+  if (ctx.sourceElement.localName === "form") showNotSent();
+  else showOffline();
+});
 // Refresh after the shortest [data-refresh-in], for time-based changes: snoozes ending, claims
 // expiring, presence. Counted from when its part last rendered.
 let refreshTimer;
@@ -101,14 +219,12 @@ setInterval(() => {
     wait.classList.toggle("late", seconds >= lateAfter && seconds < veryLateAfter);
   });
 }, 10000);
-// Block submits while offline so the browser's error page doesn't eat the input.
+// Block submits while offline: they would only fail, after a wait.
 document.addEventListener("submit", (event) => {
-  if (event.target.method === "dialog" || (offline.hidden && navigator.onLine)) return;
+  if (event.target.method === "dialog" || (offlineBanner().hidden && navigator.onLine)) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  if (offline.hidden) showOffline();
-  offline.querySelector("[data-unsent]").hidden = false;
-  offline.scrollIntoView({ block: "nearest" });
+  showNotSent();
 }, true);
 // Validate the opener's form before showing a dialog, and fill its [data-quote] fields.
 document.addEventListener("command", (event) => {
@@ -118,7 +234,6 @@ document.addEventListener("command", (event) => {
     quote[quote.localName === "input" ? "value" : "textContent"] = document.getElementById(quote.dataset.quote).value;
   });
 }, true);
-document.querySelectorAll("dialog[data-autoopen]").forEach((dialog) => dialog.showModal());
 // data-draft, data-retry, data-copy, data-clear (the photo) and data-show/data-hide buttons.
 const handleButtons = (event) => {
   const target = event.target;
@@ -211,8 +326,12 @@ const transcribePhoto = async (input) => {
     question.dispatchEvent(new Event("input", { bubbles: true }));
   }
 };
-// Read a PDF's unread pages four at a time, then reload.
+// Read a PDF's unread pages four at a time, then refresh. A morph keeps a row being read, and
+// htmx.onLoad finds it again.
+const rowsBeingRead = new WeakSet();
 const readPages = async (row) => {
+  if (rowsBeingRead.has(row)) return;
+  rowsBeingRead.add(row);
   const urls = row.dataset.readPages.trim().split(/\s+/);
   const status = row.querySelector("[data-reading]");
   const failed = [];
@@ -224,12 +343,12 @@ const readPages = async (row) => {
     }
   };
   await Promise.all(Array.from({ length: 4 }, readNext));
-  if (!failed.length) return location.reload();
+  rowsBeingRead.delete(row);
+  if (!failed.length) return refresh();
   row.dataset.readPages = failed.join(" ");
   status.lastChild.textContent = `Couldn't read ${failed.length} page${failed.length === 1 ? "" : "s"}.`;
   row.querySelector("[data-retry]").hidden = false;
 };
-document.querySelectorAll("[data-read-pages]").forEach(readPages);
 // Replace the answer with the AI's draft.
 const draftAnswer = async (button) => {
   const answer = button.form.elements.text;
@@ -297,11 +416,16 @@ const enhance = (field) => {
   if (field.autofocus) tom.focus();
 };
 
+// `element` and the elements in it that match `selector`.
+const queryAllIncludingSelf = (element, selector) => [element, ...element.querySelectorAll(selector)].filter((found) => found.matches(selector));
 htmx.onLoad((element) => {
+  syncEventSource();
+  queryAllIncludingSelf(element, "dialog[data-autoopen]").forEach((dialog) => dialog.showModal());
+  queryAllIncludingSelf(element, "[data-read-pages]").forEach(readPages);
   buzz();
-  countOpen();
-  if (element.matches("[data-refresh-in]") || element.querySelector("[data-refresh-in]")) scheduleRefresh();
-  document.querySelectorAll("select:not(.tomselected, [hidden]), input[list]:not(.tomselected)").forEach(enhance);
+  announceNewClarifications();
+  if (queryAllIncludingSelf(element, "[data-refresh-in]").length) scheduleRefresh();
+  queryAllIncludingSelf(element, "select:not(.tomselected, [hidden]), input[list]:not(.tomselected)").forEach(enhance);
 });
 document.addEventListener("click", (event) => {
   followRow(event);

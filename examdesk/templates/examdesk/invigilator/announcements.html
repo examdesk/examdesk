@@ -1,7 +1,6 @@
 {% extends "examdesk/invigilator/base.html" %}
 {% block content %}
 <h1 class="mb-5">Announcements</h1>
-{% partialdef live inline %}
 <c-live>
   <div class="vstack">
   {% for announcement, readout in items %}
@@ -40,5 +39,4 @@
   </div>
   <c-pagination :page_obj="page_obj" />
 </c-live>
-{% endpartialdef %}
 {% endblock %}

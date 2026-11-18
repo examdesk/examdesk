@@ -7,7 +7,6 @@
 {% block nav %}{% endblock %}
 
 {% block after_main %}
-{% partialdef tab_bar inline %}
 {% with pk=member.exam.pk %}
 <c-live id="tab-bar" :refresh_in="snooze_ends_in">
 {% if alert %}
@@ -54,8 +53,8 @@
 </nav>
 </c-live>
 {% endwith %}
-{% endpartialdef %}
 
+<c-live id="venue-picker">
 <c-dialog id="venue-dialog" title="Which venue are you in?" action="{% url 'invigilator:choose_venue' member.exam.pk %}" submit="Save" :autoopen="ask_venue">
   <input type="hidden" name="next" value="{{ request.path }}">
   {% if venues %}
@@ -72,4 +71,5 @@
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ request.path }}">
 </form>
+</c-live>
 {% endblock %}

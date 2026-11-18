@@ -98,9 +98,10 @@ def sort_links(sort: str) -> dict[str, dict[str, str]]:
 @require_GET
 @exam_view(examiner_only=True)
 def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Restores this device's last filters when opened without a query."""
+    """Restores this device's last filters when opened without a query, except on Back."""
     exam = member.exam
-    if not request.GET and (saved := session.filters(request.session, exam)):
+    saved = session.filters(request.session, exam)
+    if not request.GET and saved and not request.htmx.history_restore_request:
         return redirect(f"{request.path}?{saved}")
     used = set(exam.clarifications.values_list("label", flat=True))
     # Offer top-level labels too: Q3 selects Q3a and Q3b.
@@ -592,7 +593,7 @@ def settings_page(
     }
     path = reverse("examiner:settings", args=[exam.pk])
     template = "examdesk/examiner/settings.html"
-    response = render_live(request, member, template, context, partial=None, path=path)
+    response = render_live(request, member, template, context, path=path)
     forms = (delete_form, connect_form, models_form, file_form)
     response.status_code = 400 if any(form.errors for form in forms) else 200
     return response
@@ -658,7 +659,7 @@ def delete_file(request: HtmxRequest, member: Member, file_id: int) -> HttpRespo
 def exam_file(request: HtmxRequest, member: Member, file_id: int) -> HttpResponse:
     """Each page with the text the AI read from it."""
     file = get_object_or_404(member.exam.files.prefetch_related("pages"), pk=file_id)
-    return render_live(request, member, "examdesk/examiner/file.html", {"file": file}, partial=None)
+    return render_live(request, member, "examdesk/examiner/file.html", {"file": file})
 
 
 def pdf_page(member: Member, file_id: int, number: int) -> tuple[FilePage, bytes]:
