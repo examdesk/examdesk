@@ -151,28 +151,34 @@ def answer_clarification(
 
 
 @transaction.atomic
-def merge_clarifications(*, source: Clarification, target: Clarification) -> Clarification:
-    """Move the source's seats to the target and close the source.
+def merge_clarifications(*, sources: list[Clarification], target: Clarification) -> None:
+    """Move the sources' seats to the target and close the sources.
 
-    The answered one of the two becomes the target, and a target without wording takes
-    the source's. Returns the target.
+    An unanswered target adopts the answer of an answered source, and a target without
+    wording takes the first source's wording.
     """
-    _begin_write(source.exam_id)
-    source, target = _unclosed(source), Clarification.objects.get(pk=target.pk)
-    if source.pk == target.pk:
+    _begin_write(target.exam_id)
+    target, sources = Clarification.objects.get(pk=target.pk), [_unclosed(s) for s in sources]
+    if any(source.pk == target.pk for source in sources):
         raise ServiceError("A clarification cannot be merged into itself.")
     if target.closed_reason == Clarification.ClosedReason.MERGED:
         raise ServiceError("That clarification was merged into another.")
-    if target.closed_reason and source.current_answer_id:
+    answered_sources = [source for source in sources if source.current_answer_id]
+    if target.closed_reason and answered_sources:
         raise ServiceError("An answered clarification cannot be merged into an announced one.")
-    if source.current_answer_id and not target.current_answer_id:
-        source, target = target, source
-    if not target.wording and source.wording:
-        target.wording = source.wording
-        target.save(update_fields=["wording"])
-    source.reports.update(clarification=target)
-    _close(source, Clarification.ClosedReason.MERGED, merged_into=target)
-    return target
+    if not target.current_answer_id and answered_sources:
+        if len(answered_sources) > 1:
+            raise ServiceError("More than one is answered. Merge answered ones one at a time.")
+        [answered_source] = answered_sources
+        answered_source.answers.update(clarification=target)
+        target.current_answer_id = answered_source.current_answer_id
+        Clarification.objects.filter(pk=answered_source.pk).update(current_answer=None)
+    if not target.wording:
+        target.wording = next((source.wording for source in sources if source.wording), "")
+    target.save(update_fields=["current_answer", "wording"])
+    for source in sources:
+        source.reports.update(clarification=target)
+        _close(source, Clarification.ClosedReason.MERGED, merged_into=target)
 
 
 @transaction.atomic

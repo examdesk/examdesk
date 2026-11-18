@@ -44,13 +44,13 @@ clarification_patterns = [
     path("withdraw/", examiner.withdraw_answer, name="withdraw_answer"),
     path("announce/", examiner.announce_clarification, name="announce_clarification"),
     path("reopen/", examiner.reopen_clarification, name="reopen_clarification"),
-    path("merge/", examiner.merge_clarifications, name="merge_clarifications"),
     path("reword/", examiner.reword_clarification, name="reword_clarification"),
     path("relabel/", examiner.relabel_clarification, name="relabel_clarification"),
 ]
 
 examiner_patterns: list[URLPattern | URLResolver] = [
     path("clarifications/", examiner.clarifications, name="clarifications"),
+    path("clarifications/merge/", examiner.merge_clarifications, name="merge_clarifications"),
     path("clarifications/<int:clarification_id>/", include(clarification_patterns)),
     path("reports/<int:report_id>/move/", examiner.move_report, name="move_report"),
     path("announcements/", examiner.announcements, name="announcements"),

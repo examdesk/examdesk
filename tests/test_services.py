@@ -166,24 +166,45 @@ def test_announced_seats_wait_until_read_out_in_their_venue(exam: Exam) -> None:
 
 def test_merge_moves_seats_and_closes_source(exam: Exam) -> None:
     a, b = report(exam), report(exam, seat="C1")
-    services.merge_clarifications(source=a.clarification, target=b.clarification)
+    services.merge_clarifications(sources=[a.clarification], target=b.clarification)
     source = fresh(a.clarification)
     assert source.closed_reason == Clarification.ClosedReason.MERGED
     assert source.merged_into == b.clarification
     assert set(b.clarification.reports.all()) == {a, b}
 
 
-def test_merge_keeps_the_answered_clarification_as_target(exam: Exam) -> None:
+def test_merge_adopts_the_answer_of_an_answered_source(exam: Exam) -> None:
     open_, answered = report(exam), report(exam, seat="C1")
-    services.answer_clarification(
+    answer = services.answer_clarification(
         answered.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
-    target = services.merge_clarifications(
-        source=answered.clarification, target=open_.clarification
+    services.mark_delivered(answered, answer=answer, member=named(exam, "Ann"))
+    services.merge_clarifications(sources=[answered.clarification], target=open_.clarification)
+    assert fresh(open_.clarification).current_answer == answer
+    assert fresh(answered.clarification).current_answer is None
+    assert (state(open_), state(answered)) == (S.TO_DELIVER, S.DELIVERED)
+
+
+def test_merge_several_into_one(exam: Exam) -> None:
+    a, b, c = report(exam), report(exam, seat="C1"), report(exam, seat="D4")
+    services.merge_clarifications(
+        sources=[b.clarification, c.clarification], target=a.clarification
     )
-    assert target == answered.clarification
-    assert fresh(open_.clarification).closed_reason == Clarification.ClosedReason.MERGED
-    assert state(open_) == S.TO_DELIVER
+    assert set(a.clarification.reports.all()) == {a, b, c}
+    assert {fresh(r.clarification).merged_into for r in (b, c)} == {a.clarification}
+
+
+def test_merge_rejects_two_answers_for_an_unanswered_target(exam: Exam) -> None:
+    open_, *answered = report(exam), report(exam, seat="C1"), report(exam, seat="D4")
+    for r in answered:
+        services.answer_clarification(
+            r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
+        )
+    with pytest.raises(ServiceError, match="one at a time"):
+        services.merge_clarifications(
+            sources=[r.clarification for r in answered], target=open_.clarification
+        )
+    assert fresh(open_.clarification).closed_reason == ""
 
 
 def test_merge_requeues_seats_that_got_a_different_answer(exam: Exam) -> None:
@@ -196,23 +217,23 @@ def test_merge_requeues_seats_that_got_a_different_answer(exam: Exam) -> None:
     )
     services.mark_delivered(a, answer=ans_a, member=named(exam, "Ann"))
     services.mark_delivered(b, answer=ans_b, member=named(exam, "Ann"))
-    services.merge_clarifications(source=a.clarification, target=b.clarification)
+    services.merge_clarifications(sources=[a.clarification], target=b.clarification)
     assert (state(a), state(b)) == (S.TO_DELIVER, S.DELIVERED)
 
 
 def test_merge_into_a_photo_keeps_the_sources_wording(exam: Exam) -> None:
     photo, text = report(exam), report(exam, seat="C1", text="Is S finite?")
     services.reword_clarification(photo.clarification, "")  # as a photo-only clarification has none
-    services.merge_clarifications(source=text.clarification, target=photo.clarification)
+    services.merge_clarifications(sources=[text.clarification], target=photo.clarification)
     assert fresh(photo.clarification).wording == "Is S finite?"
 
 
 def test_merge_rejects_a_merged_or_the_same_clarification(exam: Exam) -> None:
     a, b, c = report(exam), report(exam, seat="C1"), report(exam, seat="D4")
-    services.merge_clarifications(source=b.clarification, target=c.clarification)
+    services.merge_clarifications(sources=[b.clarification], target=c.clarification)
     for target in (b.clarification, a.clarification):
         with pytest.raises(ServiceError):
-            services.merge_clarifications(source=a.clarification, target=target)
+            services.merge_clarifications(sources=[a.clarification], target=target)
 
 
 def test_merge_into_an_announced_clarification(exam: Exam) -> None:
@@ -222,8 +243,10 @@ def test_merge_into_an_announced_clarification(exam: Exam) -> None:
         answered.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
     with pytest.raises(ServiceError, match="answered"):
-        services.merge_clarifications(source=answered.clarification, target=announced.clarification)
-    services.merge_clarifications(source=waiting.clarification, target=announced.clarification)
+        services.merge_clarifications(
+            sources=[answered.clarification], target=announced.clarification
+        )
+    services.merge_clarifications(sources=[waiting.clarification], target=announced.clarification)
     assert state(Report.objects.get(pk=waiting.pk)) == S.TO_READ_OUT
 
 
@@ -312,7 +335,7 @@ def test_reopen_clarification(exam: Exam, reason: str) -> None:
     if reason == "announced":
         services.announce(text="!", member=named(exam, "Prof"), clarification=a.clarification)
     else:
-        services.merge_clarifications(source=a.clarification, target=b.clarification)
+        services.merge_clarifications(sources=[a.clarification], target=b.clarification)
     services.reopen_clarification(a.clarification)
     reopened = fresh(a.clarification)
     assert (reopened.closed_reason, reopened.merged_into) == ("", None)
@@ -322,7 +345,7 @@ def test_reopen_clarification(exam: Exam, reason: str) -> None:
 
 def test_merge_is_reversed_by_reopening_and_moving_back(exam: Exam) -> None:
     a, b = report(exam), report(exam, seat="B15", text="Other?")
-    services.merge_clarifications(source=a.clarification, target=b.clarification)
+    services.merge_clarifications(sources=[a.clarification], target=b.clarification)
     services.reopen_clarification(a.clarification)
     services.move_report(Report.objects.get(pk=a.pk), target=a.clarification)
     assert Report.objects.get(pk=a.pk).clarification == a.clarification

@@ -54,6 +54,7 @@ from .common import (
     group_by_venue,
     pick,
     readout_status,
+    redirect_next,
     suggestions,
 )
 from .live import is_refresh, render_live
@@ -378,18 +379,22 @@ def reopen_clarification(
 
 @require_POST
 @exam_view(examiner_only=True)
-def merge_clarifications(
-    request: HtmxRequest, member: Member, clarification_id: int
-) -> HttpResponse:
-    source = get_clarification(member.exam, clarification_id)
-    target = pick(member.exam.clarifications.all(), request.POST.get("target"))
+def merge_clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
+    """Merge the `source` clarifications into the `target` one. Shows the target, or `next` on
+    failure."""
+    clarifications = member.exam.clarifications.all()
+    back = reverse("examiner:clarifications", args=[member.exam.pk])
+    target = pick(clarifications, request.POST.get("target"))
     if target is None:
         messages.error(request, "Pick a clarification to merge into.")
-        return redirect("examiner:clarification", member.exam.pk, clarification_id)
+        return redirect_next(request, back)
+    source_ids = [pk for pk in request.POST.getlist("source") if pk.isdigit()]
+    sources = list(clarifications.filter(pk__in=source_ids))
     with flash_errors(request):
-        clarification_id = services.merge_clarifications(source=source, target=target).pk
-        messages.success(request, "Merged.")
-    return redirect("examiner:clarification", member.exam.pk, clarification_id)
+        services.merge_clarifications(sources=sources, target=target)
+        messages.success(request, f"Merged into {target.label}.")
+        return redirect("examiner:clarification", member.exam.pk, target.pk)
+    return redirect_next(request, back)
 
 
 @require_POST

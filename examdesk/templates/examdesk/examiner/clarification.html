@@ -116,18 +116,27 @@
 
 <aside class="flex min-w-0 flex-col gap-6">
 {% partialdef duplicates %}{% if duplicates %}{% with pk=member.exam.pk %}
-  <section class="list-card" aria-labelledby="duplicates-title">
-    <div class="px-4 py-3"><h2 id="duplicates-title">Possible duplicates</h2></div>
+  <section class="list-card group" aria-labelledby="duplicates-title">
+    <form method="post" action="{% url 'examiner:merge_clarifications' pk %}" id="merge-selected" class="flex items-center justify-between gap-3 px-4 py-3">
+      {% csrf_token %}
+      <input type="hidden" name="target" value="{{ clarification.pk }}">
+      <input type="hidden" name="next" value="{% url 'examiner:clarification' pk clarification.pk %}">
+      <h2 id="duplicates-title">Possible duplicates</h2>
+      <button class="btn btn-primary btn-xs hidden group-has-checked:inline-flex"><c-icon name="git-merge" />Merge into this</button>
+    </form>
     {% for other, percent in duplicates %}
       <div class="row-item items-start">
+        <input type="checkbox" class="checkbox checkbox-sm mt-0.5 rounded-sm" form="merge-selected" name="source" value="{{ other.pk }}" aria-labelledby="duplicate-{{ other.pk }}"{% if other.closed_reason %} disabled{% endif %}>
         <div class="min-w-0 flex-1">
-          <a href="{% url 'examiner:clarification' pk other.pk %}" class="text-sm font-medium hover:underline">{{ other|titled:80 }}</a>
+          <a href="{% url 'examiner:clarification' pk other.pk %}" id="duplicate-{{ other.pk }}" class="text-sm font-medium hover:underline">{{ other|titled:80 }}</a>
           <div class="mt-1 flex items-center gap-2"><c-state-badge :state="other.state" />{% if confirmed_by_ai %}<span class="meta flex items-center gap-1"><c-icon name="sparkles" />{{ percent }}% match</span>{% else %}<span class="meta">{{ percent }}% alike</span>{% endif %}</div>
         </div>
         {% if not other.closed_reason or not clarification.current_answer %}
-          <button type="button" class="btn btn-outline btn-xs" commandfor="merge-{{ other.pk }}" command="show-modal"><c-icon name="git-merge" />Merge into it</button>
-          <c-dialog id="merge-{{ other.pk }}" title="Merge into {{ other.label }}?" action="{% url 'examiner:merge_clarifications' pk clarification.pk %}" submit="Merge clarifications">
+          <button type="button" class="btn btn-ghost btn-xs" commandfor="merge-{{ other.pk }}" command="show-modal">Merge into it</button>
+          <c-dialog id="merge-{{ other.pk }}" title="Merge into {{ other.label }}?" action="{% url 'examiner:merge_clarifications' pk %}" submit="Merge clarifications">
+            <input type="hidden" name="source" value="{{ clarification.pk }}">
             <input type="hidden" name="target" value="{{ other.pk }}">
+            <input type="hidden" name="next" value="{% url 'examiner:clarification' pk clarification.pk %}">
             <blockquote>{{ other.summary }}</blockquote>
           </c-dialog>
         {% endif %}
@@ -192,7 +201,9 @@
     <blockquote data-quote="answer-text"></blockquote>
     <input type="hidden" name="text" data-quote="answer-text">
   </c-dialog>
-  <c-dialog id="merge-dialog" title="Merge into another clarification" action="{% url 'examiner:merge_clarifications' pk clarification.pk %}" submit="Merge clarifications">
+  <c-dialog id="merge-dialog" title="Merge into another clarification" action="{% url 'examiner:merge_clarifications' pk %}" submit="Merge clarifications">
+    <input type="hidden" name="source" value="{{ clarification.pk }}">
+    <input type="hidden" name="next" value="{% url 'examiner:clarification' pk clarification.pk %}">
     <select name="target" aria-label="Merge into" required>
       <option value="">Pick a clarification…</option>
       {% for other in others %}<option value="{{ other.pk }}">{{ other|titled }}</option>{% endfor %}

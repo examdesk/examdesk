@@ -361,7 +361,11 @@ def test_merge_asks_for_a_target_first(examiner: Client, exam: Exam) -> None:
         '<option value="">Pick a clarification'
         in examiner.get(url("examiner:clarification", exam, a.clarification_id)).content.decode()
     )
-    examiner.post(url("examiner:merge_clarifications", exam, a.clarification_id), {"target": ""})
+    back = url("examiner:clarification", exam, a.clarification_id)
+    response = examiner.post(
+        url("examiner:merge_clarifications", exam), {"source": a.clarification_id, "next": back}
+    )
+    assert response["Location"] == back
     assert fresh(a.clarification).closed_reason == ""
 
 
@@ -418,7 +422,7 @@ def test_clarification_page_lists_what_seats_asked_and_duplicates(
     announced = report(exam, seat="F6", label="Q3c", text="Already announced?").clarification
     services.announce(text="!", member=named(exam, "Prof"), clarification=announced)
     merged = report(exam, seat="G7", label="Q3c", text="Merged away?").clarification
-    services.merge_clarifications(source=merged, target=other.clarification)
+    services.merge_clarifications(sources=[merged], target=other.clarification)
     html = examiner.get(
         url("examiner:clarification", exam, first.clarification_id)
     ).content.decode()
@@ -435,7 +439,33 @@ def test_clarification_page_lists_what_seats_asked_and_duplicates(
     assert f">{alike}% alike<" in duplicates
     assert f'<input type="hidden" name="target" value="{other.clarification_id}">' in duplicates
     assert f'name="target" value="{announced.pk}"' in duplicates
+    assert f'name="source" value="{other.clarification_id}"' in duplicates
+    assert (
+        f'name="source" value="{announced.pk}" aria-labelledby="duplicate-{announced.pk}" disabled>'
+        in duplicates
+    )
     assert "Merged away?" not in duplicates
+
+
+def test_merge_several_and_show_the_target(examiner: Client, exam: Exam) -> None:
+    here, a, b = report(exam), report(exam, seat="C1"), report(exam, seat="D4")
+    response = examiner.post(
+        url("examiner:merge_clarifications", exam),
+        {"source": [a.clarification_id, b.clarification_id], "target": here.clarification_id},
+    )
+    assert response["Location"] == url("examiner:clarification", exam, here.clarification_id)
+    assert set(here.clarification.reports.all()) == {here, a, b}
+
+
+def test_failed_merge_stays_on_the_page(examiner: Client, exam: Exam) -> None:
+    here = report(exam).clarification
+    back = url("examiner:clarification", exam, here.pk)
+    response = examiner.post(
+        url("examiner:merge_clarifications", exam),
+        {"source": here.pk, "target": here.pk, "next": back},
+    )
+    assert response["Location"] == back
+    assert fresh(here).closed_reason == ""
 
 
 def test_announced_seats_wait_on_the_seats_pages_until_read_out(
