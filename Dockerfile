@@ -9,9 +9,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv sync --locked --no-dev --no-install-project --extra server --extra postgres
+RUN uv sync --locked --no-dev --no-install-project --extra server
 COPY . .
-RUN uv sync --locked --no-dev --extra server --extra postgres \
+RUN uv sync --locked --no-dev --extra server \
     && python manage.py tailwind build \
     && python manage.py collectstatic --no-input \
     && python manage.py download_model \

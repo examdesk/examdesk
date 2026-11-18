@@ -8,6 +8,15 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: examdesk
+          POSTGRES_PASSWORD: examdesk
+          POSTGRES_DB: examdesk
+        ports: ["5435:5432"]
+        options: --health-cmd pg_isready --health-interval 2s --health-retries 15
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v7

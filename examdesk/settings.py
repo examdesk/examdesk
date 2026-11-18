@@ -56,9 +56,11 @@ TEMPLATES = [
 ]
 
 # No persistent connections: Django advises against them under ASGI.
-DATABASES = {"default": dj_database_url.config(default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")}
-if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
-    DATABASES["default"]["OPTIONS"] = {"transaction_mode": "IMMEDIATE"}
+DATABASES = {
+    "default": dj_database_url.config(
+        default="postgres://examdesk:examdesk@localhost:5435/examdesk"
+    )
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LANGUAGE_CODE = "en-sg"

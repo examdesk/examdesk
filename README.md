@@ -39,7 +39,12 @@ questions and draft answers from the exam paper. File pages render Markdown with
 
 ## Development
 
-Requires Python 3.14 and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.14, [uv](https://docs.astral.sh/uv/) and PostgreSQL:
+
+```sh
+docker run -d --name examdesk-postgres --restart unless-stopped -p 127.0.0.1:5435:5432 \
+  -e POSTGRES_USER=examdesk -e POSTGRES_PASSWORD=examdesk -e POSTGRES_DB=examdesk postgres:18-alpine
+```
 
 ```sh
 uv sync
@@ -73,7 +78,7 @@ The Playwright test needs a browser: `uv run playwright install chromium`.
 | `DJANGO_EMAIL_USER`, `DJANGO_EMAIL_PASSWORD` | empty | SMTP credentials |
 | `DJANGO_DEFAULT_FROM_EMAIL` | `Exam Desk <examdesk@localhost>` | Sender of sign-in codes |
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated host names |
-| `DATABASE_URL` | `sqlite:///db.sqlite3` | e.g. `postgres://user:password@host/examdesk` |
+| `DATABASE_URL` | `postgres://examdesk:examdesk@localhost:5435/examdesk` | PostgreSQL |
 | `EXAMDESK_MEDIA_ROOT` | `media/` | Photos and PDFs, under `exams/<exam id>/` |
 | `EXAMDESK_STATIC_ROOT` | `static/` | Target of `collectstatic` |
 | `HF_HOME` | `~/.cache/huggingface` | Where `download_model` puts the model |
@@ -135,8 +140,8 @@ connect again.
 
 Each push to `main` publishes `ghcr.io/examdesk/examdesk:latest` (and `:<version>` for `v*`
 tags) for amd64 and arm64. The image has the stylesheet, static files and model built in,
-serves static files itself, runs migrations on start and listens on port 8000. It includes
-the PostgreSQL driver; keep `/data` on a volume for photos and PDFs.
+serves static files itself, runs migrations on start and listens on port 8000. Keep `/data`
+on a volume for photos and PDFs.
 
 On [Dokploy](https://dokploy.com/):
 
@@ -158,10 +163,10 @@ On [Dokploy](https://dokploy.com/):
 
 ### Without Docker
 
-gunicorn behind Caddy, with PostgreSQL or MySQL.
+gunicorn behind Caddy, with PostgreSQL.
 
 ```sh
-uv sync --no-dev --extra server --extra postgres   # or --extra mysql
+uv sync --no-dev --extra server
 uv run manage.py migrate
 uv run manage.py createcachetable
 uv run manage.py download_model

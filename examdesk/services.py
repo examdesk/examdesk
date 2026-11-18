@@ -184,8 +184,8 @@ def reword_clarification(clarification: Clarification, wording: str) -> None:
 @transaction.atomic
 def mark_delivered(report: Report, *, answer: Answer | None, member: Member) -> Delivery:
     """Record that the invigilator showed `answer` to the seat. Idempotent."""
-    clarification = Clarification.objects.get(pk=report.clarification_id)
-    _begin_write(clarification.exam_id)
+    _begin_write(member.exam_id)
+    clarification = Clarification.objects.get(reports=report)
     if clarification.closed_reason:
         raise ServiceError("That clarification is closed.")
     if answer is None or answer.pk != clarification.current_answer_id:
@@ -372,7 +372,7 @@ def reset_link(exam: Exam, role: Role) -> None:
 @transaction.atomic
 def delete_exam(exam: Exam) -> None:
     """Delete a closed exam, and its photos after commit."""
-    if Exam.objects.get(pk=exam.pk).is_live:
+    if Exam.objects.select_for_update().get(pk=exam.pk).is_live:
         raise ServiceError("Close the exam before deleting it.")
     folder = Path(settings.MEDIA_ROOT) / "exams" / str(exam.pk)
     exam.delete()

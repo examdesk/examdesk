@@ -24,6 +24,7 @@ dependencies = [
     "onnxruntime>=1.30.0",
     "openai>=3.52.0",
     "pillow>=12.3.0",
+    "psycopg[binary]>=3.3.6",
     "pypdfium2>=5.15.2",
     "segno>=1.6.6",
     "tokenizers>=0.23.2",
@@ -42,13 +43,11 @@ dev = [
 ]
 
 [project.optional-dependencies]
-# Deployment only: the ASGI server and one database driver.
+# Deployment only: the ASGI server.
 server = [
     "gunicorn>=26.2.0",
     "uvicorn-worker>=0.4.0",
 ]
-postgres = ["psycopg[binary]>=3.3.6"]
-mysql = ["mysqlclient>=2.3.0"]
 
 [tool.ruff]
 target-version = "py314"

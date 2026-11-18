@@ -228,7 +228,6 @@ async def transcribe_photo(request: HtmxRequest, exam_id: int) -> HttpResponseBa
     Async, and without a database connection while it waits on the AI service.
     """
     member = await sync_to_async(admit)(request, exam_id, live_only=True)
-    await sync_to_async(connections.close_all)()
     if not isinstance(member, Member):
         return member
     if not member.exam.has_ai_service:
@@ -237,6 +236,7 @@ async def transcribe_photo(request: HtmxRequest, exam_id: int) -> HttpResponseBa
     if not form.is_valid():
         return HttpResponse(form_errors(form), status=400)
     photo = form.cleaned_data["photo"]
+    await sync_to_async(connections.close_all)()
     try:
         text = await ai.transcribe(member.exam, photo.read(), photo.content_type)
     except openai.APIError as error:
