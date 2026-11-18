@@ -12,7 +12,6 @@ def config(request: HttpRequest) -> dict[str, Any]:
             "very_late_after": int(settings.EXAMDESK_VERY_LATE_AFTER.total_seconds()),
             "photo_max_side": settings.EXAMDESK_PHOTO_MAX_SIDE,
             "photo_max_bytes": settings.EXAMDESK_PHOTO_MAX_BYTES,
-            "backup_days": settings.EXAMDESK_BACKUP_DAYS,
             "text_max": settings.EXAMDESK_TEXT_MAX,
             "registration": settings.EXAMDESK_REGISTRATION,
             "registration_domains": settings.EXAMDESK_REGISTRATION_DOMAINS,

@@ -97,7 +97,7 @@
     </div>
   </section>
   <c-dialog id="delete-dialog" title="Delete {{ name }}?" action="{% url 'examiner:delete_exam' pk %}" submit="Delete permanently" danger :autoopen="delete_form.errors">
-    <p>Its reports, answers and photos are deleted. Backups keep them for {{ config.backup_days }} days.</p>
+    <p>Its reports, answers and photos are deleted.</p>
     <div class="field">{{ delete_form.name.as_field_group }}</div>
   </c-dialog>
 {% endif %}
