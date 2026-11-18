@@ -279,6 +279,20 @@ def test_home_shows_exam_cards_with_counts(client: Client, exam: Exam, staff: Us
     assert "<strong>1</strong><span>seat to deliver</span>" in html
 
 
+def test_home_paginates_exams_newest_first(
+    client: Client, exam: Exam, staff: User, settings: Settings
+) -> None:
+    settings.EXAMDESK_PAGE_SIZE = 1
+    services.create_exam(name="Finals", owner=staff)
+    client.force_login(staff)
+    first = client.get(reverse("home")).content.decode()
+    assert "Finals</a>" in first
+    assert f"{exam.name}</a>" not in first
+    second = client.get(reverse("home") + "?page=2").content.decode()
+    assert f"{exam.name}</a>" in second
+    assert "Finals</a>" not in second
+
+
 def test_home_is_a_landing_page_until_there_is_an_exam(
     invigilator: Client, staff: User, settings: Settings
 ) -> None:

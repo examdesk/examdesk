@@ -20,7 +20,7 @@
 {% partialdef live inline %}
 <c-live class="min-w-0">
   <div class="vstack">
-  {% for announcement, missing in announcements %}
+  {% for announcement, missing in page_obj %}
     <article class="tight">
       <div class="flex items-start gap-3">
         <div class="min-w-0 flex-1">
@@ -43,6 +43,7 @@
     <c-empty icon="megaphone" title="No announcements yet" />
   {% endfor %}
   </div>
+  <c-pagination :page_obj="page_obj" />
 </c-live>
 {% endpartialdef %}
 </div>

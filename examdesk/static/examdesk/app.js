@@ -14,13 +14,6 @@ const countOpen = () => {
   if (openCount !== null && count > openCount) news.textContent = `New clarification. ${count} open.`;
   openCount = count;
 };
-const filterSeats = () => {
-  const field = document.querySelector("[data-seat-filter]");
-  if (!field) return;
-  const typed = field.value.replace(/\s/g, "").toUpperCase();
-  document.querySelectorAll("[data-seat]").forEach((card) => (card.hidden = !card.dataset.seat.includes(typed)));
-  document.querySelectorAll("[data-venue]").forEach((venue) => (venue.hidden = !venue.querySelector("[data-seat]:not([hidden])")));
-};
 const submitOnCtrlEnter = (event) => {
   if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey) || event.target.localName !== "textarea") return;
   event.preventDefault();
@@ -307,11 +300,9 @@ const enhance = (field) => {
 htmx.onLoad((element) => {
   buzz();
   countOpen();
-  filterSeats();
   if (element.matches("[data-refresh-in]") || element.querySelector("[data-refresh-in]")) scheduleRefresh();
   document.querySelectorAll("select:not(.tomselected, [hidden]), input[list]:not(.tomselected)").forEach(enhance);
 });
-document.addEventListener("input", (event) => event.target.matches("[data-seat-filter]") && filterSeats());
 document.addEventListener("click", (event) => {
   followRow(event);
   handleButtons(event);

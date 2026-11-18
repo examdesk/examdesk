@@ -13,6 +13,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
+from django.core.paginator import Paginator
 from django.db import connections
 from django.db.models import Prefetch, QuerySet, prefetch_related_objects
 from django.http import Http404, HttpResponse, HttpResponseBase
@@ -34,7 +35,7 @@ from ..forms import (
     TextForm,
     form_errors,
 )
-from ..labels import covers, natural, top_level
+from ..labels import covers, natural, normalize_place, top_level
 from ..matching import rank_similar, same_question, similar_enough
 from ..models import (
     Announcement,
@@ -136,7 +137,7 @@ def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
     filtered = state != "open" or bool(filters.get("label"))
     context = {
         "form": form,
-        "rows": rows,
+        "page_obj": Paginator(rows, settings.EXAMDESK_PAGE_SIZE).get_page(request.GET.get("page")),
         "filtered": filtered,
         "sorts": sort_links(sort),
     }
@@ -449,7 +450,8 @@ def move_report(request: HtmxRequest, member: Member, report_id: int) -> HttpRes
 @require_GET
 @exam_view(examiner_only=True)
 def announcements(request: HtmxRequest, member: Member) -> HttpResponse:
-    context = {"announcements": readout_status(member.exam), **suggestions(member.exam)}
+    paginator = Paginator(readout_status(member.exam), settings.EXAMDESK_PAGE_SIZE)
+    context = {"page_obj": paginator.get_page(request.GET.get("page")), **suggestions(member.exam)}
     return render_live(request, member, "examdesk/examiner/announcements.html", context)
 
 
@@ -490,17 +492,22 @@ class SeatTally:
 @require_GET
 @exam_view(examiner_only=True)
 def seats(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Seat tiles by venue with a count per state. Read out counts as delivered."""
+    """Seat tiles by venue with a count per state. Read out counts as delivered. `?seat=` keeps the
+    seats that contain it."""
+    seat_query = normalize_place(request.GET.get("seat", ""))
     counts: defaultdict[tuple[str, str], Counter[Report.State]] = defaultdict(Counter)
-    for r in Report.objects.of_exam(member.exam).with_state():
+    for r in Report.objects.of_exam(member.exam).filter(seat__contains=seat_query).with_state():
         state = Report.State.DELIVERED if r.state == Report.State.READ_OUT else r.state
         counts[r.venue, r.seat][state] += 1
     tiles = []
-    for venue, seat in sorted(counts, key=lambda place: natural(place[1])):
+    for venue, seat in sorted(
+        counts, key=lambda place: (not place[0], natural(place[0]), natural(place[1]))
+    ):
         tally = [(s, counts[venue, seat][s]) for s in Report.PROGRESS if counts[venue, seat][s]]
         tiles.append((venue, SeatTally(seat, tally)))
-    venues = group_by_venue(tiles)
-    return render_live(request, member, "examdesk/examiner/seats.html", {"venues": venues})
+    page_obj = Paginator(tiles, settings.EXAMDESK_PAGE_SIZE).get_page(request.GET.get("page"))
+    context = {"seat_query": seat_query, "page_obj": page_obj, "venues": group_by_venue(page_obj)}
+    return render_live(request, member, "examdesk/examiner/seats.html", context)
 
 
 @require_GET

@@ -5,18 +5,18 @@
 <div class="page-header">
   <h1>Clarifications</h1>
 </div>
-<form method="get" class="filters mb-4 grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap" data-autosubmit>
+<form method="get" action="{{ request.path }}" class="filters mb-4 grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap" data-autosubmit>
   <div class="sm:w-44">{{ form.state }}</div> <div class="col-span-2 sm:w-80">{{ form.label }}</div> {{ form.sort }}
   <noscript><button class="btn btn-outline btn-sm">Apply</button></noscript>
 </form>
 <c-error>{{ form|form_errors }}</c-error>
 
-{% partialdef sortable %}{% if sort.order %} aria-sort="{{ sort.order }}"{% endif %}><a href="{% querystring sort=sort.sort %}" class="sort">{{ label }}{% if sort.order %}<c-icon name="chevron-{% if sort.order == 'ascending' %}up{% else %}down{% endif %}" />{% endif %}</a>{% endpartialdef %}
+{% partialdef sortable %}{% if sort.order %} aria-sort="{{ sort.order }}"{% endif %}><a href="{% querystring sort=sort.sort page=None %}" class="sort">{{ label }}{% if sort.order %}<c-icon name="chevron-{% if sort.order == 'ascending' %}up{% else %}down{% endif %}" />{% endif %}</a>{% endpartialdef %}
 
 {% partialdef live inline %}
 <c-live>
 {% with pk=member.exam.pk %}
-  {% if rows %}
+  {% if page_obj.object_list %}
   <div class="table-card">
   <table>
     <thead><tr>
@@ -27,7 +27,7 @@
       {% with sort=sorts.state label="State" %}<th class="w-36 max-sm:hidden"{% partial sortable %}</th>{% endwith %}
     </tr></thead>
     <tbody>
-      {% for row in rows %}
+      {% for row in page_obj %}
         {% with clarification=row.clarification %}
         <tr class="row-link">
           <td class="font-medium whitespace-nowrap max-sm:hidden">{{ clarification.label }}</td>
@@ -59,6 +59,7 @@
     </tbody>
   </table>
   </div>
+  <c-pagination :page_obj="page_obj" />
   {% elif filtered %}
     <c-empty icon="search" title="No clarifications match" />
   {% else %}

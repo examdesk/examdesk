@@ -349,6 +349,21 @@ def test_open_groups_seats_by_venue_and_deliver_names_them_in_full(
     )
 
 
+def test_announcements_paginate_newest_first(
+    invigilator: Client, exam: Exam, settings: Settings
+) -> None:
+    settings.EXAMDESK_PAGE_SIZE = 1
+    services.announce(text="Typo in Q2", member=named(exam, "Prof"))
+    services.announce(text="Ten minutes left", member=named(exam, "Prof"))
+    first = invigilator.get(url("invigilator:announcements", exam)).content.decode()
+    assert "Ten minutes left" in first
+    assert "Typo in Q2" not in first
+    assert 'href="?page=2" rel="next">' in first
+    second = invigilator.get(url("invigilator:announcements", exam) + "?page=2").content.decode()
+    assert "Typo in Q2" in second
+    assert "Ten minutes left" not in second
+
+
 def test_announcements_unread_then_marked_as_announced(invigilator: Client, exam: Exam) -> None:
     announcement = services.announce(text="Typo in Q2", member=named(exam, "Prof"))
     unset = invigilator.get(url("invigilator:announcements", exam)).content.decode()

@@ -13,6 +13,7 @@ import openai
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db import connections
 from django.db.models import Prefetch
 from django.http import Http404, HttpResponse, HttpResponseBase
@@ -351,14 +352,16 @@ def announcements(request: HtmxRequest, member: Member) -> HttpResponse:
     found = member.exam.announcements.prefetch_related(
         Prefetch("readouts", Readout.objects.select_related("member"))
     )
+    page_obj = Paginator(found, settings.EXAMDESK_PAGE_SIZE).get_page(request.GET.get("page"))
     items = [
         (
             announcement,
             next((r for r in announcement.readouts.all() if r.venue == member.venue), None),
         )
-        for announcement in found
+        for announcement in page_obj
     ]
-    return invigilator_page(request, member, "announcements", {"items": items})
+    context = {"items": items, "page_obj": page_obj}
+    return invigilator_page(request, member, "announcements", context)
 
 
 @require_POST

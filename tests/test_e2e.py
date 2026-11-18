@@ -152,3 +152,26 @@ def test_question_filter_applies_its_picks_when_closed(
     prof.get_by_role("option", name="All").click()
     expect(prof).to_have_url(re.compile(r"state=all&label=Q3"))
     expect(chips).to_have_count(1)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_find_a_seat_as_you_type(
+    server: str, browser: Browser, staff: User, settings: Settings
+) -> None:
+    settings.EXAMDESK_PAGE_SIZE = 2
+    exam = services.create_exam(name="CS2109S Final", owner=staff)
+    for seat in ("A1", "B2", "B14"):
+        report(exam, seat=seat)
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
+    prof.wait_for_url("**/examiner/**")
+    prof.goto(f"{server}/exams/{exam.pk}/examiner/seats/?page=2")
+    # Each pause in typing searches, and the box keeps the focus.
+    search = prof.get_by_role("searchbox", name="Find a seat")
+    search.press_sequentially("b")
+    expect(prof).to_have_url(re.compile(r"\?seat=b$"))
+    prof.keyboard.type("1")
+    expect(prof).to_have_url(re.compile(r"\?seat=b1$"))
+    expect(prof).not_to_have_url(re.compile("page="))
+    expect(search).to_have_value("b1")
+    expect(prof.get_by_role("link", name=re.compile("^LT19 B14:"))).to_be_visible()
+    expect(prof.get_by_role("link", name=re.compile("^LT19 B2:"))).to_be_hidden()

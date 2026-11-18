@@ -7,6 +7,7 @@ from django.conf import settings
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from pytest_django.fixtures import Settings
 
 from examdesk import services
 from examdesk.models import Exam, Readout, Report
@@ -152,6 +153,26 @@ def test_examiner_announcements_page(invigilator: Client, examiner: Client, exam
     assert "Announce to all venues" not in queue
 
 
+def test_seats_paginate_by_venue_and_find_a_seat(
+    examiner: Client, exam: Exam, settings: Settings
+) -> None:
+    settings.EXAMDESK_PAGE_SIZE = 2
+    report(exam, venue="LT20", seat="A1")
+    report(exam, seat="B14")
+    report(exam, seat="B2")
+    seats = url("examiner:seats", exam)
+    first = examiner.get(seats).content.decode()
+    assert first.index('aria-label="LT19 B2:') < first.index('aria-label="LT19 B14:')
+    assert 'aria-label="LT20 A1:' not in first
+    assert 'aria-label="LT20 A1:' in examiner.get(seats + "?page=2").content.decode()
+    found = examiner.get(seats + "?seat=b+1").content.decode()
+    assert 'value="B1"' in found
+    assert 'aria-label="LT19 B14:' in found
+    assert 'aria-label="LT19 B2:' not in found
+    assert 'aria-label="LT20 A1:' not in found
+    assert "No seats match" in examiner.get(seats + "?seat=Z9").content.decode()
+
+
 def test_seats_page_tiles_by_venue(examiner: Client, exam: Exam) -> None:
     done = report(exam)
     answer = services.answer_clarification(
@@ -204,6 +225,20 @@ def test_deleting_an_announcement_asks_first(
     assert not Readout.objects.exists()
 
 
+def test_announcements_paginate_newest_first(
+    examiner: Client, exam: Exam, settings: Settings
+) -> None:
+    settings.EXAMDESK_PAGE_SIZE = 1
+    services.announce(text="Typo in Q2", member=named(exam, "Prof"))
+    services.announce(text="Ten minutes left", member=named(exam, "Prof"))
+    first = examiner.get(url("examiner:announcements", exam)).content.decode()
+    assert "Ten minutes left" in first
+    assert "Typo in Q2" not in first
+    second = examiner.get(url("examiner:announcements", exam) + "?page=2").content.decode()
+    assert "Typo in Q2" in second
+    assert "Ten minutes left" not in second
+
+
 def test_clarifications_sort_by_question_and_badge_counts_open(
     examiner: Client, exam: Exam
 ) -> None:
@@ -233,6 +268,27 @@ def test_clarifications_sort_by_question_and_badge_counts_open(
     ).content.decode()
     assert html.index("Three?") < html.index("Two?")
     assert 'title="Open clarifications" data-open-count="2">2</span>' in html
+
+
+def test_clarification_page_links_keep_the_sort(
+    examiner: Client, exam: Exam, settings: Settings
+) -> None:
+    settings.EXAMDESK_PAGE_SIZE = 2
+    for label in ("Q1", "Q2", "Q3"):
+        report(exam, label=label, text=f"{label}?")
+    clarifications = url("examiner:clarifications", exam)
+    first = examiner.get(clarifications + "?sort=question").content.decode()
+    assert "Q2?" in first
+    assert "Q3?" not in first
+    assert 'href="?sort=question&amp;page=2" rel="next">' in first
+    second = examiner.get(clarifications + "?sort=question&page=2").content.decode()
+    assert "Q3?" in second
+    assert "Q2?" not in second
+    assert 'href="?sort=question&amp;page=1" rel="prev">' in second
+    assert "Page 2 of 2" in second
+    assert '<a href="?sort=seats" class="sort">' in second
+    refresh = examiner.get(clarifications + "?sort=question&page=2", headers=REFRESH)
+    assert "Q3?" in refresh.content.decode()
 
 
 def test_relabel_changes_the_clarifications_label(examiner: Client, exam: Exam) -> None:

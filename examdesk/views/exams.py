@@ -5,6 +5,7 @@ from collections import Counter
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Count
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect, render
@@ -25,9 +26,11 @@ def home(request: HttpRequest) -> HttpResponse:
     )
     if request.user.is_authenticated:
         visible |= Exam.objects.filter(owner_id=request.user.pk)
-    exams = list(visible.distinct().order_by("-created_at"))
-    if not exams and not request.user.is_authenticated:
+    paginator = Paginator(visible.distinct().order_by("-created_at"), settings.EXAMDESK_PAGE_SIZE)
+    if not paginator.count and not request.user.is_authenticated:
         return render(request, "examdesk/landing.html")
+    page_obj = paginator.get_page(request.GET.get("page"))
+    exams = list(page_obj)
     open_counts = dict(
         Clarification.objects.in_state(Clarification.State.OPEN)
         .filter(exam__in=exams)
@@ -44,7 +47,7 @@ def home(request: HttpRequest) -> HttpResponse:
     )
     to_deliver = Counter(exam_id for exam_id, _, _ in seats)
     cards = [(exam, open_counts.get(exam.pk, 0), to_deliver[exam.pk]) for exam in exams]
-    return render(request, "examdesk/home.html", {"cards": cards})
+    return render(request, "examdesk/home.html", {"cards": cards, "page_obj": page_obj})
 
 
 def staff_name(request: HttpRequest) -> str:

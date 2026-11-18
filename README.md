@@ -117,6 +117,7 @@ The Playwright test needs a browser: `uv run playwright install chromium`.
 | `EXAMDESK_PROXY_COUNT` | `1`, or `0` with `DJANGO_DEBUG` | Proxies in front that append to `X-Forwarded-For`; sign-in rate limits go by the client address before them |
 | `EXAMDESK_BACKUP_DAYS` | `14` | Backup retention shown when deleting an exam |
 | `EXAMDESK_TEXT_MAX` | `2000` | Longest question, answer or announcement, in characters |
+| `EXAMDESK_PAGE_SIZE` | `24` | Exams, clarifications, announcements or seats per page |
 | `WEB_CONCURRENCY` | `3` | gunicorn workers in the Docker image |
 
 With `DJANGO_DEBUG` off, cookies are secure-only and `X-Forwarded-Proto` is trusted.

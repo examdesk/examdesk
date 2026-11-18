@@ -5,10 +5,10 @@
   <h1>Seats</h1>
 </div>
 <div class="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
-  <label class="relative mb-0 block w-60">
+  <form method="get" action="{{ request.path }}" role="search" class="relative w-60" hx-get="{{ request.path }}" hx-trigger="input delay:300ms, submit" hx-target="body" hx-swap="innerMorph" hx-push-url="true">
     <c-icon name="search" class="pointer-events-none absolute top-1/2 left-3 z-10 -translate-y-1/2 text-subtle" />
-    <input type="search" class="h-9 pl-9 text-sm" data-seat-filter placeholder="Find a seat, e.g. B14" aria-label="Find a seat" autocapitalize="characters" autocomplete="off">
-  </label>
+    <input type="search" name="seat" value="{{ seat_query }}" class="h-9 pl-9 text-sm" placeholder="Find a seat, e.g. B14" aria-label="Find a seat" autocapitalize="characters" autocomplete="off">
+  </form>
   <p class="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted" aria-label="Legend">
     <span class="inline-flex items-center gap-1.5"><span class="h-3 w-1 rounded-full bg-amber-500"></span>Open</span>
     <span class="inline-flex items-center gap-1.5"><span class="h-3 w-1 rounded-full bg-blue-600"></span>To deliver</span>
@@ -18,11 +18,11 @@
 {% partialdef live inline %}
 <c-live>
   {% for venue, tiles in venues %}
-    <section data-venue>
+    <section>
     <c-venue-heading :venue="venue" />
     <div class="seat-grid">
       {% for tile in tiles %}
-        <a class="seat-card state-{{ tile.least|slugify }}" data-seat="{{ tile.seat }}" href="{% seat_url 'examiner:seat' member.exam.pk venue tile.seat %}"
+        <a class="seat-card state-{{ tile.least|slugify }}" href="{% seat_url 'examiner:seat' member.exam.pk venue tile.seat %}"
            aria-label="{{ venue }} {{ tile.seat }}:{% for state, count in tile.tally %} {{ count }} {{ state.label|lower }}{% if not forloop.last %},{% endif %}{% endfor %}">
           <strong>{{ tile.seat }}</strong>
           <span class="flex flex-wrap gap-x-2.5">
@@ -35,8 +35,9 @@
     </div>
     </section>
   {% empty %}
-    <c-empty icon="users" title="No seat has asked anything yet" />
+    {% if seat_query %}<c-empty icon="search" title="No seats match" />{% else %}<c-empty icon="users" title="No seat has asked anything yet" />{% endif %}
   {% endfor %}
+  <c-pagination :page_obj="page_obj" />
 </c-live>
 {% endpartialdef %}
 {% endblock %}

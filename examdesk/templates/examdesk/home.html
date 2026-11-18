@@ -30,6 +30,7 @@
     </article>
   {% endfor %}
 </div>
+<c-pagination :page_obj="page_obj" />
 {% else %}
   <c-empty icon="inbox" title="No exams yet" />
 {% endif %}
