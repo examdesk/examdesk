@@ -115,6 +115,27 @@
 </div>
 
 <aside class="flex min-w-0 flex-col gap-6">
+{% partialdef duplicates %}{% if duplicates %}{% with pk=member.exam.pk %}
+  <section class="list-card" aria-labelledby="duplicates-title">
+    <div class="px-4 py-3"><h2 id="duplicates-title">Possible duplicates</h2></div>
+    {% for other, percent in duplicates %}
+      <div class="row-item items-start">
+        <div class="min-w-0 flex-1">
+          <a href="{% url 'examiner:clarification' pk other.pk %}" class="text-sm font-medium hover:underline">{{ other|titled:80 }}</a>
+          <div class="mt-1 flex items-center gap-2"><c-state-badge :state="other.state" />{% if confirmed_by_ai %}<span class="meta flex items-center gap-1"><c-icon name="sparkles" />{{ percent }}% match</span>{% else %}<span class="meta">{{ percent }}% alike</span>{% endif %}</div>
+        </div>
+        {% if not other.closed_reason or not clarification.current_answer %}
+          <button type="button" class="btn btn-outline btn-xs" commandfor="merge-{{ other.pk }}" command="show-modal"><c-icon name="git-merge" />Merge into it</button>
+          <c-dialog id="merge-{{ other.pk }}" title="Merge into {{ other.label }}?" action="{% url 'examiner:merge_clarifications' pk clarification.pk %}" submit="Merge clarifications">
+            <input type="hidden" name="target" value="{{ other.pk }}">
+            <blockquote>{{ other.summary }}</blockquote>
+          </c-dialog>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+{% endwith %}{% endif %}{% endpartialdef %}
+
 {% partialdef live inline %}
 <c-live>
 {% with pk=member.exam.pk editable=member.exam.is_live %}
@@ -147,25 +168,12 @@
 </c-live>
 {% endpartialdef %}
 
-{% if editable and not clarification.closed_reason and duplicates %}
-  <section class="list-card" aria-labelledby="duplicates-title">
-    <div class="px-4 py-3"><h2 id="duplicates-title">Possible duplicates</h2></div>
-    {% for other, alike in duplicates %}
-      <div class="row-item items-start">
-        <div class="min-w-0 flex-1">
-          <a href="{% url 'examiner:clarification' pk other.pk %}" class="text-sm font-medium hover:underline">{{ other|titled:80 }}</a>
-          <div class="mt-1 flex items-center gap-2"><c-state-badge :state="other.state" /><span class="meta">{{ alike }}% alike</span></div>
-        </div>
-        {% if not other.closed_reason or not clarification.current_answer %}
-          <button type="button" class="btn btn-outline btn-xs" commandfor="merge-{{ other.pk }}" command="show-modal"><c-icon name="git-merge" />Merge into it</button>
-          <c-dialog id="merge-{{ other.pk }}" title="Merge into {{ other.label }}?" action="{% url 'examiner:merge_clarifications' pk clarification.pk %}" submit="Merge clarifications">
-            <input type="hidden" name="target" value="{{ other.pk }}">
-            <blockquote>{{ other.summary }}</blockquote>
-          </c-dialog>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </section>
+{% if editable and not clarification.closed_reason %}
+  {% if member.exam.has_ai_service %}
+    <p class="meta flex items-center gap-2" role="status" hx-get="{% url 'examiner:clarification_duplicates' pk clarification.pk %}" hx-trigger="load" hx-swap="outerHTML"><span class="loading loading-spinner loading-xs"></span>Finding duplicates</p>
+  {% else %}
+    {% partial duplicates %}
+  {% endif %}
 {% endif %}
 </aside>
 </div>

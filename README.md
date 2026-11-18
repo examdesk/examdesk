@@ -9,8 +9,8 @@ Django, [htmx 4](https://four.htmx.org/), [daisyUI](https://daisyui.com/) via
 [django-cotton](https://django-cotton.com/), [Lucide](https://lucide.dev/) and
 [Tom Select](https://tom-select.js.org/). A sentence-embedding model on the server flags
 duplicate questions. An exam can add its own AI service to transcribe photos of students'
-questions and draft answers from the exam paper. File pages render Markdown with
-[markdown-it-py](https://markdown-it-py.readthedocs.io/) and maths as MathML with
+questions, draft answers from the exam paper and confirm duplicates. File pages render Markdown
+with [markdown-it-py](https://markdown-it-py.readthedocs.io/) and maths as MathML with
 [latex2mathml](https://github.com/roniemartinez/latex2mathml).
 
 ## Layout
@@ -22,7 +22,7 @@ questions and draft answers from the exam paper. File pages render Markdown with
 | `examdesk/labels.py` | Normalizing question labels, venues and names; natural sort |
 | `examdesk/similarity.py` | Sentence-embedding similarity |
 | `examdesk/matching.py` | Finding clarifications that ask the same thing |
-| `examdesk/ai.py` | Transcribing photos and drafting answers with the exam's AI service |
+| `examdesk/ai.py` | Transcribing photos, drafting answers and confirming duplicates with the exam's AI service |
 | `examdesk/pdf.py` | Counting and rendering PDF pages with PDFium |
 | `examdesk/templatetags/` | Template filters, including Markdown with MathML maths |
 | `examdesk/fields.py` | Encrypted text field, for AI service keys |
@@ -129,8 +129,8 @@ address, key and models.
 
 Examiners then pick two models. The vision model transcribes photos taken while reporting and
 reads PDF pages; a transcription fills in the question for the invigilator to correct. The text
-model drafts answers. A model without reasoning answers in about 2 seconds; a reasoning model can
-take 20.
+model drafts answers and confirms possible duplicates. A model without reasoning answers in
+about 2 seconds; a reasoning model can take 20.
 
 Examiners can also upload the paper and its errata as PDF or text files. The vision model reads
 each PDF page as an image, which keeps formulas and scanned pages. Pages are read four at a time
@@ -140,6 +140,11 @@ file shows each page beside its text.
 Draft with AI sends the files' text and the student's question to the text model. Its reply
 replaces the answer for the examiner to check and send. The AI is told to quote the paper or reply
 with a canned answer, and never to use answers in the files.
+
+With an AI service, the text model checks the ten clarifications the sentence-embedding model
+finds most alike, in one request. The page lists those it finds ask the same thing, with its
+confidence from the reply's logprobs. The reply is cached until those ten change. If the service
+fails, the page lists the most alike.
 
 API keys are encrypted with `DJANGO_SECRET_KEY`. After changing it, examiners disconnect and
 connect again.

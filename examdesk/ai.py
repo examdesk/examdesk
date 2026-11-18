@@ -2,11 +2,19 @@
 
 import asyncio
 import base64
-from collections.abc import Iterable
+import hashlib
+import json
+import math
+import re
+from collections.abc import Iterable, Sequence
 
 from django.conf import settings
 from openai import AsyncOpenAI, OpenAI
-from openai.types.chat import ChatCompletionContentPartParam, ChatCompletionMessageParam
+from openai.types.chat import (
+    ChatCompletionContentPartParam,
+    ChatCompletionMessageParam,
+    ChatCompletionTokenLogprob,
+)
 
 from . import pdf
 from .models import Clarification, Exam, ExamFile
@@ -39,6 +47,12 @@ gets "2b says: Give your answer in metres."
 - "Is it 2(n-1) or 2n-1 in 5a?", when 5a has \\(2n-1\\), gets "5a says: 2n - 1."
 
 Reply with only the words for the student, with maths in plain text rather than LaTeX."""
+CONFIRM_DUPLICATES = """\
+During an exam, students ask clarifications about questions on the paper. The question number \
+is in brackets; parts such as a and b are different questions. Clarifications about the same \
+question often ask different things. For each other clarification, write one line: its id, a \
+colon, then Yes if it asks the same thing about the same question as the clarification, so that \
+one answer serves both, or No. Write nothing else."""
 
 
 def list_models(base_url: str, api_key: str) -> list[str]:
@@ -48,13 +62,14 @@ def list_models(base_url: str, api_key: str) -> list[str]:
         return sorted(model.id for model in client.models.list())
 
 
+def _client(exam: Exam) -> AsyncOpenAI:
+    timeout = settings.EXAMDESK_AI_TIMEOUT.total_seconds()
+    return AsyncOpenAI(base_url=exam.ai_base_url, api_key=exam.ai_api_key, timeout=timeout)
+
+
 async def _reply(exam: Exam, model: str, messages: list[ChatCompletionMessageParam]) -> str:
     """Raises `openai.APIError`."""
-    async with AsyncOpenAI(
-        base_url=exam.ai_base_url,
-        api_key=exam.ai_api_key,
-        timeout=settings.EXAMDESK_AI_TIMEOUT.total_seconds(),
-    ) as client:
+    async with _client(exam) as client:
         completion = await client.chat.completions.create(
             model=model, temperature=0, messages=messages
         )
@@ -88,7 +103,7 @@ async def draft_answer(exam: Exam, clarification: Clarification, files: Iterable
     system = "\n\n".join(
         [DRAFT.format(canned=canned), *(f"# {file.name}\n\n{file.text}" for file in files)]
     )
-    asked = "\n".join(dict.fromkeys(text for text in clarification.texts if text))
+    asked = "\n".join(_distinct_texts(clarification))
     question = f"Exam question: {clarification.label}\nThe student asks:\n{asked}"
     messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": system},
@@ -96,3 +111,80 @@ async def draft_answer(exam: Exam, clarification: Clarification, files: Iterable
     ]
     text = await _reply(exam, exam.ai_text_model, messages)
     return text[: settings.EXAMDESK_TEXT_MAX]
+
+
+def _distinct_texts(clarification: Clarification) -> list[str]:
+    return list(dict.fromkeys(text for text in clarification.texts if text))
+
+
+def _labeled_texts(clarification: Clarification) -> str:
+    return f"[{clarification.label}] {' / '.join(_distinct_texts(clarification))}"
+
+
+def _duplicates_messages(
+    clarification: Clarification, candidates: Sequence[Clarification]
+) -> list[ChatCompletionMessageParam]:
+    tagged = "\n\n".join(
+        f'<clarification id="C{n}">\n{_labeled_texts(candidate)}\n</clarification>'
+        for n, candidate in enumerate(candidates, 1)
+    )
+    prompt = (
+        f"Clarification:\n<clarification>\n{_labeled_texts(clarification)}\n</clarification>\n\n"
+        f"Other clarifications:\n\n{tagged}\n\n"
+        f'Reply with {len(candidates)} line(s), such as "C1: Yes".'
+    )
+    return [
+        {"role": "system", "content": CONFIRM_DUPLICATES},
+        {"role": "user", "content": prompt},
+    ]
+
+
+def duplicates_cache_key(
+    exam: Exam, clarification: Clarification, candidates: Sequence[Clarification]
+) -> str:
+    """Changes with the service, the model and the prompt."""
+    messages = _duplicates_messages(clarification, candidates)
+    data = json.dumps([exam.ai_base_url, exam.ai_text_model, messages])
+    return "duplicates:" + hashlib.sha256(data.encode()).hexdigest()
+
+
+async def confirm_duplicates(
+    exam: Exam, clarification: Clarification, candidates: Sequence[Clarification]
+) -> list[float]:
+    """For each of `candidates`, the probability that it asks the same thing as `clarification`:
+    1 or 0 without logprobs. Requires the clarifications' reports prefetched.
+
+    Raises `openai.APIError`, or `ValueError` for a reply without a yes or no per candidate.
+    """
+    async with _client(exam) as client:
+        completion = await client.chat.completions.create(
+            model=exam.ai_text_model,
+            temperature=0,
+            messages=_duplicates_messages(clarification, candidates),
+            logprobs=True,
+            top_logprobs=5,
+        )
+    choice = completion.choices[0]
+    if choice.logprobs and choice.logprobs.content:
+        probabilities = [
+            _yes_probability(token)
+            for token in choice.logprobs.content
+            if token.token.strip().lower() in ("yes", "no")
+        ]
+    else:
+        words = re.findall(r"\b(yes|no)\b", (choice.message.content or "").lower())
+        probabilities = [float(word == "yes") for word in words]
+    if len(probabilities) != len(candidates):
+        raise ValueError(f"Expected {len(candidates)} yes or no answers, got {len(probabilities)}")
+    return probabilities
+
+
+def _yes_probability(token: ChatCompletionTokenLogprob) -> float:
+    """P(yes) among the token's yes and no alternatives, or the token itself without any."""
+    probabilities = {"yes": 0.0, "no": 0.0}
+    for alternative in token.top_logprobs:
+        if (word := alternative.token.strip().lower()) in probabilities:
+            probabilities[word] += math.exp(alternative.logprob)
+    if total := probabilities["yes"] + probabilities["no"]:
+        return probabilities["yes"] / total
+    return float(token.token.strip().lower() == "yes")

@@ -1,6 +1,7 @@
-"""The exam's own AI service: transcribing photos and drafting answers."""
+"""The exam's own AI service: transcribing photos, drafting answers and finding duplicates."""
 
 import json
+import math
 import threading
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -10,6 +11,7 @@ from typing import Any
 import httpx2
 import openai
 import pytest
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import Client
@@ -32,9 +34,11 @@ def connect(exam: Exam, base_url: str = SERVICE["base_url"]) -> None:
 
 
 class FakeService(ThreadingHTTPServer):
-    """An OpenAI-compatible service on localhost that answers with `status`."""
+    """An OpenAI-compatible service on localhost that answers with `status` and `content`."""
 
     status = 200
+    content = " Can we assume x > 0?\n"
+    logprobs: list[dict[str, Any]] | None = None
     requests: list[tuple[dict[str, str], dict[str, Any]]]
 
     @property
@@ -52,14 +56,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         self.server.requests.append(({k.lower(): v for k, v in self.headers.items()}, body))
-        message = {"role": "assistant", "content": " Can we assume x > 0?\n"}
+        message = {"role": "assistant", "content": self.server.content}
+        choice = {"index": 0, "finish_reason": "stop", "message": message}
+        if self.server.logprobs is not None:
+            choice["logprobs"] = {"content": self.server.logprobs}
         self.send(
             {
                 "id": "1",
                 "object": "chat.completion",
                 "created": 0,
                 "model": body["model"],
-                "choices": [{"index": 0, "finish_reason": "stop", "message": message}],
+                "choices": [choice],
             }
         )
 
@@ -77,7 +84,8 @@ class Handler(BaseHTTPRequestHandler):
 
 @pytest.fixture
 def ai(exam: Exam) -> Iterator[FakeService]:
-    """The exam's AI service."""
+    """The exam's AI service, with an empty cache."""
+    cache.clear()
     with FakeService(("127.0.0.1", 0), Handler) as server:
         server.requests = []
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -375,3 +383,119 @@ def test_text_files_show_their_text_without_images(examiner: Client, exam: Exam)
     page = examiner.get(url("examiner:file", exam, file.pk)).content.decode()
     assert "Q3b: x is a positive integer." in page
     assert "/image/" not in page
+
+
+def three_clarifications(exam: Exam) -> None:
+    for seat, label, text in [
+        ("B14", "Q3b", "Is the answer big-O or an exact count?"),
+        ("B15", "Q1", "Is the list sorted?"),
+        ("B16", "Q3b", "Do we give the exact count?"),
+    ]:
+        report(exam, seat=seat, label=label, text=text)
+
+
+def duplicates(client: Client, exam: Exam) -> tuple[int, str]:
+    """The duplicates panel of the latest Q3b clarification."""
+    clarification = exam.clarifications.filter(label="Q3b").last()
+    assert clarification is not None
+    response = client.get(url("examiner:clarification_duplicates", exam, clarification.pk))
+    return response.status_code, response.content.decode()
+
+
+def reply_line_tokens(yes_probability: float) -> list[dict[str, Any]]:
+    """The tokens of a reply line "C1: Yes" or "C1: No", with yes and no alternatives."""
+    alternatives = [
+        {"token": " Yes", "logprob": math.log(yes_probability)},
+        {"token": " No", "logprob": math.log(1 - yes_probability)},
+    ]
+    word = " Yes" if yes_probability >= 0.5 else " No"
+    return [
+        {"token": "C1", "logprob": 0, "top_logprobs": []},
+        {"token": ":", "logprob": 0, "top_logprobs": []},
+        {"token": word, "logprob": 0, "top_logprobs": alternatives},
+    ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_ai_confirms_possible_duplicates(examiner: Client, exam: Exam, ai: FakeService) -> None:
+    three_clarifications(exam)
+    later = exam.clarifications.last()
+    assert later is not None
+    page = examiner.get(url("examiner:clarification", exam, later.pk)).content.decode()
+    assert "Finding duplicates" in page
+    assert "% alike" not in page
+    ai.content = "C1: Yes\nC2: No"
+    status, panel = duplicates(examiner, exam)
+    assert status == 200
+    assert panel.count("% match") == 1
+    assert "100% match" in panel  # without logprobs
+    assert "big-O" in panel
+    [(_, body)] = ai.requests
+    assert body["model"] == "text"
+    assert body["logprobs"]
+    prompt = body["messages"][1]["content"]
+    assert "Clarification:\n<clarification>\n[Q3b] Do we give the exact count?\n" in prompt
+    assert '<clarification id="C1">\n[Q3b] Is the answer big-O or an exact count?\n' in prompt
+    assert '<clarification id="C2">\n[Q1] Is the list sorted?\n' in prompt
+
+
+@pytest.mark.django_db(transaction=True)
+def test_duplicates_show_their_probability(examiner: Client, exam: Exam, ai: FakeService) -> None:
+    three_clarifications(exam)
+    ai.logprobs = reply_line_tokens(0.6) + reply_line_tokens(0.9)
+    panel = duplicates(examiner, exam)[1]
+    assert "60% match" in panel
+    assert "90% match" in panel
+    assert panel.index("Is the list sorted") < panel.index("big-O")  # likeliest first
+    no_alternatives = {"token": " No", "logprob": 0, "top_logprobs": []}
+    ai.logprobs = [*reply_line_tokens(0.6), *reply_line_tokens(0.9)[:2], no_alternatives]
+    cache.clear()
+    panel = duplicates(examiner, exam)[1]
+    assert "big-O" in panel
+    assert "Is the list sorted" not in panel
+
+
+@pytest.mark.django_db(transaction=True)
+def test_no_duplicates_when_the_ai_finds_none(
+    examiner: Client, exam: Exam, ai: FakeService
+) -> None:
+    three_clarifications(exam)
+    ai.content = "C1: No\nC2: No"
+    assert duplicates(examiner, exam) == (200, "")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_replies_are_cached(examiner: Client, exam: Exam, ai: FakeService) -> None:
+    three_clarifications(exam)
+    ai.content = "C1: Yes\nC2: Yes"
+    duplicates(examiner, exam)
+    assert duplicates(examiner, exam)[1].count("% match") == 2
+    assert len(ai.requests) == 1
+    report(exam, seat="B17", label="Q1", text="Is the input list sorted?")
+    ai.content = "C1: Yes\nC2: Yes\nC3: Yes"
+    duplicates(examiner, exam)
+    assert len(ai.requests) == 2  # a new candidate
+
+
+@pytest.mark.parametrize(("status", "content"), [(400, ""), (200, "Yes.")])
+@pytest.mark.django_db(transaction=True)
+def test_failed_ai_falls_back_to_the_most_alike(
+    examiner: Client, exam: Exam, ai: FakeService, status: int, content: str
+) -> None:
+    three_clarifications(exam)
+    ai.status, ai.content = status, content
+    status, panel = duplicates(examiner, exam)
+    assert status == 200
+    assert "% alike" in panel
+    assert "% match" not in panel
+
+
+def test_no_ai_duplicates_without_a_service(examiner: Client, exam: Exam) -> None:
+    three_clarifications(exam)
+    assert duplicates(examiner, exam)[0] == 404
+
+
+def test_invigilators_cannot_ask_for_duplicates(invigilator: Client, exam: Exam) -> None:
+    three_clarifications(exam)
+    connect(exam)
+    assert duplicates(invigilator, exam)[0] == 403

@@ -12,10 +12,11 @@ import segno
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
+from django.core.cache import cache
 from django.db import connections
-from django.db.models import Prefetch
+from django.db.models import Prefetch, QuerySet, prefetch_related_objects
 from django.http import Http404, HttpResponse, HttpResponseBase
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET, require_POST
@@ -164,21 +165,16 @@ def clarification_page(
     reports = list(
         Report.objects.with_state().filter(clarification=clarification).select_related("member")
     )
-    related = list(
-        member.exam.clarifications.exclude(pk=clarification.pk)
-        .exclude(closed_reason=Clarification.ClosedReason.MERGED)
-        .prefetch_related("reports")
-    )
+    related = list(unmerged_others(member.exam, clarification))
     current = clarification.current_answer
     context = {
         "clarification": clarification,
         # reports that add something to the wording
         "asked": [r for r in reports if r.photo or (r.text and r.text != clarification.wording)],
-        "duplicates": [
-            (other, round(score * 100))
-            for other, score in rank_similar(clarification.texts, related)
-            if same_question(clarification.label, other.label) or similar_enough(score)
-        ],
+        # with an AI service, loaded by `clarification_duplicates`
+        "duplicates": []
+        if member.exam.has_ai_service
+        else possible_duplicates(clarification, rank_similar(clarification.texts, related)),
         "form": form,
         "reports": reports,
         "answers": clarification.answers.select_related("member"),
@@ -194,6 +190,87 @@ def clarification_page(
     response = render_live(request, member, template, context, path=path)
     response.status_code = 400 if label_form and label_form.errors else 200
     return response
+
+
+DUPLICATE_CANDIDATES = 10
+
+
+def unmerged_others(exam: Exam, clarification: Clarification) -> QuerySet[Clarification]:
+    return (
+        exam.clarifications.exclude(pk=clarification.pk)
+        .exclude(closed_reason=Clarification.ClosedReason.MERGED)
+        .prefetch_related("reports")
+    )
+
+
+def possible_duplicates(
+    clarification: Clarification, ranked: list[tuple[Clarification, float]]
+) -> list[tuple[Clarification, int]]:
+    """Those under the same question or similar enough, with the similarity in percent."""
+    return [
+        (other, round(score * 100))
+        for other, score in ranked
+        if same_question(clarification.label, other.label) or similar_enough(score)
+    ]
+
+
+def rank_others(
+    member: Member, clarification_id: int
+) -> tuple[Clarification, list[tuple[Clarification, float]]]:
+    """The clarification, and the unmerged others by similarity to it."""
+    clarification = get_clarification(member.exam, clarification_id)
+    prefetch_related_objects([clarification], "reports")
+    return clarification, rank_similar(
+        clarification.texts, unmerged_others(member.exam, clarification)
+    )
+
+
+@require_GET
+async def clarification_duplicates(
+    request: HtmxRequest, exam_id: int, clarification_id: int
+) -> HttpResponseBase:
+    """Of the most alike clarifications, those the AI service finds ask the same thing, likeliest
+    first. Without its answer, the most alike.
+
+    Async, and without a database connection while it waits on the AI service.
+    """
+    member = await sync_to_async(admit)(request, exam_id, examiner_only=True, live_only=True)
+    if not isinstance(member, Member):
+        return member
+    if not member.exam.has_ai_service:
+        raise Http404
+    clarification, ranked = await sync_to_async(rank_others)(member, clarification_id)
+    candidates = sorted(
+        (other for other, _ in ranked[:DUPLICATE_CANDIDATES]), key=lambda other: other.pk
+    )
+    key = ai.duplicates_cache_key(member.exam, clarification, candidates)
+    probabilities: list[float] | None = await cache.aget(key) if candidates else []
+    if probabilities is None:
+        await sync_to_async(connections.close_all)()
+        try:
+            probabilities = await ai.confirm_duplicates(member.exam, clarification, candidates)
+        except (openai.APIError, ValueError) as error:
+            logger.warning("Couldn't confirm duplicates: %s", error)
+        else:
+            await cache.aset(key, probabilities, timeout=None)
+    if probabilities is None:
+        duplicates = possible_duplicates(clarification, ranked)
+    else:
+        duplicates = [
+            (other, round(probability * 100))
+            for probability, other in sorted(
+                zip(probabilities, candidates, strict=True), key=lambda pair: pair[0], reverse=True
+            )
+            if probability >= 0.5
+        ]
+    context = {
+        "member": member,
+        "clarification": clarification,
+        "duplicates": duplicates,
+        "confirmed_by_ai": probabilities is not None,
+    }
+    template = "examdesk/examiner/clarification.html#duplicates"
+    return await sync_to_async(render)(request, template, context)
 
 
 @require_GET

@@ -39,6 +39,7 @@ invigilator_patterns = [
 clarification_patterns = [
     path("", examiner.clarification, name="clarification"),
     path("answer/", examiner.answer_clarification, name="answer_clarification"),
+    path("duplicates/", examiner.clarification_duplicates, name="clarification_duplicates"),
     path("draft/", examiner.draft_answer, name="draft_answer"),
     path("withdraw/", examiner.withdraw_answer, name="withdraw_answer"),
     path("announce/", examiner.announce_clarification, name="announce_clarification"),
