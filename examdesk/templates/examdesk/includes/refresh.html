@@ -1,0 +1,3 @@
+{# A refresh: the page's live part, and the tab bar or nav badges, each swapped in by id. #}
+{% if live_partial %}{% include live_partial %}{% endif %}
+{% if invigilator_screen %}{% include "examdesk/invigilator/base.html#tab_bar" %}{% elif member.is_examiner %}{% include "examdesk/includes/nav.html#clarifications_badge" %}{% include "examdesk/includes/nav.html#announcements_badge" %}{% endif %}

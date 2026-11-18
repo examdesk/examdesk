@@ -30,12 +30,20 @@ questions and draft answers from the exam paper. File pages render Markdown with
 | `examdesk/accounts.py` | Sign-up rules for django-allauth's emailed-code sign-in |
 | `examdesk/session.py` | Per-device state: member, filters, snoozed alerts |
 | `examdesk/access.py` | The `exam_view` access decorator |
-| `examdesk/views/` | `exams`, `invigilator`, `examiner`, `live` (polling), `common` |
-| `examdesk/templates/examdesk/` | Pages; each page's polled part is its `live` partial |
+| `examdesk/listener.py` | Listening for new exam versions and passing them to open subscriptions |
+| `examdesk/views/` | `exams`, `invigilator`, `examiner`, `live` (streams and refreshes), `common` |
+| `examdesk/templates/examdesk/` | Pages; each page's live part is its `live` partial |
 | `examdesk/templates/account/` | django-allauth pages and email |
 | `examdesk/templates/cotton/` | django-cotton components |
 | `examdesk/static/examdesk/` | `app.js`, vendored htmx, Tom Select and Invoker Commands polyfill |
 | `tests/` | Unit and view tests, and a Playwright end-to-end test |
+
+## Live updates
+
+Each page subscribes to its exam's version with server-sent events. A database trigger sends a
+NOTIFY for each new version, and each server process listens on one PostgreSQL connection. On a new
+version a page fetches its live parts in one request: its `live` partial, and the tab bar or nav
+badges. Wait times count up in the browser. While nothing changes the server only sends heartbeats.
 
 ## Development
 
@@ -52,11 +60,13 @@ uv run manage.py migrate
 uv run manage.py createcachetable
 uv run manage.py download_model   # 23 MB
 uv run manage.py createsuperuser
-DJANGO_DEBUG=1 uv run manage.py tailwind runserver   # rebuilds the CSS on template changes
+uv run manage.py tailwind watch   # in its own terminal: rebuilds the CSS on template changes
+DJANGO_DEBUG=1 uv run uvicorn examdesk.asgi:application --reload --timeout-graceful-shutdown 1
 ```
 
 Give the superuser an email address and sign in with it. There are no passwords: Exam Desk
-emails a code, which in development is printed in the `runserver` console.
+emails a code, which in development is printed in the uvicorn console. `runserver` can't serve
+the pages' streams.
 
 Quality gate:
 
@@ -82,8 +92,8 @@ The Playwright test needs a browser: `uv run playwright install chromium`.
 | `EXAMDESK_MEDIA_ROOT` | `media/` | Photos and PDFs, under `exams/<exam id>/` |
 | `EXAMDESK_STATIC_ROOT` | `static/` | Target of `collectstatic` |
 | `HF_HOME` | `~/.cache/huggingface` | Where `download_model` puts the model |
-| `EXAMDESK_POLL_EVERY` | `2` | Seconds between polls of a page's live part |
-| `EXAMDESK_OFFLINE_AFTER` | `6` | Seconds without a successful poll before a page says it is offline |
+| `EXAMDESK_HEARTBEAT_EVERY` | `5` | Seconds between heartbeats on a page's stream |
+| `EXAMDESK_OFFLINE_AFTER` | `12` | Seconds without a heartbeat before a page says it is offline and reconnects |
 | `EXAMDESK_SEEN_EVERY` | `30` | Seconds between presence updates |
 | `EXAMDESK_ONLINE_FOR` | `60` | Seconds a member counts as online after last seen |
 | `EXAMDESK_SEAT_CLAIM_FOR` | `300` | Longest seat claim, in seconds |

@@ -506,6 +506,7 @@ dev = [
     { name = "pytest-django" },
     { name = "pytest-playwright" },
     { name = "ruff" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -545,6 +546,7 @@ dev = [
     { name = "pytest-django", specifier = ">=4.14.0" },
     { name = "pytest-playwright", specifier = ">=0.9.0" },
     { name = "ruff", specifier = ">=0.16.9" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
 [[package]]

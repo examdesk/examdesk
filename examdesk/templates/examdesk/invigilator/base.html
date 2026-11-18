@@ -9,7 +9,7 @@
 {% block after_main %}
 {% partialdef tab_bar inline %}
 {% with pk=member.exam.pk %}
-<c-live id="tab-bar" load="{% if not counts %}{% url 'invigilator:tab_bar' pk %}?tab={{ tab }}&here={{ request.get_full_path|urlencode }}&v={% endif %}">
+<c-live id="tab-bar" :refresh_in="snooze_ends_in">
 {% if alert %}
   <div class="invigilator-alert" role="alert" data-alert="{{ alert_key }}">
     <div>
@@ -21,14 +21,14 @@
       <div class="flex gap-2">
         <div class="flex-1">
           {% if member.venue %}
-            <c-read-out-button :announcement="alert" :member="member" next="{{ here }}" />
+            <c-read-out-button :announcement="alert" :member="member" next="{{ page_url }}" />
           {% else %}
             <a class="btn btn-block btn-outline" href="{% url 'invigilator:announcements' pk %}">Open Announcements</a>
           {% endif %}
         </div>
         <form method="post" action="{% url 'invigilator:snooze_announcement' pk alert.pk %}">
           {% csrf_token %}
-          <input type="hidden" name="next" value="{{ here }}">
+          <input type="hidden" name="next" value="{{ page_url }}">
           <button class="btn btn-outline">Remind me later</button>
         </form>
       </div>

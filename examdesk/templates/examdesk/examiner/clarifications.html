@@ -11,7 +11,7 @@
 </form>
 <c-error>{{ form|form_errors }}</c-error>
 
-{% partialdef sortable %}{% if sort.order %} aria-sort="{{ sort.order }}"{% endif %}><a href="{% querystring sort=sort.sort v=None %}" class="sort">{{ label }}{% if sort.order %}<c-icon name="chevron-{% if sort.order == 'ascending' %}up{% else %}down{% endif %}" />{% endif %}</a>{% endpartialdef %}
+{% partialdef sortable %}{% if sort.order %} aria-sort="{{ sort.order }}"{% endif %}><a href="{% querystring sort=sort.sort %}" class="sort">{{ label }}{% if sort.order %}<c-icon name="chevron-{% if sort.order == 'ascending' %}up{% else %}down{% endif %}" />{% endif %}</a>{% endpartialdef %}
 
 {% partialdef live inline %}
 <c-live>
@@ -39,7 +39,7 @@
                 <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted sm:hidden">
                   <span class="font-medium text-base-content">{{ clarification.label }}</span> ·
                   <span>{{ row.reports|length }} seat{{ row.reports|length|pluralize }}</span>
-                  {% if row.since %}<span class="wait{% if clarification.state == 'open' %} {{ row.since|wait_level }}{% endif %}">{{ row.since|wait }}</span>{% endif %}
+                  {% if row.since %}<span class="wait{% if clarification.state == 'open' %} {{ row.since|wait_level }}{% endif %}" data-wait-since="{{ row.since|date:'U' }}"{% if clarification.state == 'open' %} data-wait-level{% endif %}>{{ row.since|wait }}</span>{% endif %}
                   <c-state-badge :state="clarification.state" />
                 </div>
               </div>
@@ -50,7 +50,7 @@
             {% if clarification.state == "answered" and row.unresolved %}<div class="meta">{{ row.unresolved }} to deliver</div>{% endif %}
           </td>
           <td class="max-sm:hidden">
-            {% if row.since %}<span class="wait{% if clarification.state == 'open' %} {{ row.since|wait_level }}{% endif %}" title="Asked at {{ row.since|time:'H:i' }}">{{ row.since|wait }}</span>{% else %}<span class="text-subtle">–</span>{% endif %}
+            {% if row.since %}<span class="wait{% if clarification.state == 'open' %} {{ row.since|wait_level }}{% endif %}" data-wait-since="{{ row.since|date:'U' }}"{% if clarification.state == 'open' %} data-wait-level{% endif %} title="Asked at {{ row.since|time:'H:i' }}">{{ row.since|wait }}</span>{% else %}<span class="text-subtle">–</span>{% endif %}
           </td>
           <td class="max-sm:hidden"><c-state-badge :state="clarification.state" /></td>
         </tr>

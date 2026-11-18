@@ -321,11 +321,14 @@ class SeatClaim(models.Model):
     def __str__(self) -> str:
         return f"{self.venue} {self.seat} by {self.member.name}"
 
+    @property
+    def expires_at(self) -> datetime:
+        return self.claimed_at + settings.EXAMDESK_SEAT_CLAIM_FOR
+
     def holds(self, undelivered: Iterable[Report]) -> bool:
         """Not expired, and no answer is newer than the claim."""
         answers = (report.clarification.current_answer for report in undelivered)
-        recent = timezone.now() - self.claimed_at < settings.EXAMDESK_SEAT_CLAIM_FOR
-        return recent and all(
+        return timezone.now() < self.expires_at and all(
             answer is None or answer.created_at <= self.claimed_at for answer in answers
         )
 

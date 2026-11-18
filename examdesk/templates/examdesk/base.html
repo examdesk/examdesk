@@ -17,7 +17,7 @@
   <script src="{% static 'examdesk/tom-select-2.6.2.complete.min.js' %}" defer></script>
   <script src="{% static 'examdesk/app.js' %}" defer></script>
 </head>
-<body class="min-h-screen{% if invigilator_screen %} invigilator{% endif %}" data-offline-after="{{ config.offline_after }}" data-photo-max-side="{{ config.photo_max_side }}" data-photo-max-bytes="{{ config.photo_max_bytes }}" hx-headers:inherited='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body class="min-h-screen{% if invigilator_screen %} invigilator{% endif %}" data-offline-after="{{ config.offline_after }}" data-late-after="{{ config.late_after }}" data-very-late-after="{{ config.very_late_after }}" data-photo-max-side="{{ config.photo_max_side }}" data-photo-max-bytes="{{ config.photo_max_bytes }}" hx-headers:inherited='{"X-CSRFToken": "{{ csrf_token }}"}'>
   <header class="appbar">
     <div class="mx-auto flex h-14 items-center gap-2.5 px-4 {% if invigilator_screen %}max-w-2xl{% else %}max-w-6xl sm:px-6{% endif %}">
       {% if invigilator_screen %}
@@ -52,5 +52,6 @@
   <datalist id="labels">{% for value in labels %}<option value="{{ value }}">{% endfor %}</datalist>
   <datalist id="venues">{% for value in venues %}<option value="{{ value }}">{% endfor %}</datalist>
   <datalist id="seats">{% for value in seats %}<option value="{{ value }}">{% endfor %}</datalist>
+  {% if page_url %}<div id="refresh" hidden hx-get="{{ page_url }}" hx-trigger="exam-changed throttle:1s" hx-swap="none" data-stream="{% url 'events' member.exam.pk %}" data-version="{{ member.exam.version }}"></div>{% endif %}
 </body>
 </html>

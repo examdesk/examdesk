@@ -4,14 +4,14 @@ from contextlib import contextmanager
 from typing import Any
 
 from django.contrib import messages
-from django.db.models import Model, QuerySet
+from django.db.models import Model, Prefetch, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from .. import services
 from ..labels import natural
-from ..models import Clarification, Exam, Report
+from ..models import Announcement, Clarification, Exam, Member, Readout, Report
 
 
 @contextmanager
@@ -39,9 +39,11 @@ def get_clarification(exam: Exam, clarification_id: int) -> Clarification:
 
 
 def suggestions(exam: Exam) -> dict[str, Any]:
+    """The datalists' options. `labels` is lazy, as refreshes don't render the datalists."""
     reports = Report.objects.of_exam(exam)
+    labels = exam.clarifications.values_list("label", flat=True)
     return {
-        "labels": sorted(set(exam.clarifications.values_list("label", flat=True)), key=natural),
+        "labels": lambda: sorted(set(labels), key=natural),
         "venues": reports.values_list("venue", flat=True).distinct().order_by("venue"),
         "seats": reports.values_list("seat", flat=True).distinct().order_by("seat"),
     }
@@ -59,3 +61,18 @@ def group_by_venue[T](pairs: Iterable[tuple[str, T]]) -> list[tuple[str, list[T]
     for venue, item in pairs:
         groups[venue].append(item)
     return sorted(groups.items(), key=lambda group: (not group[0], natural(group[0])))
+
+
+def to_read_out(member: Member) -> QuerySet[Announcement]:
+    """Not yet read out in the member's venue; all of them if none is set."""
+    announcements = member.exam.announcements.all()
+    return announcements.exclude(readouts__venue=member.venue) if member.venue else announcements
+
+
+def readout_status(exam: Exam) -> list[tuple[Announcement, list[str]]]:
+    """Each announcement with the known venues it has not been read out in yet."""
+    readouts = Prefetch("readouts", Readout.objects.select_related("member"))
+    announcements = list(exam.announcements.select_related("member").prefetch_related(readouts))
+    venues = set(Report.objects.of_exam(exam).values_list("venue", flat=True))
+    venues |= {r.venue for a in announcements for r in a.readouts.all()}
+    return [(a, sorted(venues - {r.venue for r in a.readouts.all()})) for a in announcements]

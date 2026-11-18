@@ -20,6 +20,7 @@ from examdesk.similarity import similarity
 from examdesk.templatetags.examdesk_tags import icon
 from tests.helpers import (
     HTMX,
+    REFRESH,
     fresh,
     icon_then,
     member,
@@ -262,41 +263,36 @@ def test_tab_bar_badges_count_my_venue(invigilator: Client, exam: Exam) -> None:
     report(exam, seat="C1", label="Q5")  # open, in my venue
     report(exam, venue="LT20", seat="A1", label="Q6")  # open, other venue
     services.announce(text="Typo", member=named(exam, "Prof"))
-    bar = invigilator.get(
-        url("invigilator:tab_bar", exam) + "?tab=open_clarifications&v=", headers=HTMX
-    ).content.decode()
-    assert '<span class="count" title="Open clarifications">1</span>' in bar
-    assert '<span class="count action" title="Seats to deliver">1</span>' in bar
-    assert '<span class="count urgent" title="To read out">1</span>' in bar
-    assert re.search(r'href="[^"]+/open/" aria-current="page"', bar)
-    page = invigilator.get(url("invigilator:report", exam)).content.decode()
-    assert 'hx-trigger="load"' in page
-    assert 'class="count' not in page.split('class="dock"')[1].split("</nav>")[0]
+    html = invigilator.get(url("invigilator:open_clarifications", exam)).content.decode()
+    assert '<span class="count" title="Open clarifications">1</span>' in html
+    assert '<span class="count action" title="Seats to deliver">1</span>' in html
+    assert '<span class="count urgent" title="To read out">1</span>' in html
+    assert re.search(r'href="[^"]+/open/" aria-current="page"', html)
+    refresh = invigilator.get(url("invigilator:report", exam), headers=REFRESH)
+    assert '<div id="tab-bar" hx-swap-oob="outerMorph">' in refresh.content.decode()
 
 
 def test_tab_bar_alerts_newest_unread_announcement(invigilator: Client, exam: Exam) -> None:
     services.announce(text="Typo in Q2", member=named(exam, "Prof"))
     newest = services.announce(text="30 minutes left", member=named(exam, "Prof"))
-    tabs = url("invigilator:tab_bar", exam) + "?tab=to_deliver&here=/somewhere/&v="
-    bar = invigilator.get(tabs, headers=HTMX).content.decode()
-    assert f'data-alert="{newest.pk}.0"' in bar
-    assert "1 more" in bar
-    assert "Open Announcements" in bar
+    page = url("invigilator:to_deliver", exam)
+    html = invigilator.get(page).content.decode()
+    assert f'data-alert="{newest.pk}.0"' in html
+    assert "1 more" in html
+    assert "Open Announcements" in html
     with_venue(invigilator, exam, "LT19")
-    bar = invigilator.get(tabs, headers=HTMX).content.decode()
-    assert "Read out in LT19" in bar
-    assert '<input type="hidden" name="next" value="/somewhere/">' in bar
+    html = invigilator.get(page, headers=REFRESH).content.decode()
+    assert "Read out in LT19" in html
+    assert f'<input type="hidden" name="next" value="{page}">' in html
     here = url("invigilator:to_deliver", exam)
     response = invigilator.post(url("invigilator:mark_read_out", exam, newest.pk), {"next": here})
     assert response["Location"] == here
-    on_tab = invigilator.get(
-        url("invigilator:tab_bar", exam) + "?tab=announcements&v=", headers=HTMX
-    ).content.decode()
+    on_tab = invigilator.get(url("invigilator:announcements", exam)).content.decode()
     assert "data-alert" not in on_tab
     services.mark_read_out(
         exam.announcements.get(text="Typo in Q2"), venue="LT19", member=named(exam, "Ann")
     )
-    assert "data-alert" not in invigilator.get(tabs, headers=HTMX).content.decode()
+    assert "data-alert" not in invigilator.get(page).content.decode()
 
 
 def test_open_screen_lists_open_seats_in_my_venue(invigilator: Client, exam: Exam) -> None:
@@ -490,10 +486,8 @@ def test_deliver_badge_and_home_count_seats_not_questions(
         services.answer_clarification(
             r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
         )
-    bar = invigilator.get(
-        url("invigilator:tab_bar", exam) + "?tab=report&v=", headers=HTMX
-    ).content.decode()
-    assert '<span class="count action" title="Seats to deliver">1</span>' in bar
+    html = invigilator.get(url("invigilator:report", exam)).content.decode()
+    assert '<span class="count action" title="Seats to deliver">1</span>' in html
     client.force_login(staff)
     home = client.get(reverse("home")).content.decode()
     assert "<strong>1</strong><span>seat to deliver</span>" in home
@@ -510,12 +504,13 @@ def test_opening_a_seat_to_deliver_shows_other_tas_it_is_taken(
     taken = 'aria-label="LT19 B14: 1 to deliver, with {}"'
     ben = Client()
     open_link(ben, exam.invigilator_token, "Ben")
-    invigilator.get(seat + "&v=1", headers=HTMX)  # a poll takes nothing
+    invigilator.get(seat, headers=REFRESH)  # a refresh takes nothing
     assert ", with " not in ben.get(url("invigilator:to_deliver", exam)).content.decode()
     invigilator.get(seat)
     html = ben.get(url("invigilator:to_deliver", exam)).content.decode()
     assert taken.format("Ann") in html
     assert 'class="seat-card claimed"' in html
+    assert re.search(r'<div id="live" data-refresh-in="([1-9]\d*)"', html)  # when the claim expires
     # Ben opening it anyway takes it over, and is told.
     assert "<strong>Ann</strong> was delivering to this seat" in ben.get(seat).content.decode()
     assert "was delivering" not in ben.get(seat).content.decode()  # now Ben's
@@ -569,19 +564,18 @@ def test_snooze_puts_off_the_alert_on_this_device(
 ) -> None:
     with_venue(invigilator, exam, "LT19")
     announcement = services.announce(text="Typo in Q2", member=named(exam, "Prof"))
-    bar = url("invigilator:tab_bar", exam) + "?tab=report&v="
-    assert (
-        f'data-alert="{announcement.pk}.0"' in invigilator.get(bar, headers=HTMX).content.decode()
-    )
+    page = url("invigilator:report", exam)
+    assert f'data-alert="{announcement.pk}.0"' in invigilator.get(page).content.decode()
     later = url("invigilator:snooze_announcement", exam, announcement.pk)
     assert invigilator.post(later, {"next": url("invigilator:report", exam)})["Location"] == url(
         "invigilator:report", exam
     )
-    html = invigilator.get(bar, headers=HTMX).content.decode()
+    html = invigilator.get(page).content.decode()
     assert "data-alert" not in html
     assert '<span class="count urgent" title="To read out">1</span>' in html
+    assert re.search(r'<div id="tab-bar" data-refresh-in="[1-9]\d*"', html)  # when it returns
     # Once the delay is over it returns, under a new key so that it vibrates again.
     settings.EXAMDESK_SNOOZE_FOR = timedelta(0)
     invigilator.post(later)
-    html = invigilator.get(bar, headers=HTMX).content.decode()
+    html = invigilator.get(page).content.decode()
     assert re.search(rf'data-alert="{announcement.pk}\.[1-9]\d*"', html)

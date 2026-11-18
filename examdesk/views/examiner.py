@@ -15,7 +15,7 @@ from django.contrib import messages
 from django.db import connections
 from django.db.models import Prefetch
 from django.http import Http404, HttpResponse, HttpResponseBase
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET, require_POST
@@ -42,7 +42,6 @@ from ..models import (
     ExamFile,
     FilePage,
     Member,
-    Readout,
     Report,
     Role,
 )
@@ -52,9 +51,10 @@ from .common import (
     get_clarification,
     group_by_venue,
     pick,
+    readout_status,
     suggestions,
 )
-from .live import nav_badge, polled, render_live
+from .live import is_refresh, render_live
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,6 @@ def sort_links(sort: str) -> dict[str, dict[str, str]]:
 
 @require_GET
 @exam_view(examiner_only=True)
-@polled
 def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
     """Restores this device's last filters when opened without a query."""
     exam = member.exam
@@ -106,7 +105,7 @@ def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
     # A saved filter may name a label that was since relabeled or deleted.
     query = request.GET.copy()
     query.setlist("label", [label for label in query.getlist("label") if label in labels])
-    if "v" not in query:  # not a poll
+    if not is_refresh(request):
         session.save_filters(request.session, exam, query.urlencode())
     form = ClarificationFilterForm(query, labels=sorted(labels, key=natural), sorts=SORT_KEYS)
     filters = form.cleaned_data if form.is_valid() else {}
@@ -142,14 +141,6 @@ def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
     }
     template = "examdesk/examiner/clarifications.html"
     return render_live(request, member, template, context | suggestions(exam))
-
-
-@require_GET
-@exam_view(examiner_only=True)
-@polled
-def clarifications_badge(request: HtmxRequest, member: Member) -> HttpResponse:
-    count = member.exam.clarifications.in_state(Clarification.State.OPEN).count()
-    return nav_badge(request, member, "clarifications_badge", {"open": count})
 
 
 def clarification_page(
@@ -207,7 +198,6 @@ def clarification_page(
 
 @require_GET
 @exam_view(examiner_only=True)
-@polled
 def clarification(request: HtmxRequest, member: Member, clarification_id: int) -> HttpResponse:
     return clarification_page(request, member, clarification_id)
 
@@ -379,30 +369,11 @@ def move_report(request: HtmxRequest, member: Member, report_id: int) -> HttpRes
     return redirect("examiner:clarification", member.exam.pk, report.clarification_id)
 
 
-def readout_status(exam: Exam) -> list[tuple[Announcement, list[str]]]:
-    """Each announcement with the known venues it has not been read out in yet."""
-    readouts = Prefetch("readouts", Readout.objects.select_related("member"))
-    announcements = list(exam.announcements.select_related("member").prefetch_related(readouts))
-    venues = set(Report.objects.of_exam(exam).values_list("venue", flat=True))
-    venues |= {r.venue for a in announcements for r in a.readouts.all()}
-    return [(a, sorted(venues - {r.venue for r in a.readouts.all()})) for a in announcements]
-
-
 @require_GET
 @exam_view(examiner_only=True)
-@polled
 def announcements(request: HtmxRequest, member: Member) -> HttpResponse:
     context = {"announcements": readout_status(member.exam), **suggestions(member.exam)}
     return render_live(request, member, "examdesk/examiner/announcements.html", context)
-
-
-@require_GET
-@exam_view(examiner_only=True)
-@polled
-def announcements_badge(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Announcements not yet read out in every venue."""
-    missing = sum(1 for _, venues in readout_status(member.exam) if venues)
-    return nav_badge(request, member, "announcements_badge", {"missing": missing})
 
 
 @require_POST
@@ -441,7 +412,6 @@ class SeatTally:
 
 @require_GET
 @exam_view(examiner_only=True)
-@polled
 def seats(request: HtmxRequest, member: Member) -> HttpResponse:
     """Seat tiles by venue with a count per state. Read out counts as delivered."""
     counts: defaultdict[tuple[str, str], Counter[Report.State]] = defaultdict(Counter)
@@ -458,7 +428,6 @@ def seats(request: HtmxRequest, member: Member) -> HttpResponse:
 
 @require_GET
 @exam_view(examiner_only=True)
-@polled
 def seat(request: HtmxRequest, member: Member) -> HttpResponse:
     """A seat's reports with their delivery history."""
     venue, seat = seat_from(request)
@@ -475,19 +444,25 @@ def seat(request: HtmxRequest, member: Member) -> HttpResponse:
 @require_GET
 @exam_view(examiner_only=True)
 def members(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Members grouped by venue, online first.
-
-    Not `polled`: online status changes without the exam version changing.
-    """
+    """Members grouped by venue, online first. Joining and presence don't change the exam version,
+    so the list refreshes every `EXAMDESK_SEEN_EVERY` too."""
     people = sorted(member.exam.members.active(), key=lambda m: (not m.online, m.name.casefold()))
     venues = group_by_venue((person.venue or "", person) for person in people)
+    context = {
+        "venues": venues,
+        "links": lambda: join_links(request, member.exam),  # lazy: refreshes don't show them
+        "presence_update_in": int(settings.EXAMDESK_SEEN_EVERY.total_seconds()),
+    }
+    return render_live(request, member, "examdesk/examiner/members.html", context)
+
+
+def join_links(request: HtmxRequest, exam: Exam) -> list[dict[str, Any]]:
     links = []
     for role in Role:
-        url = request.build_absolute_uri(reverse("join", args=[member.exam.token(role)]))
+        url = request.build_absolute_uri(reverse("join", args=[exam.token(role)]))
         qr = mark_safe(segno.make(url, error="m").svg_inline(scale=5, omitsize=True))
         links.append({"role": role, "url": url, "qr": qr})
-    template = "examdesk/examiner/members.html"
-    return render_live(request, member, template, {"venues": venues, "links": links})
+    return links
 
 
 @require_POST
@@ -520,17 +495,18 @@ def settings_page(
     models_form = models_form or AIModelsForm(exam=exam)
     file_form = file_form or ExamFileForm()
     context = {
-        "member": member,
         "delete_form": delete_form,
         "connect_form": connect_form,
         "models_form": models_form,
         "file_form": file_form,
         "files": exam.files.prefetch_related("pages"),
     }
+    path = reverse("examiner:settings", args=[exam.pk])
     template = "examdesk/examiner/settings.html"
+    response = render_live(request, member, template, context, partial=None, path=path)
     forms = (delete_form, connect_form, models_form, file_form)
-    status = 400 if any(form.errors for form in forms) else 200
-    return render(request, template, context, status=status)
+    response.status_code = 400 if any(form.errors for form in forms) else 200
+    return response
 
 
 @require_POST
@@ -593,7 +569,7 @@ def delete_file(request: HtmxRequest, member: Member, file_id: int) -> HttpRespo
 def exam_file(request: HtmxRequest, member: Member, file_id: int) -> HttpResponse:
     """Each page with the text the AI read from it."""
     file = get_object_or_404(member.exam.files.prefetch_related("pages"), pk=file_id)
-    return render(request, "examdesk/examiner/file.html", {"member": member, "file": file})
+    return render_live(request, member, "examdesk/examiner/file.html", {"file": file}, partial=None)
 
 
 def pdf_page(member: Member, file_id: int, number: int) -> tuple[FilePage, bytes]:

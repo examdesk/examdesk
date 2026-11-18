@@ -1,4 +1,4 @@
-"""Joining, roles, names, polling, and pages across both roles."""
+"""Joining, roles, names, refreshes, and pages across both roles."""
 
 import importlib
 import re
@@ -12,12 +12,20 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.urls import reverse
-from pytest_django import DjangoAssertNumQueries
 from pytest_django.fixtures import Settings
 
 from examdesk import services, session
 from examdesk.models import Clarification, Exam
-from tests.helpers import HTMX, icon_then, named, open_link, poll_url, report, url, with_venue
+from tests.helpers import (
+    HTMX,
+    REFRESH,
+    icon_then,
+    named,
+    open_link,
+    report,
+    url,
+    with_venue,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -132,19 +140,30 @@ def test_pages_carry_csrf_header_for_htmx(examiner: Client, exam: Exam) -> None:
     assert re.search(r"<body[^>]*hx-headers:inherited='\{\"X-CSRFToken\": \"\w+\"\}'", html)
 
 
-def test_polling_returns_204_until_version_changes(
-    examiner: Client, exam: Exam, django_assert_max_num_queries: DjangoAssertNumQueries
+def test_a_refresh_sends_the_live_part_and_badges_to_swap_in(examiner: Client, exam: Exam) -> None:
+    report(exam)
+    page = url("examiner:clarifications", exam) + "?sort=question"
+    assert f'<div id="refresh" hidden hx-get="{page}"' in examiner.get(page).content.decode()
+    report(exam, label="Q7")
+    html = examiner.get(page, headers=REFRESH).content.decode()
+    assert "<html" not in html
+    assert "Q7" in html
+    assert '<div id="live" hx-swap-oob="outerMorph">' in html
+    badge = '<span id="clarifications-badge" hx-swap-oob="outerMorph"><span class="count action"'
+    assert f'{badge} title="Open clarifications" data-open-count="2">2</span>' in html
+    assert '<span id="announcements-badge" hx-swap-oob="outerMorph"></span>' in html
+
+
+def test_pages_subscribe_to_their_exam_version(
+    invigilator: Client, examiner: Client, exam: Exam
 ) -> None:
     report(exam)
-    page = examiner.get(url("examiner:clarifications", exam)).content.decode()
-    poll = poll_url(page)
-    with django_assert_max_num_queries(2):  # the session, and the member with its exam
-        assert examiner.get(poll, headers=HTMX).status_code == 204
-    report(exam, label="Q7")
-    fragment = examiner.get(poll, headers=HTMX)
-    assert fragment.status_code == 200
-    assert b"<html" not in fragment.content
-    assert b"Q7" in fragment.content
+    stream_attributes = (
+        f'data-stream="{url("events", exam)}" data-version="{Exam.objects.get().version}"'
+    )
+    for client, page in ((invigilator, "invigilator:report"), (examiner, "examiner:settings")):
+        assert stream_attributes in client.get(url(page, exam)).content.decode(), page
+    assert "data-stream" not in Client().get(reverse("home")).content.decode()
 
 
 def test_closed_exam_stops_invigilator_and_is_read_only(
@@ -163,12 +182,12 @@ def test_closed_exam_stops_invigilator_and_is_read_only(
     assert Clarification.objects.get().current_answer is None
 
 
-def test_deleted_exam_stops_polling_and_shows_the_404_page(examiner: Client, exam: Exam) -> None:
+def test_deleted_exam_reloads_its_pages_into_the_404_page(examiner: Client, exam: Exam) -> None:
     pk = exam.pk
     services.close_exam(exam)
     services.delete_exam(exam)
-    poll = examiner.get(reverse("examiner:clarifications", args=[pk]), headers=HTMX)
-    assert poll["HX-Refresh"] == "true"
+    refresh = examiner.get(reverse("examiner:clarifications", args=[pk]), headers=REFRESH)
+    assert refresh["HX-Refresh"] == "true"
     page = examiner.get(reverse("examiner:clarifications", args=[pk]))
     assert page.status_code == 404
     assert "Open the exam link you were given." in page.content.decode()
@@ -202,7 +221,6 @@ def test_every_page_and_fragment_renders_with_data(
         (invigilator, url("invigilator:to_deliver", exam)),
         (invigilator, url("invigilator:deliver_seat", exam) + "?venue=LT19&seat=C1"),
         (invigilator, url("invigilator:announcements", exam)),
-        (invigilator, url("invigilator:tab_bar", exam) + "?tab=report&v="),
         (
             examiner,
             url("examiner:clarifications", exam) + "?state=all&label=Q3b&label=Q5&sort=-seats",
@@ -213,13 +231,10 @@ def test_every_page_and_fragment_renders_with_data(
         (examiner, url("examiner:seat", exam) + "?venue=LT19&seat=B14"),
         (examiner, url("examiner:settings", exam)),
         (examiner, url("examiner:announcements", exam)),
-        (examiner, url("examiner:announcements_badge", exam) + "?v="),
-        (examiner, url("examiner:clarifications_badge", exam) + "?v="),
     ]
     for client, page in pages:
-        for headers in ({}, HTMX):
-            response = client.get(page, headers=headers)
-            assert response.status_code == 200, page
+        for headers in ({}, REFRESH):
+            assert client.get(page, headers=headers).status_code == 200, page
     matched = invigilator.get(pages[0][1]).content.decode()
     assert '<button class="match">' in matched
     assert "C1" in invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
@@ -235,39 +250,6 @@ def test_name_is_prefilled_for_staff(
     client.force_login(staff)
     join = reverse("join", args=[exam.examiner_token])
     assert f'value="{expected}"' in client.get(join).content.decode()
-
-
-def test_polls_pause_while_a_dialog_is_open(
-    invigilator: Client, examiner: Client, exam: Exam
-) -> None:
-    guard = "hx-trigger=\"every 2s [!document.querySelector('dialog[open]')]\""
-    pages = [
-        *[
-            (invigilator, page)
-            for page in (
-                "invigilator:open_clarifications",
-                "invigilator:to_deliver",
-                "invigilator:announcements",
-            )
-        ],
-        *[
-            (examiner, page)
-            for page in (
-                "examiner:clarifications",
-                "examiner:seats",
-                "examiner:seat",
-                "examiner:announcements",
-            )
-        ],
-    ]
-    for client, page in pages:
-        assert guard in client.get(url(page, exam)).content.decode(), page
-    for client, badges in (
-        (invigilator, "invigilator:tab_bar"),
-        (examiner, "examiner:announcements_badge"),
-        (examiner, "examiner:clarifications_badge"),
-    ):
-        assert guard in client.get(url(badges, exam) + "?v=", headers=HTMX).content.decode(), badges
 
 
 def test_leave_takes_the_exam_off_this_device(invigilator: Client, exam: Exam) -> None:
@@ -314,7 +296,7 @@ def test_home_is_a_landing_page_until_there_is_an_exam(
     assert landing not in [t.name for t in visitor.get(reverse("home")).templates]
 
 
-def test_delivery_state_updates_by_polling(
+def test_delivery_state_updates_on_refresh(
     invigilator: Client, examiner: Client, exam: Exam
 ) -> None:
     first = report(exam)
@@ -322,22 +304,17 @@ def test_delivery_state_updates_by_polling(
     answer = services.answer_clarification(
         first.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
-    clarification_poll = poll_url(
-        examiner.get(url("examiner:clarification", exam, first.clarification_id)).content.decode()
-    )
-    page = f"{url('invigilator:deliver_seat', exam)}?venue=LT19&seat=B14"
-    show_poll = poll_url(invigilator.get(page).content.decode())
-    seat_poll = poll_url(
-        examiner.get(url("examiner:seat", exam) + "?venue=LT19&seat=B14").content.decode()
-    )
+    clarification_page = url("examiner:clarification", exam, first.clarification_id)
+    deliver_page = f"{url('invigilator:deliver_seat', exam)}?venue=LT19&seat=B14"
+    seat_page = url("examiner:seat", exam) + "?venue=LT19&seat=B14"
     services.mark_delivered(first, answer=answer, member=named(exam, "Bob"))  # another invigilator
     services.mark_delivered(second, answer=answer, member=named(exam, "Bob"))
-    clarification_live = examiner.get(clarification_poll, headers=HTMX).content.decode()
+    clarification_live = examiner.get(clarification_page, headers=REFRESH).content.decode()
     assert clarification_live.count('<span class="badge state-delivered">Delivered</span>') == 2
-    show_live = invigilator.get(show_poll, headers=HTMX).content.decode()
-    assert "Unmark</button>" in show_live
-    assert 'text-base-content">Bob</strong>' in show_live
-    seat_live = examiner.get(seat_poll, headers=HTMX).content.decode()
+    deliver_live = invigilator.get(deliver_page, headers=REFRESH).content.decode()
+    assert "Unmark</button>" in deliver_live
+    assert 'text-base-content">Bob</strong>' in deliver_live
+    seat_live = examiner.get(seat_page, headers=REFRESH).content.decode()
     assert icon_then("check", "Delivered by Bob at") in seat_live
     assert icon_then("pen-line", "Ann</span>", "Reported by") in seat_live
     assert f'<a href="{url("examiner:seats", exam)}"' in seat_live

@@ -2,10 +2,9 @@ from django.contrib import admin
 from django.urls import URLPattern, URLResolver, include, path
 from django.views.generic import RedirectView
 
-from .views import examiner, exams, invigilator
+from .views import examiner, exams, invigilator, live
 
 invigilator_patterns = [
-    path("tab-bar/", invigilator.tab_bar, name="tab_bar"),
     path("venue/", invigilator.choose_venue, name="choose_venue"),
     path("report/", invigilator.report, name="report"),
     path("report/transcribe/", invigilator.transcribe_photo, name="transcribe_photo"),
@@ -51,11 +50,9 @@ clarification_patterns = [
 
 examiner_patterns: list[URLPattern | URLResolver] = [
     path("clarifications/", examiner.clarifications, name="clarifications"),
-    path("clarifications/badge/", examiner.clarifications_badge, name="clarifications_badge"),
     path("clarifications/<int:clarification_id>/", include(clarification_patterns)),
     path("reports/<int:report_id>/move/", examiner.move_report, name="move_report"),
     path("announcements/", examiner.announcements, name="announcements"),
-    path("announcements/badge/", examiner.announcements_badge, name="announcements_badge"),
     path("announcements/new/", examiner.announce, name="announce"),
     path(
         "announcements/<int:announcement_id>/delete/",
@@ -89,6 +86,7 @@ exam_patterns: list[URLPattern | URLResolver] = [
     path("", exams.exam_home, name="exam"),
     path("photos/<int:report_id>/", exams.photo, name="photo"),
     path("leave/", exams.leave_exam, name="leave_exam"),
+    path("events/", live.events, name="events"),
     path("name/", exams.rename_member, name="rename_member"),
     path("reports/<int:report_id>/delete/", exams.delete_report, name="delete_report"),
     path("invigilator/", include((invigilator_patterns, "invigilator"))),

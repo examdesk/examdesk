@@ -7,8 +7,9 @@ from django.http import HttpRequest
 def config(request: HttpRequest) -> dict[str, Any]:
     return {
         "config": {
-            "poll_every": int(settings.EXAMDESK_POLL_EVERY.total_seconds()),
             "offline_after": int(settings.EXAMDESK_OFFLINE_AFTER.total_seconds()),
+            "late_after": int(settings.EXAMDESK_LATE_AFTER.total_seconds()),
+            "very_late_after": int(settings.EXAMDESK_VERY_LATE_AFTER.total_seconds()),
             "photo_max_side": settings.EXAMDESK_PHOTO_MAX_SIDE,
             "photo_max_bytes": settings.EXAMDESK_PHOTO_MAX_BYTES,
             "backup_days": settings.EXAMDESK_BACKUP_DAYS,

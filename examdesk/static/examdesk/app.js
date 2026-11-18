@@ -36,24 +36,78 @@ const buzz = () => {
   try { sessionStorage.setItem("alerted", id); } catch {}
   navigator.vibrate?.(200);
 };
-// Offline banner. Pages that aren't polling (hidden, dialog open, or no poller) never go stale.
+// Each new exam version refreshes the live parts. With a dialog open, the refresh waits until it
+// closes, since a morph would remove it. A stream silent for longer than `offlineAfter` has
+// dropped: the page shows the offline banner and reconnects.
+const refreshElement = document.getElementById("refresh");
 const offline = document.getElementById("offline");
 const offlineAfter = Number(document.body.dataset.offlineAfter) * 1000;
-let lastOk = Date.now();
+let eventSource;
+let version = refreshElement?.dataset.version;
+let lastMessageAt = Date.now();
+let connectedAt = 0;
+let refreshPending = false;
+const refresh = () => {
+  if (document.querySelector("dialog[open]")) refreshPending = true;
+  else htmx.trigger(refreshElement, "exam-changed");
+};
+const connect = () => {
+  eventSource?.close();
+  connectedAt = Date.now();
+  eventSource = new EventSource(`${refreshElement.dataset.stream}?version=${version}`);
+  eventSource.onmessage = () => (lastMessageAt = Date.now());
+  eventSource.addEventListener("changed", (event) => {
+    lastMessageAt = Date.now();
+    version = event.lastEventId;
+    refresh();
+  });
+};
+if (refreshElement) connect();
+document.addEventListener("close", () => {
+  if (!refreshPending) return;
+  refreshPending = false;
+  refresh();
+}, true);
+// A tab shown again after its stream dropped reconnects before showing the offline banner.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || !eventSource || Date.now() - lastMessageAt <= offlineAfter) return;
+  lastMessageAt = Date.now();
+  connect();
+});
 const showOffline = () => {
-  offline.querySelector("time").textContent = new Date(lastOk).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  offline.querySelector("time").textContent = new Date(lastMessageAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   offline.hidden = false;
 };
-document.addEventListener("htmx:after:request", (event) => {
-  if (event.detail.ctx?.response?.status < 400) lastOk = Date.now();
-});
 setInterval(() => {
-  if (document.hidden || document.querySelector("dialog[open]") || !document.querySelector('[hx-trigger^="every"]')) lastOk = Date.now();
-  const stale = Date.now() - lastOk > offlineAfter || !navigator.onLine;
-  if (stale && offline.hidden) showOffline();
-  if (!stale) offline.querySelector("[data-unsent]").hidden = true;
-  offline.hidden = !stale;
+  const heartbeatMissed = eventSource && Date.now() - lastMessageAt > offlineAfter;
+  if (heartbeatMissed && Date.now() - connectedAt > offlineAfter) connect();
+  const isOffline = heartbeatMissed || !navigator.onLine;
+  if (isOffline && offline.hidden) showOffline();
+  if (!isOffline) offline.querySelector("[data-unsent]").hidden = true;
+  offline.hidden = !isOffline;
 }, 1000);
+// Refresh after the shortest [data-refresh-in], for time-based changes: snoozes ending, claims
+// expiring, presence. Counted from when its part last rendered.
+let refreshTimer;
+const scheduleRefresh = () => {
+  clearTimeout(refreshTimer);
+  const delays = [...document.querySelectorAll("[data-refresh-in]")].map((part) => Number(part.dataset.refreshIn));
+  if (delays.length) refreshTimer = setTimeout(refresh, Math.min(...delays) * 1000);
+};
+// Wait times count up as the `wait` and `wait_level` template filters render them.
+const lateAfter = Number(document.body.dataset.lateAfter);
+const veryLateAfter = Number(document.body.dataset.veryLateAfter);
+setInterval(() => {
+  document.querySelectorAll("[data-wait-since]").forEach((wait) => {
+    const seconds = Date.now() / 1000 - Number(wait.dataset.waitSince);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    wait.lastChild.textContent = minutes < 1 ? "<1 min" : hours ? `${hours} h ${String(minutes % 60).padStart(2, "0")} min` : `${minutes} min`;
+    if (!("waitLevel" in wait.dataset)) return;
+    wait.classList.toggle("very-late", seconds >= veryLateAfter);
+    wait.classList.toggle("late", seconds >= lateAfter && seconds < veryLateAfter);
+  });
+}, 10000);
 // Block submits while offline so the browser's error page doesn't eat the input.
 document.addEventListener("submit", (event) => {
   if (event.target.method === "dialog" || (offline.hidden && navigator.onLine)) return;
@@ -250,10 +304,11 @@ const enhance = (field) => {
   if (field.autofocus) tom.focus();
 };
 
-htmx.onLoad(() => {
+htmx.onLoad((element) => {
   buzz();
   countOpen();
   filterSeats();
+  if (element.matches("[data-refresh-in]") || element.querySelector("[data-refresh-in]")) scheduleRefresh();
   document.querySelectorAll("select:not(.tomselected, [hidden]), input[list]:not(.tomselected)").forEach(enhance);
 });
 document.addEventListener("input", (event) => event.target.matches("[data-seat-filter]") && filterSeats());

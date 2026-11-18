@@ -1,6 +1,5 @@
 """Shared test helpers; fixtures are in `conftest.py`."""
 
-import re
 import uuid
 from typing import Any
 
@@ -52,6 +51,8 @@ def open_link(client: Client, token: str, name: str = "Ann") -> None:
 
 
 HTMX = {"HX-Request": "true"}
+REFRESH = HTMX | {"HX-Source": "div#refresh"}
+"""Headers of a refresh of a page's live parts."""
 
 
 def seat_page(exam: Exam, venue: str, seat: str, report: Report | None = None) -> str:
@@ -74,9 +75,3 @@ def with_venue(client: Client, exam: Exam, venue: str) -> Client:
 def icon_then(name: str, text: str, title: str = "") -> str:
     """An icon followed by its text, as rendered."""
     return f"{icon(name, title)}{text}"
-
-
-def poll_url(html: str) -> str:
-    found = re.search(r'id="live"[^>]* hx-get="([^"]+)"', html)
-    assert found
-    return found[1].replace("&amp;", "&")

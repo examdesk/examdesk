@@ -10,7 +10,7 @@
   {% endfor %}
 </section>
 {% partialdef live inline %}
-<c-live>
+<c-live :refresh_in="presence_update_in">
   {% for venue, people in venues %}
     <section class="mb-6">
       <c-venue-heading :venue="venue" />

@@ -154,8 +154,8 @@ def _list(name: str, default: str, sep: str) -> list[str]:
     return [item.strip() for item in os.environ.get(name, default).split(sep) if item.strip()]
 
 
-EXAMDESK_POLL_EVERY = _seconds("EXAMDESK_POLL_EVERY", 2)
-EXAMDESK_OFFLINE_AFTER = _seconds("EXAMDESK_OFFLINE_AFTER", 6)
+EXAMDESK_HEARTBEAT_EVERY = _seconds("EXAMDESK_HEARTBEAT_EVERY", 5)
+EXAMDESK_OFFLINE_AFTER = _seconds("EXAMDESK_OFFLINE_AFTER", 12)
 EXAMDESK_SEEN_EVERY = _seconds("EXAMDESK_SEEN_EVERY", 30)
 EXAMDESK_ONLINE_FOR = _seconds("EXAMDESK_ONLINE_FOR", 60)
 EXAMDESK_SEAT_CLAIM_FOR = _seconds("EXAMDESK_SEAT_CLAIM_FOR", 300)

@@ -2,17 +2,37 @@
 
 import os
 import re
+import threading
+from collections.abc import Iterator
 
 import pytest
+import uvicorn
 from django.contrib.auth.models import User
+from django.core.asgi import get_asgi_application
 from playwright.sync_api import Browser, Page, expect
-from pytest_django.live_server_helper import LiveServer
+from pytest_django.fixtures import Settings
 
 from examdesk import services
 from tests.helpers import report
 
 # Playwright's sync API runs an event loop; the ORM calls here are still synchronous.
 os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
+
+
+@pytest.fixture
+def server(transactional_db: None, settings: Settings) -> Iterator[str]:
+    """Exam Desk under uvicorn, as deployed: Django's live server can't stream."""
+    settings.WHITENOISE_USE_FINDERS = True  # tests run without `collectstatic`
+    config = uvicorn.Config(get_asgi_application(), port=0, timeout_graceful_shutdown=1)
+    uvicorn_server = uvicorn.Server(config)
+    thread = threading.Thread(target=uvicorn_server.run)
+    thread.start()
+    while not uvicorn_server.started and thread.is_alive():
+        thread.join(0.01)
+    port = uvicorn_server.servers[0].sockets[0].getsockname()[1]
+    yield f"http://127.0.0.1:{port}"
+    uvicorn_server.should_exit = True
+    thread.join()
 
 
 def open_link(browser: Browser, url: str, name: str, phone: bool = False) -> Page:
@@ -25,14 +45,10 @@ def open_link(browser: Browser, url: str, name: str, phone: bool = False) -> Pag
 
 
 @pytest.mark.django_db(transaction=True)
-def test_report_answer_deliver_and_announce(
-    live_server: LiveServer, browser: Browser, staff: User
-) -> None:
+def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff: User) -> None:
     exam = services.create_exam(name="CS2109S Final", owner=staff)
-    prof = open_link(browser, f"{live_server.url}/join/{exam.examiner_token}/", "Prof")
-    invigilator = open_link(
-        browser, f"{live_server.url}/join/{exam.invigilator_token}/", "Ann", phone=True
-    )
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
+    invigilator = open_link(browser, f"{server}/join/{exam.invigilator_token}/", "Ann", phone=True)
 
     # The invigilator's first screen asks for their venue; then they report a new clarification.
     expect(invigilator.get_by_role("heading", name="Which venue are you in?")).to_be_visible()
@@ -50,11 +66,11 @@ def test_report_answer_deliver_and_announce(
     invigilator.get_by_role("link", name="Open").click()
     expect(invigilator.locator(".badge.state-open", has_text="B14")).to_be_visible()
 
-    # The examiner answers; the invigilator's Deliver badge and Open list follow by polling.
+    # The examiner answers; the invigilator's Deliver badge and Open list follow.
     prof.get_by_role("link", name="Is x an integer?").click()
     prof.get_by_role("button", name="State your assumptions.").click()
     prof.get_by_role("button", name="Send", exact=True).click()
-    prof.get_by_role("link", name="Seats").click()  # the badge turns green by polling
+    prof.get_by_role("link", name="Seats").click()
     expect(invigilator.locator(".dock .count.action")).to_have_text("1")
     expect(invigilator.get_by_text("No open clarifications in LT19")).to_be_visible()
     invigilator.get_by_role("link", name="Deliver").click()
@@ -109,13 +125,13 @@ def test_report_answer_deliver_and_announce(
 
 @pytest.mark.django_db(transaction=True)
 def test_question_filter_applies_its_picks_when_closed(
-    live_server: LiveServer, browser: Browser, staff: User
+    server: str, browser: Browser, staff: User
 ) -> None:
     exam = services.create_exam(name="CS2109S Final", owner=staff)
     report(exam, label="Q10", text="Ten?")
     report(exam, seat="C1", label="Q2", text="Two?")
     report(exam, seat="D4", label="Q3b", text="Three?")
-    prof = open_link(browser, f"{live_server.url}/join/{exam.examiner_token}/", "Prof")
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
     prof.get_by_role("link", name="Clarifications").first.click()
     search = prof.get_by_role("combobox", name="Questions")
     search.click()

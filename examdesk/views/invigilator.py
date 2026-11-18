@@ -1,6 +1,7 @@
 """The invigilator screens (phone), also open to examiners."""
 
 import logging
+import math
 import time
 import uuid
 from collections import defaultdict
@@ -13,10 +14,11 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
 from django.db import connections
-from django.db.models import Prefetch, QuerySet
+from django.db.models import Prefetch
 from django.http import Http404, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from .. import ai, services, session
@@ -45,27 +47,27 @@ from .common import (
     redirect_next,
     suggestions,
 )
-from .live import polled, render_live
+from .live import is_refresh, render_live
 
 logger = logging.getLogger(__name__)
 
 
-def to_read_out(member: Member) -> QuerySet[Announcement]:
-    """Not yet read out in the member's venue; all of them if none is set."""
-    announcements = member.exam.announcements.all()
-    return announcements.exclude(readouts__venue=member.venue) if member.venue else announcements
-
-
 def invigilator_page(
-    request: HtmxRequest, member: Member, page: str, context: dict[str, Any], tab: str = ""
+    request: HtmxRequest,
+    member: Member,
+    page: str,
+    context: dict[str, Any],
+    tab: str = "",
+    partial: str | None = "live",
 ) -> HttpResponse:
-    """Render `invigilator/<page>.html` with the tab `tab` (by default `page`) active.
+    """Render `invigilator/<page>.html` with the tab `tab` (by default `page`) active. See
+    `render_live` for `partial`.
 
     Asks for a venue once per exam, and releases the member's seat claim on any other
     page than `deliver_seat`.
     """
     exam = member.exam
-    if page != "deliver_seat" and "v" not in request.GET:
+    if page != "deliver_seat" and not is_refresh(request):
         services.release_seat(member)
     ask_venue = member.venue is None and not request.htmx
     if ask_venue:
@@ -76,7 +78,8 @@ def invigilator_page(
         "ask_venue": ask_venue,
         **suggestions(exam),
     }
-    return render_live(request, member, f"examdesk/invigilator/{page}.html", context)
+    template = f"examdesk/invigilator/{page}.html"
+    return render_live(request, member, template, context, partial=partial)
 
 
 def deliver_seat_url(member: Member, report: Report, back: str = "") -> str:
@@ -88,39 +91,6 @@ def deliver_seat_url(member: Member, report: Report, back: str = "") -> str:
         report.seat,
         report=report.pk,
         back=back,
-    )
-
-
-@require_GET
-@exam_view(live_only=True)
-@polled
-def tab_bar(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Tab badges and the newest unsnoozed announcement to read out; buttons return to `here`."""
-    tab = request.GET.get("tab")
-    announcements = list(to_read_out(member))
-    later = session.snoozed(request.session, member.exam)
-    due = [a for a in announcements if later.get(a.pk, 0) <= time.time()]
-    alert = due[0] if due and tab != "announcements" else None
-    counts = {
-        "open_clarifications": Report.objects.open().in_venue_of(member).count(),
-        # Seats, as the To deliver tab lists them, not their questions.
-        "to_deliver": Report.objects.to_deliver()
-        .in_venue_of(member)
-        .values("venue", "seat")
-        .distinct()
-        .count(),
-        "announcements": len(announcements),
-    }
-    context = {
-        "tab": tab,
-        "counts": counts,
-        "alert": alert,
-        # Changes when a put-off alert returns, so that it vibrates again.
-        "alert_key": alert and f"{alert.pk}.{int(later.get(alert.pk, 0))}",
-        "here": request.GET.get("here", ""),
-    }
-    return render_live(
-        request, member, "examdesk/invigilator/base.html", context, partial="tab_bar"
     )
 
 
@@ -218,7 +188,8 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
         if request.htmx:  # typing in the question re-ranks the matches
             context |= {"member": member, "start_form": start_form}
             return render(request, "examdesk/invigilator/report.html#matches", context)
-    return invigilator_page(request, member, "report", context | {"start_form": start_form})
+    context |= {"start_form": start_form}
+    return invigilator_page(request, member, "report", context, partial=None)
 
 
 @require_POST
@@ -247,7 +218,6 @@ async def transcribe_photo(request: HtmxRequest, exam_id: int) -> HttpResponseBa
 
 @require_GET
 @exam_view(live_only=True)
-@polled
 def report_saved(request: HtmxRequest, member: Member, report_id: int) -> HttpResponse:
     """What a report just saved, to check before reporting the next."""
     reports = Report.objects.of_exam(member.exam).with_state()
@@ -257,7 +227,6 @@ def report_saved(request: HtmxRequest, member: Member, report_id: int) -> HttpRe
 
 @require_GET
 @exam_view(live_only=True)
-@polled
 def open_clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
     """Open reports in the member's venue, grouped by label, oldest first."""
     reports = Report.objects.open().in_venue_of(member).select_related("clarification")
@@ -281,7 +250,6 @@ class SeatTile:
 
 @require_GET
 @exam_view(live_only=True)
-@polled
 def to_deliver(request: HtmxRequest, member: Member) -> HttpResponse:
     """Seats still to deliver in seat order, then fully delivered seats, newest first."""
     seats: defaultdict[tuple[str, str], list[Report]] = defaultdict(list)
@@ -306,13 +274,21 @@ def to_deliver(request: HtmxRequest, member: Member) -> HttpResponse:
         "undelivered": group_by_venue((tile.venue, tile) for tile in undelivered_tiles),
         "delivered": group_by_venue((tile.venue, tile) for _, tile in delivered),
         "delivered_count": len(delivered),
+        # Claims expire without a new exam version.
+        "claim_expires_in": min(
+            (
+                math.ceil((tile.claim.expires_at - timezone.now()).total_seconds())
+                for tile in undelivered_tiles
+                if tile.claim
+            ),
+            default=None,
+        ),
     }
     return invigilator_page(request, member, "to_deliver", context)
 
 
 @require_GET
 @exam_view(live_only=True)
-@polled
 def deliver_seat(request: HtmxRequest, member: Member) -> HttpResponse:
     """Opens on `report`, else the first undelivered one. Opening it claims the seat."""
     venue, seat = seat_from(request)
@@ -320,7 +296,7 @@ def deliver_seat(request: HtmxRequest, member: Member) -> HttpResponse:
         Report.objects.at_seat(member.exam, venue, seat).answered().with_state().with_deliveries()
     )
     taken_from = None
-    if (undelivered := [r for r in reports if not r.delivered]) and "v" not in request.GET:
+    if (undelivered := [r for r in reports if not r.delivered]) and not is_refresh(request):
         claim = member.exam.claims.select_related("member").filter(venue=venue, seat=seat).first()
         if claim and claim.member_id != member.pk and claim.holds(undelivered):
             taken_from = claim
@@ -370,7 +346,6 @@ def unmark_delivered(request: HtmxRequest, member: Member, delivery_id: int) -> 
 
 @require_GET
 @exam_view(live_only=True)
-@polled
 def announcements(request: HtmxRequest, member: Member) -> HttpResponse:
     """Each announcement with its readout in the member's venue, if any."""
     found = member.exam.announcements.prefetch_related(

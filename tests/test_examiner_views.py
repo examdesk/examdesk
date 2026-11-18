@@ -12,7 +12,16 @@ from examdesk import services
 from examdesk.models import Exam, Readout, Report
 from examdesk.similarity import similarity
 from examdesk.templatetags.examdesk_tags import icon
-from tests.helpers import HTMX, fresh, icon_then, member, named, open_link, poll_url, report, url
+from tests.helpers import (
+    REFRESH,
+    fresh,
+    icon_then,
+    member,
+    named,
+    open_link,
+    report,
+    url,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -41,7 +50,7 @@ def test_clarification_filters_come_back_on_the_plain_url(examiner: Client, exam
     page = url("examiner:clarifications", exam)
     assert examiner.get(page).status_code == 200
     examiner.get(page + "?state=all&label=Q3&sort=-seats")
-    examiner.get(page + "?state=open&v=1", headers=HTMX)  # a poll does not save
+    examiner.get(page + "?state=open", headers=REFRESH)  # a refresh does not save
     response = examiner.get(page)
     assert response.status_code == 302
     assert response["Location"] == page + "?state=all&label=Q3&sort=-seats"
@@ -137,10 +146,7 @@ def test_examiner_announcements_page(invigilator: Client, examiner: Client, exam
     assert "Typo in Q2" in html
     assert '<span class="badge state-to-read-out" title="Not read out yet">' in html
     assert icon_then("clock", "LT20</span>") in html
-    badge = examiner.get(
-        url("examiner:announcements_badge", exam) + "?v=", headers=HTMX
-    ).content.decode()
-    assert ">1</span>" in badge
+    assert '<span class="count" title="Not read out in every venue yet">1</span>' in html
     queue = examiner.get(url("examiner:clarifications", exam)).content.decode()
     assert "Typo in Q2" not in queue
     assert "Announce to all venues" not in queue
@@ -188,9 +194,8 @@ def test_deleting_an_announcement_asks_first(
     assert 'aria-label="Delete announcement"' in page
     assert f'commandfor="delete-{posted.pk}" command="show-modal"' in page
     assert f'<dialog id="delete-{posted.pk}" class="modal" aria-labelledby' in page
-    stale = re.sub(r"v=[^&]*", "v=stale", poll_url(page))
-    live = examiner.get(stale, headers=HTMX)
-    assert 'aria-label="Delete announcement"' in live.content.decode()  # the polled part alone
+    live = examiner.get(url("examiner:announcements", exam), headers=REFRESH)
+    assert 'aria-label="Delete announcement"' in live.content.decode()  # the live part alone
     assert invigilator.post(url("examiner:delete_announcement", exam, posted.pk)).status_code == 403
     response = examiner.post(url("examiner:delete_announcement", exam, posted.pk), follow=True)
     html = response.content.decode()
@@ -212,10 +217,8 @@ def test_clarifications_sort_by_question_and_badge_counts_open(
     assert html.index("Two?") < html.index("Ten?")
     assert ' aria-sort="ascending"><a href="?sort=-question" class="sort">Question' in html
     assert '<a href="?sort=seats" class="sort">Seats</a>' in html
-    poll = url("examiner:clarifications", exam) + "?sort=question&v=0"
-    assert (
-        '<a href="?sort=seats" class="sort">' in examiner.get(poll, headers=HTMX).content.decode()
-    )
+    refresh = examiner.get(url("examiner:clarifications", exam) + "?sort=question", headers=REFRESH)
+    assert '<a href="?sort=seats" class="sort">' in refresh.content.decode()
     html = examiner.get(url("examiner:clarifications", exam) + "?sort=-question").content.decode()
     assert html.index("Ten?") < html.index("Two?")
     assert ' aria-sort="descending"><a href="?sort=question" class="sort">' in html
@@ -229,10 +232,7 @@ def test_clarifications_sort_by_question_and_badge_counts_open(
         url("examiner:clarifications", exam) + "?state=all&sort=-state"
     ).content.decode()
     assert html.index("Three?") < html.index("Two?")
-    badge = examiner.get(
-        url("examiner:clarifications_badge", exam) + "?v=", headers=HTMX
-    ).content.decode()
-    assert 'title="Open clarifications" data-open-count="2">2</span>' in badge
+    assert 'title="Open clarifications" data-open-count="2">2</span>' in html
 
 
 def test_relabel_changes_the_clarifications_label(examiner: Client, exam: Exam) -> None:
@@ -345,7 +345,9 @@ def test_queue_shows_seats_to_deliver_and_wait(examiner: Client, exam: Exam) -> 
     html = examiner.get(url("examiner:clarifications", exam) + "?state=all").content.decode()
     assert "2 seats" in html
     assert '<div class="meta">2 to deliver</div>' in html
-    assert '<span class="wait" title="Asked at' in html  # answered: no late colour
+    assert re.search(
+        r'<span class="wait" data-wait-since="\d+" title="Asked at', html
+    )  # no late colour
     assert 'class="row-target"' in html
 
 
