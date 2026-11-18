@@ -21,9 +21,8 @@ from .common import flash_errors, redirect_next
 
 @require_GET
 def home(request: HttpRequest) -> HttpResponse:
-    visible = Exam.objects.filter(
-        members__in=session.joined_member_ids(request.session), members__removed=False
-    )
+    joined_ids = session.joined_member_ids(request.session)
+    visible = Exam.objects.filter(members__in=joined_ids, members__removed=False)
     if request.user.is_authenticated:
         visible |= Exam.objects.filter(owner_id=request.user.pk)
     paginator = Paginator(visible.distinct().order_by("-created_at"), settings.EXAMDESK_PAGE_SIZE)
@@ -46,8 +45,19 @@ def home(request: HttpRequest) -> HttpResponse:
         .distinct()
     )
     to_deliver = Counter(exam_id for exam_id, _, _ in seats)
-    cards = [(exam, open_counts.get(exam.pk, 0), to_deliver[exam.pk]) for exam in exams]
-    return render(request, "examdesk/home.html", {"cards": cards, "page_obj": page_obj})
+    roles = dict(
+        Member.objects.filter(pk__in=joined_ids, exam__in=exams).values_list("exam", "role")
+    )
+    exam_rows = [
+        (
+            exam,
+            open_counts.get(exam.pk, 0),
+            to_deliver[exam.pk],
+            Role(roles.get(exam.pk, Role.EXAMINER)),
+        )
+        for exam in exams
+    ]
+    return render(request, "examdesk/home.html", {"exam_rows": exam_rows, "page_obj": page_obj})
 
 
 def staff_name(request: HttpRequest) -> str:
@@ -66,7 +76,7 @@ def create_exam(request: StaffRequest) -> HttpResponse:
     owner = services.add_member(exam, name=staff_name(request), role=Role.EXAMINER)
     session.remember(request.session, owner)
     messages.success(request, f"Created {exam.name}.")
-    return redirect("examiner:members", exam.pk)
+    return redirect("examiner:clarifications", exam.pk)
 
 
 def suggested_name(request: HttpRequest) -> str:

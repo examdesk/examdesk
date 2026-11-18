@@ -2,7 +2,7 @@
 {# Entering an emailed code: to sign in, or to confirm the address on sign-up. #}
 {% block title %}Enter code · Exam Desk{% endblock %}
 {% block content %}
-<c-centered-card icon="mail" title="Check your email">
+<c-centered-card title="Check your email">
   <c-slot name="lead">Enter the code we sent to <strong>{{ email }}</strong>.</c-slot>
   <c-error>{{ verify_form.non_field_errors|join:" " }}</c-error>
   <form method="post" action="{{ action_url }}">

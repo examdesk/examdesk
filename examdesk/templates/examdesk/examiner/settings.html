@@ -1,107 +1,113 @@
 {% extends "examdesk/base.html" %}
 {% block content %}
-{% with pk=member.exam.pk name=member.exam.name %}
-<div class="max-w-3xl">
-<div class="page-header">
-  <h1>Settings</h1>
+{% with pk=member.exam.pk name=member.exam.name exam=member.exam %}
+<c-page-header title="Settings" />
+
+<c-live id="settings" class="settings-layout">
+<div class="settings-column">
+<section class="card-box" aria-labelledby="exam-title">
+  <header class="card-header">
+    <h2 id="exam-title">Exam</h2>
+    <c-exam-status :exam="exam" />
+  </header>
+  <p class="font-semibold">{{ name }}</p>
+  <p class="meta">Created {{ exam.created_at|date:"j M Y, H:i" }}</p>
+  <footer class="card-footer">
+    {% if exam.is_live %}
+      <button type="button" class="btn btn-danger btn-sm" commandfor="close-dialog" command="show-modal"><c-icon name="lock" />Close exam…</button>
+    {% else %}
+      <form method="post" action="{% url 'examiner:reopen_exam' pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary btn-sm"><c-icon name="lock-open" />Reopen exam</button>
+      </form>
+    {% endif %}
+  </footer>
+</section>
+{% if not exam.is_live %}
+  <section class="card-box danger flex flex-wrap items-center justify-between gap-4" aria-labelledby="delete-title">
+    <h2 id="delete-title">Delete the exam</h2>
+    <button type="button" class="btn btn-danger btn-sm" commandfor="delete-dialog" command="show-modal"><c-icon name="trash-2" />Delete exam…</button>
+  </section>
+{% endif %}
 </div>
 
-<c-live id="settings" class="flex flex-col gap-6">
-<section class="card-box">
-  <div class="card-header"><h2>AI service</h2>{% if member.exam.ai_base_url %}<span class="badge green">Connected</span>{% endif %}</div>
-  {% if member.exam.ai_base_url %}
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <span class="min-w-0 truncate text-sm text-muted">{{ member.exam.ai_base_url }}</span>
-      <form method="post" action="{% url 'examiner:disconnect_ai_service' pk %}">
-        {% csrf_token %}
-        <button class="btn btn-outline btn-sm">Disconnect</button>
-      </form>
-    </div>
+<div class="settings-column">
+<section class="card-box" aria-labelledby="ai-title">
+  <header class="card-header">
+    <h2 id="ai-title" class="flex items-center gap-1.5"><c-icon name="sparkles" class="text-primary" />AI service</h2>
+    {% if exam.ai_base_url %}<span class="badge green">Connected</span>{% else %}<span class="badge">Not connected</span>{% endif %}
+  </header>
+  {% if exam.ai_base_url %}
+    <p class="mb-4 truncate rounded-lg bg-base-200/60 px-3 py-2 font-mono text-meta text-muted">{{ exam.ai_base_url }}</p>
+    <c-dialog id="disconnect-dialog" title="Disconnect the AI service?" action="{% url 'examiner:disconnect_ai_service' pk %}" submit="Disconnect" danger>
+      <p>Its address, API key and models are removed.</p>
+    </c-dialog>
+    <form method="post" action="{% url 'examiner:choose_ai_models' pk %}" id="models-form">
+      {% csrf_token %}
+      <div class="field">{{ models_form.vision_model.as_field_group }}</div>
+      <div class="field mb-0">{{ models_form.text_model.as_field_group }}</div>
+    </form>
+    <footer class="card-footer justify-between">
+      <button type="button" class="btn btn-ghost btn-danger btn-sm -ml-3" commandfor="disconnect-dialog" command="show-modal"><c-icon name="unplug" />Disconnect…</button>
+      <button class="btn btn-primary btn-sm" form="models-form"><c-icon name="check" />Save models</button>
+    </footer>
   {% else %}
-    <form method="post" action="{% url 'examiner:connect_ai_service' pk %}">
+    <form method="post" action="{% url 'examiner:connect_ai_service' pk %}" id="connect-form">
       {% csrf_token %}
       <div class="field">{{ connect_form.base_url.as_field_group }}</div>
-      <div class="field">{{ connect_form.api_key.as_field_group }}</div>
-      <button class="btn btn-primary">Connect</button>
+      <div class="field mb-0">{{ connect_form.api_key.as_field_group }}</div>
     </form>
+    <footer class="card-footer"><button class="btn btn-primary btn-sm" form="connect-form"><c-icon name="plug" />Connect</button></footer>
   {% endif %}
 </section>
 
-{% if member.exam.ai_base_url %}
-<section class="card-box">
-  <div class="card-header"><h2>Models</h2></div>
-  <form method="post" action="{% url 'examiner:choose_ai_models' pk %}">
-    {% csrf_token %}
-    <div class="field">{{ models_form.vision_model.as_field_group }}</div>
-    <div class="field">{{ models_form.text_model.as_field_group }}</div>
-    <button class="btn btn-primary">Save</button>
-  </form>
-</section>
-{% endif %}
-
-{% if member.exam.has_ai_service %}
-<section class="card-box">
-  <div class="card-header"><h2>Files for the AI</h2></div>
-  {% if files %}
-    <ul class="mb-4 divide-y divide-base-300 border-y border-base-300">
-      {% for file in files %}{% with unread=file.unread %}
-        <li class="flex items-center gap-3 py-2"{% if unread %} data-read-pages="{% for page in unread %}{% url 'examiner:read_page' pk file.pk page.number %} {% endfor %}"{% endif %}>
-          <c-icon name="file-text" class="shrink-0" />
-          <a href="{% url 'examiner:file' pk file.pk %}" class="min-w-0 flex-1 truncate text-sm hover:underline">{{ file.name }}</a>
-          {% if unread %}
-            <span class="meta flex shrink-0 items-center gap-1.5" role="status" data-reading><span class="loading loading-spinner loading-xs"></span><span>Reading · {{ unread|length }} page{{ unread|length|pluralize }} left</span></span>
-            <button type="button" class="btn btn-outline btn-xs" data-retry hidden>Retry</button>
-          {% endif %}
-          <form method="post" action="{% url 'examiner:delete_file' pk file.pk %}">
-            {% csrf_token %}
-            <button class="btn btn-ghost btn-danger btn-xs" aria-label="Delete {{ file.name }}">Delete</button>
-          </form>
-        </li>
-      {% endwith %}
-      {% endfor %}
-    </ul>
-  {% endif %}
-  <form method="post" action="{% url 'examiner:add_file' pk %}" enctype="multipart/form-data" data-autosubmit>
-    {% csrf_token %}
-    <label class="btn btn-outline"><c-icon name="upload" />Upload file<input type="file" name="file" accept=".pdf,.txt,.md" hidden></label>
-    {{ file_form.file.errors }}
-  </form>
-</section>
-{% endif %}
-
-{% if member.exam.is_live %}
-  <section class="danger-zone">
-    <div class="flex flex-wrap items-center justify-between gap-4 p-5">
-      <h2>Close the exam</h2>
-      <button type="button" class="btn btn-danger" commandfor="close-dialog" command="show-modal"><c-icon name="lock" />Close exam</button>
-    </div>
-  </section>
-  <c-dialog id="close-dialog" title="Close the exam?" action="{% url 'examiner:close_exam' pk %}" submit="Close the exam" danger>
-    <p>It becomes read-only and the invigilator link stops working.</p>
-  </c-dialog>
-{% else %}
-  <section class="card-box flex flex-wrap items-center justify-between gap-4">
-    <div>
-      <h2>Reopen the exam</h2>
-      <p class="mt-1 text-sm text-muted">Invigilators can use their link again.</p>
-    </div>
-    <form method="post" action="{% url 'examiner:reopen_exam' pk %}">
+{% if exam.has_ai_service %}
+<section class="card-box" aria-labelledby="files-title">
+  <header class="card-header">
+    <h2 id="files-title" class="flex items-center gap-2">Files for the AI<span class="count">{{ files|length }}</span></h2>
+    <form method="post" action="{% url 'examiner:add_file' pk %}" enctype="multipart/form-data" data-autosubmit>
       {% csrf_token %}
-      <button class="btn btn-primary"><c-icon name="lock-open" />Reopen exam</button>
+      <label class="btn btn-outline btn-sm"><c-icon name="upload" />Upload file<input type="file" name="file" accept=".pdf,.txt,.md" hidden></label>
     </form>
-  </section>
-  <section class="danger-zone">
-    <div class="flex flex-wrap items-center justify-between gap-4 p-5">
-      <h2>Delete the exam</h2>
-      <button type="button" class="btn btn-danger" commandfor="delete-dialog" command="show-modal"><c-icon name="trash-2" />Delete exam</button>
-    </div>
-  </section>
+  </header>
+  {{ file_form.file.errors }}
+  {% if files %}
+    <ul class="-my-3 divide-y divide-base-300">
+      {% for file in files %}{% with unread=file.unread read=file.read_count total=file.pages.all|length %}
+        <li class="py-3"{% if unread %} data-read-pages="{% for page in unread %}{% url 'examiner:read_page' pk file.pk page.number %} {% endfor %}"{% endif %}>
+          <div class="flex items-center gap-3">
+            <c-icon name="file-text" class="text-subtle" />
+            <div class="min-w-0 flex-1">
+              <a href="{% url 'examiner:file' pk file.pk %}" class="block truncate text-sm font-medium hover:underline">{{ file.name }}</a>
+              <p class="meta"{% if unread %} role="status" data-reading{% endif %}>{% if unread %}Reading {{ read }} of {{ total }} page{{ total|pluralize }}{% else %}{{ total }} page{{ total|pluralize }}{% endif %}</p>
+            </div>
+            {% if unread %}<button type="button" class="btn btn-outline btn-xs" data-retry hidden><c-icon name="rotate-ccw" />Retry</button>{% endif %}
+            <button type="button" class="btn btn-ghost btn-danger btn-xs btn-square" commandfor="delete-file-{{ file.pk }}" command="show-modal" aria-label="Delete {{ file.name }}…" title="Delete…"><c-icon name="trash-2" /></button>
+            <c-dialog id="delete-file-{{ file.pk }}" title="Delete {{ file.name }}?" action="{% url 'examiner:delete_file' pk file.pk %}" submit="Delete" danger>
+              <p>The AI no longer uses it to draft answers.</p>
+            </c-dialog>
+          </div>
+          {% if unread %}<progress class="progress progress-primary mt-2 ml-7 block h-1 w-[calc(100%-1.75rem)]" value="{{ read }}" max="{{ total }}" aria-label="Pages read" data-progress></progress>{% endif %}
+        </li>
+      {% endwith %}{% endfor %}
+    </ul>
+  {% else %}
+    <c-empty icon="file-text" title="No files yet" class="py-8" />
+  {% endif %}
+</section>
+{% endif %}
+</div>
+
+{% if not exam.is_live %}
   <c-dialog id="delete-dialog" title="Delete {{ name }}?" action="{% url 'examiner:delete_exam' pk %}" submit="Delete permanently" danger :autoopen="delete_form.errors">
     <p>Its reports, answers and photos are deleted.</p>
     <div class="field">{{ delete_form.name.as_field_group }}</div>
   </c-dialog>
+{% else %}
+  <c-dialog id="close-dialog" title="Close the exam?" action="{% url 'examiner:close_exam' pk %}" submit="Close exam" danger>
+    <p>It becomes read-only and the invigilator link stops working.</p>
+  </c-dialog>
 {% endif %}
 </c-live>
-</div>
 {% endwith %}
 {% endblock %}

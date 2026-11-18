@@ -1,29 +1,35 @@
-{# A join link with its QR code. #}
+{# One role's join link in the invite dialog: QR code, the link to copy, full screen and reset. #}
 <c-vars link exam />
 {% with role=link.role id=link.role.value %}
-<div class="row-item flex-wrap">
-  <div class="w-full shrink-0 sm:w-28">
-    <p class="text-sm font-medium">{{ role.label }}s</p>
-    {% if role == "invigilator" and not exam.is_live %}<span class="badge closed">Off while closed</span>{% endif %}
+<div data-role="{{ id }}">
+  <div class="flex flex-col items-center px-6 pt-5 pb-6">
+    {% if role == "examiner" %}
+      <div class="flash warning mb-5 w-full"><c-icon name="triangle-alert" /><span>Full control of the exam. Share it only with examiners.</span></div>
+    {% elif not exam.is_live %}
+      <div class="flash mb-5 w-full"><c-icon name="lock" /><span>Off while the exam is closed.</span></div>
+    {% endif %}
+    <button type="button" class="qr size-56 cursor-zoom-in p-3 transition hover:shadow-md{% if role == 'invigilator' and not exam.is_live %} opacity-40{% endif %}" commandfor="{{ id }}-qr" command="show-modal" aria-label="Show the {{ role.label|lower }} QR code full screen">{{ link.qr }}</button>
+    <div class="mt-5 flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+      <div class="copy-field h-10 min-w-0 flex-1"><span>{{ link.url }}</span></div>
+      <button type="button" class="btn btn-primary sm:w-32" data-copy="{{ link.url }}"><c-icon name="copy" /><span data-copy-label="Copy link">Copy link</span></button>
+    </div>
   </div>
-  <div class="copy-field min-w-48 flex-1"><span><a href="{{ link.url }}" class="text-muted">{{ link.url }}</a></span>
-    <button class="btn btn-ghost btn-xs" data-copy="{{ link.url }}" aria-label="Copy {{ role.label }} link"><c-icon name="copy" />Copy</button></div>
-  <div class="flex shrink-0 gap-2">
-    <button type="button" class="btn btn-outline btn-sm" commandfor="{{ id }}-qr" command="show-modal"><c-icon name="qr-code" />QR code</button>
-    <button type="button" class="btn btn-ghost btn-danger btn-sm" commandfor="reset-{{ id }}-link" command="show-modal"><c-icon name="rotate-ccw" />Reset</button>
+  <div class="flex items-center justify-between gap-2 border-t border-base-300 bg-base-200/50 px-6 py-3">
+    <button type="button" class="btn btn-ghost btn-danger -ml-3" commandfor="reset-{{ id }}-link" command="show-modal"><c-icon name="rotate-ccw" />Reset link…</button>
+    <button type="button" class="btn btn-outline" commandfor="{{ id }}-qr" command="show-modal"><c-icon name="maximize" />Full screen</button>
   </div>
-  {% if role == "examiner" %}<p class="w-full text-[13px] text-error sm:pl-31">Full control of the exam. Don't share it with invigilators.</p>{% endif %}
 </div>
-<c-dialog id="reset-{{ id }}-link" title="Reset {{ role.label }} link?" action="{% url 'examiner:reset_link' exam.pk %}" submit="Reset link" danger>
+<c-dialog id="reset-{{ id }}-link" title="Reset the {{ role.label|lower }} link?" action="{% url 'examiner:reset_link' exam.pk %}" submit="Reset link" danger>
   <input type="hidden" name="role" value="{{ id }}">
   <p>The current link and QR code stop working. {{ role.label }}s already on the exam stay.</p>
 </c-dialog>
 <dialog id="{{ id }}-qr" class="modal" aria-labelledby="{{ id }}-qr-title">
   <div class="modal-box full-screen flex flex-col items-center justify-center gap-6 text-center">
-    <p class="eyebrow">{{ exam.name }}</p>
-    <h2 id="{{ id }}-qr-title" class="text-3xl font-semibold tracking-tight">{{ role.label }}s: scan to join</h2>
-    <span class="qr size-[min(70dvh,90vw)] border-0">{{ link.qr }}</span>
-    <button type="button" class="btn btn-outline" commandfor="{{ id }}-qr" command="close"><c-icon name="x" />Close</button>
+    <button type="button" class="btn btn-ghost btn-square absolute top-4 right-4" commandfor="{{ id }}-qr" command="close" aria-label="Close"><c-icon name="x" class="size-6" /></button>
+    <p class="text-lg font-medium text-subtle">{{ exam.name }}</p>
+    <h2 id="{{ id }}-qr-title" class="text-4xl font-semibold tracking-tight">{{ role.label }}s: scan to join</h2>
+    <span class="qr size-[min(65dvh,90vw)] border-0">{{ link.qr }}</span>
+    <p class="font-mono text-sm text-subtle">{{ link.url }}</p>
   </div>
 </dialog>
 {% endwith %}

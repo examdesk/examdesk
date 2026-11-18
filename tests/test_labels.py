@@ -6,6 +6,7 @@ from examdesk.labels import (
     normalize_label,
     normalize_name,
     normalize_place,
+    place_order,
     top_level,
 )
 
@@ -55,6 +56,11 @@ def test_covers() -> None:
 
 def test_natural_puts_b2_before_b14() -> None:
     assert sorted(["B14", "B2", "A10", "A9"], key=natural) == ["A9", "A10", "B2", "B14"]
+
+
+def test_place_order_sorts_by_venue_then_seat() -> None:
+    places = [("LT20", "A1"), ("LT19", "B14"), ("LT19", "B2")]
+    assert sorted(places, key=place_order) == [("LT19", "B2"), ("LT19", "B14"), ("LT20", "A1")]
 
 
 def test_normalize_name_collapses_spaces() -> None:

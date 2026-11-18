@@ -43,3 +43,8 @@ def covers(query: str, label: str) -> bool:
 def natural(text: str) -> list[Any]:
     """Sort key putting B2 before B14."""
     return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", text)]
+
+
+def place_order(place: tuple[str, str]) -> tuple[list[Any], list[Any]]:
+    """Sort key putting LT19 B2 before LT19 B14 and LT20 A1."""
+    return natural(place[0]), natural(place[1])

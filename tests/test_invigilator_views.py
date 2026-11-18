@@ -22,7 +22,6 @@ from tests.helpers import (
     HTMX,
     REFRESH,
     fresh,
-    icon_then,
     member,
     named,
     open_link,
@@ -61,7 +60,7 @@ def test_failed_report_keeps_input_and_client_key(invigilator: Client, exam: Exa
     assert response.status_code == 200
     assert "Describe the clarification with text or a photo." in html
     assert f'value="{key}"' in html
-    assert "Save clarification" in html
+    assert '<details class="group new-question" id="new-question" open>' in html
     assert not Report.objects.exists()
 
 
@@ -93,7 +92,7 @@ def test_deliver_list_shows_seats_with_counts(invigilator: Client, exam: Exam) -
             r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
         )
     html = invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
-    assert "Yes" not in html
+    assert '<span class="mt-0.5 block truncate">Yes</span>' in html
     assert "Is y real?" not in html
     assert 'aria-label="LT19 B14: 2 to deliver"' in html
     assert 'aria-label="LT19 C1: 1 to deliver"' in html
@@ -104,11 +103,11 @@ def test_deliver_list_shows_seats_with_counts(invigilator: Client, exam: Exam) -
     )
     html = invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
     delivered = html[html.index('<details id="delivered"') :]
-    assert "Recently delivered (1)" in delivered
+    assert 'Delivered recently<span class="count">1</span>' in delivered
     assert 'aria-label="LT19 C1: all delivered"' in delivered
 
 
-def test_seat_page_accordion_marks_and_unmarks(invigilator: Client, exam: Exam) -> None:
+def test_seat_page_marks_and_unmarks(invigilator: Client, exam: Exam) -> None:
     q3 = report(exam)
     q5 = report(exam, label="Q5", text="Is y real?")
     answers = [
@@ -117,35 +116,30 @@ def test_seat_page_accordion_marks_and_unmarks(invigilator: Client, exam: Exam) 
         )
         for r, t in ((q3, "Yes"), (q5, "No"))
     ]
-
-    def row(r: Report, state: str = "") -> str:
-        return f'<details id="q-{r.pk}" name="clarifications" class="clarification{state}"'
-
     page = invigilator.get(seat_page(exam, "LT19", "B14")).content.decode()
-    assert page.count('class="clarification"') == 2
-    assert "<strong>Q5</strong> Is y real?" in page
-    assert row(q3) + " open>" in page
-    assert row(q5) + ">" in page
-    assert "Delivered to B14</button>" in page
-    assert f'href="{url("invigilator:to_deliver", exam)}" aria-label="Back"' in page
+    assert page.count("Delivered to B14</button>") == 2
+    assert '<span class="line-clamp-2">Is y real?</span>' in page
+    assert "Delivered</h2>" not in page
+    assert f'<a href="{url("invigilator:to_deliver", exam)}" class="mb-3' in page
     response = invigilator.post(
         url("invigilator:mark_delivered", exam, q3.pk), {"answer": answers[0].pk}, follow=True
     )
-    assert response.redirect_chain[-1][0] == seat_page(exam, "LT19", "B14", q3)  # stays
+    assert response.redirect_chain[-1][0] == seat_page(exam, "LT19", "B14")  # stays
     html = response.content.decode()
     assert "Delivered Q3b to LT19 B14." in html
-    assert row(q3, " done") + " open>" in html
-    assert row(q5) + ">" in html
-    done = invigilator.get(seat_page(exam, "LT19", "B14", q3)).content.decode()
-    assert 'Delivered by <strong class="font-medium text-base-content">Ann</strong>' in done
-    assert "Unmark</button>" in done
+    assert html.count("Delivered to B14</button>") == 1
+    delivered = html[html.index("Delivered</h2>") :]
+    assert "<strong>Q3b</strong> Is x an integer?" in delivered
+    assert '<span class="meta">Ann · ' in delivered
+    assert "Unmark</button>" in delivered
     response = invigilator.post(
-        url("invigilator:mark_delivered", exam, q5.pk), {"answer": answers[1].pk}
+        url("invigilator:mark_delivered", exam, q5.pk), {"answer": answers[1].pk}, follow=True
     )
-    assert response["Location"] == seat_page(exam, "LT19", "B14", q5)
+    assert response.redirect_chain[-1][0] == seat_page(exam, "LT19", "B14")
+    assert "All delivered to B14" in response.content.decode()
     delivery = q5.deliveries.get()
     response = invigilator.post(url("invigilator:unmark_delivered", exam, delivery.pk), follow=True)
-    assert response.redirect_chain[-1][0] == seat_page(exam, "LT19", "B14", q5)
+    assert response.redirect_chain[-1][0] == seat_page(exam, "LT19", "B14")
     html = response.content.decode()
     assert "Unmarked LT19 B14." in html
     assert not q5.deliveries.exists()
@@ -153,43 +147,37 @@ def test_seat_page_accordion_marks_and_unmarks(invigilator: Client, exam: Exam) 
     assert q5.deliveries.get().member.name == "Ann"
 
 
-def test_report_edit_shows_step_one_with_values(invigilator: Client, exam: Exam) -> None:
-    report(exam)
-    query = "?venue=LT19&seat=B20&label=Q3b"
-    assert (
-        'class="match"' in invigilator.get(url("invigilator:report", exam) + query).content.decode()
+def test_a_delivered_seat_offers_the_next_seat(invigilator: Client, exam: Exam) -> None:
+    with_venue(invigilator, exam, "LT19")
+    first = report(exam, seat="B14")
+    report(exam, seat="A2", clarification=first.clarification)
+    report(exam, seat="C1", clarification=first.clarification)
+    answer = services.answer_clarification(
+        first.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
-    step_two = invigilator.get(url("invigilator:report", exam) + query).content.decode()
-    back = re.search(
-        r'<a class="btn btn-outline btn-square" href="([^"]+)" aria-label="Back to step 1"',
-        step_two,
-    )
-    assert back
-    html = invigilator.get(
-        url("invigilator:report", exam) + back[1].replace("&amp;", "&")
+    html = invigilator.post(
+        url("invigilator:mark_delivered", exam, first.pk), {"answer": answer.pk}, follow=True
     ).content.decode()
-    assert 'class="match"' not in html
-    assert re.search(r'<input[^>]*name="seat"[^>]*value="B20"', html)
-    assert re.search(r'<input[^>]*name="label"[^>]*value="Q3b"', html)
+    next_seat = seat_page(exam, "LT19", "C1").replace("&", "&amp;")
+    assert f'href="{next_seat}">Next seat: C1' in html
+    for r in Report.objects.exclude(seat="B14"):
+        services.mark_delivered(r, answer=answer, member=named(exam, "Ann"))
+    html = invigilator.get(seat_page(exam, "LT19", "B14")).content.decode()
+    assert "Next seat" not in html
+    assert "Back to Deliver</a>" in html
 
 
-def test_report_page_keeps_the_last_seat_and_question(invigilator: Client, exam: Exam) -> None:
+def test_report_page_starts_blank_in_my_venue(invigilator: Client, exam: Exam) -> None:
     data = {"client_key": uuid.uuid4(), "venue": "LT19", "seat": "B14", "label": "Q3b", "text": "?"}
     response = invigilator.post(url("invigilator:report", exam), data)
     assert response["Location"] == url("invigilator:report_saved", exam, Report.objects.get().pk)
-    step_one = invigilator.get(url("invigilator:report", exam)).content.decode()
-    assert 'class="match"' not in step_one
-    assert re.search(r'<input[^>]*name="venue"[^>]*value="LT19"', step_one)
-    assert re.search(r'<input[^>]*name="seat"[^>]*value="B14"', step_one)
-    assert re.search(r'<input[^>]*name="label"[^>]*value="Q3b"', step_one)
-    assert re.search(r'<input[^>]*name="label"[^>]*autofocus', step_one)
-    assert not re.search(r'<input[^>]*name="seat"[^>]*autofocus', step_one)
-    invigilator.post(url("rename_member", exam), {"name": "Ann Tan"})
-    renamed = invigilator.get(url("invigilator:report", exam)).content.decode()
-    assert re.search(r'<input[^>]*name="seat"[^>]*value="B14"', renamed)
+    page = invigilator.get(url("invigilator:report", exam)).content.decode()
+    assert 'class="match"' not in page
+    assert not re.search(r'<input[^>]*name="seat"[^>]*value=', page)
+    assert re.search(r'<input[^>]*name="seat"[^>]*autofocus', page)
     invigilator.post(url("invigilator:choose_venue", exam), {"venue": "LT20"})
-    elsewhere = invigilator.get(url("invigilator:report", exam)).content.decode()
-    assert not re.search(r'<input[^>]*name="seat"[^>]*value="B14"', elsewhere)
+    page = invigilator.get(url("invigilator:report", exam)).content.decode()
+    assert '<input type="hidden" name="venue" value="LT20">' in page
 
 
 def test_match_list_marks_what_the_seat_already_asked(invigilator: Client, exam: Exam) -> None:
@@ -203,18 +191,18 @@ def test_match_list_marks_what_the_seat_already_asked(invigilator: Client, exam:
     ).content.decode()
     assert html.count("Asked from this seat</span>") == 1
     assert "{#" not in html  # a multi-line {# #} comment would show on the page
-    seat_link = seat_page(exam, "LT19", "B14", asked) + "&back=report"
-    assert f'<a class="match" href="{seat_link.replace("&", "&amp;")}">' in html
-    assert html.count('<button class="match">') == 1
+    seat_link = seat_page(exam, "LT19", "B14") + "&back=report"
+    assert f'href="{seat_link.replace("&", "&amp;")}"><svg' in html
+    assert html.count('<span class="match-action">Same question') == 1
     assert "Yes" not in html
     assert html.count("</svg>Open</span>") == 1
-    assert '<span class="badge">Q3a</span>' in html
+    assert '<span class="label-chip">Q3a</span>' in html
     fresh_seat = invigilator.get(
         url("invigilator:report", exam) + "?venue=LT19&seat=D4&label=Q3b"
     ).content.decode()
-    assert "Asked from this seat" not in fresh_seat
-    assert fresh_seat.count('<button class="match">') == 2
-    assert '<span class="badge">Q3a</span>' in fresh_seat
+    assert "Asked from this seat</span>" not in fresh_seat
+    assert fresh_seat.count('<span class="match-action">Same question') == 2
+    assert '<span class="label-chip">Q3a</span>' in fresh_seat
 
 
 def test_joining_an_answered_match_offers_its_answer(invigilator: Client, exam: Exam) -> None:
@@ -230,16 +218,16 @@ def test_joining_an_answered_match_offers_its_answer(invigilator: Client, exam: 
     joined = Report.objects.get(seat="D4")
     assert response["Location"] == url("invigilator:report_saved", exam, joined.pk)
     assert not joined.deliveries.exists()
-    show = seat_page(exam, "LT19", "D4", joined) + "&back=report"
+    show = seat_page(exam, "LT19", "D4") + "&back=report"
     saved = invigilator.get(response["Location"]).content.decode()
     assert f'href="{show.replace("&", "&amp;")}"><svg' in saved
-    assert "Report another question" in saved
-    assert "Delete this report</button>" in saved
+    assert "Report another</a>" in saved
+    assert "Delete this report…</button>" in saved
     html = invigilator.get(show).content.decode()
-    assert '<p class="show-panel">Yes</p>' in html
+    assert '<p class="answer-to-show">Yes</p>' in html
     assert "Delivered to D4</button>" in html
     assert '<input type="hidden" name="back" value="report">' in html
-    assert f'href="{url("invigilator:report", exam)}" aria-label="Back"' in html
+    assert f'<a href="{url("invigilator:report", exam)}" class="mb-3' in html
     marked = {"answer": answer.pk, "back": "report"}
     response = invigilator.post(url("invigilator:mark_delivered", exam, joined.pk), marked)
     assert response["Location"] == show
@@ -250,7 +238,7 @@ def test_joining_an_answered_match_offers_its_answer(invigilator: Client, exam: 
         follow=True,
     )
     html = response.content.decode()
-    assert "LT19 E5 · Q3a</h1>" in html
+    assert "LT19 E5 · Q3a</p>" in html
     assert "Show the answer" not in html
 
 
@@ -264,7 +252,7 @@ def test_tab_bar_badges_count_my_venue(invigilator: Client, exam: Exam) -> None:
     report(exam, venue="LT20", seat="A1", label="Q6")  # open, other venue
     services.announce(text="Typo", member=named(exam, "Prof"))
     html = invigilator.get(url("invigilator:open_clarifications", exam)).content.decode()
-    assert '<span class="count" title="Open clarifications">1</span>' in html
+    assert '<span class="count" title="Waiting for an answer">1</span>' in html
     assert '<span class="count action" title="Seats to deliver">1</span>' in html
     assert '<span class="count urgent" title="To read out">1</span>' in html
     assert re.search(r'href="[^"]+/open/" aria-current="page"', html)
@@ -279,7 +267,7 @@ def test_tab_bar_alerts_newest_unread_announcement(invigilator: Client, exam: Ex
     html = invigilator.get(page).content.decode()
     assert f'data-alert="{newest.pk}.0"' in html
     assert "1 more" in html
-    assert "Open Announcements" in html
+    assert "Mark as read out</a>" in html
     with_venue(invigilator, exam, "LT19")
     html = invigilator.get(page, headers=REFRESH).content.decode()
     assert "Read out in LT19" in html
@@ -300,14 +288,11 @@ def test_open_screen_lists_open_seats_in_my_venue(invigilator: Client, exam: Exa
     report(exam)
     report(exam, venue="LT20", seat="A1", label="Q6")
     html = invigilator.get(url("invigilator:open_clarifications", exam)).content.decode()
-    assert '<span class="badge state-open">B14</span>' in html
-    assert not re.search(
-        re.escape(icon("map-pin")) + r"(\w+)</span>", html
-    )  # my venue only: no venue name
-    assert '<span class="badge state-open">A1</span>' not in html
+    assert '<span class="place-chip">B14</span>' in html  # my venue only: no venue name
+    assert "A1</span>" not in html
     with_venue(invigilator, exam, "LT21")
     assert (
-        "No open clarifications in LT21<"
+        "Nothing waiting in LT21"
         in invigilator.get(url("invigilator:open_clarifications", exam)).content.decode()
     )
 
@@ -317,8 +302,11 @@ def test_open_groups_clarifications_by_question(invigilator: Client, exam: Exam)
     report(exam, seat="C1", label="Q2", text="Two?")
     report(exam, seat="D4", label="Q2", text="Also two?")
     html = invigilator.get(url("invigilator:open_clarifications", exam)).content.decode()
-    assert re.findall(r'<h2 class="group-heading">(Q\w+)</h2>', html) == ["Q2", "Q10"]
-    q2 = html[html.index(">Q2</h2>") : html.index(">Q10</h2>")]
+    headings = re.findall(
+        r'<h2 class="section-title">(Q\w+)<span class="count">(\d+)</span></h2>', html
+    )
+    assert headings == [("Q2", "2"), ("Q10", "1")]
+    q2 = html[html.index(">Q2<span") : html.index(">Q10<span")]
     assert q2.index("Two?") < q2.index("Also two?")
 
 
@@ -329,23 +317,19 @@ def test_open_groups_seats_by_venue_and_deliver_names_them_in_full(
     report(exam, seat="C1", clarification=first.clarification)
     report(exam, venue="LT20", seat="A1", clarification=first.clarification)
     html = invigilator.get(url("invigilator:open_clarifications", exam)).content.decode()
-    venues = re.findall(re.escape(icon("map-pin")) + r"(\w+)</span>", html)
-    assert venues == ["LT19", "LT20"]
-    lt19 = html[html.index("LT19</span>") : html.index("LT20</span>")]
-    assert lt19.count('class="badge state-open"') == 2
+    chip = '<span class="place-chip"><span class="font-normal text-subtle">{}</span>{}</span>'
+    assert html.index(chip.format("LT19", "B14")) < html.index(chip.format("LT19", "C1"))
+    assert chip.format("LT20", "A1") in html
     services.answer_clarification(
         first.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
     html = invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
     assert 'aria-label="LT20 A1: 1 to deliver"' in html
-    venues = re.findall(
-        '<h2 class="venue-heading">' + re.escape(icon("map-pin")) + r"(\w+)</h2>", html
-    )
-    assert venues == ["LT19", "LT20"]
+    heading = '<h2 class="section-title">' + re.escape(icon("map-pin")) + r"(\w+)</h2>"
+    assert re.findall(heading, html) == ["LT19", "LT20"]
     with_venue(invigilator, exam, "LT19")
-    assert (
-        'class="venue-heading"'
-        not in invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
+    assert not re.findall(
+        heading, invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
     )
 
 
@@ -358,7 +342,7 @@ def test_announcements_paginate_newest_first(
     first = invigilator.get(url("invigilator:announcements", exam)).content.decode()
     assert "Ten minutes left" in first
     assert "Typo in Q2" not in first
-    assert 'href="?page=2" rel="next">' in first
+    assert 'href="?page=2" rel="next"' in first
     second = invigilator.get(url("invigilator:announcements", exam) + "?page=2").content.decode()
     assert "Typo in Q2" in second
     assert "Ten minutes left" not in second
@@ -387,9 +371,7 @@ def test_announcements_unread_then_marked_as_announced(invigilator: Client, exam
     assert response["Location"] == url("invigilator:announcements", exam)
     read = invigilator.get(url("invigilator:announcements", exam)).content.decode()
     assert 'aria-label="Read out in LT19: unmark"' in read
-    assert icon_then("map-pin", "LT19</span>", "Venue") in read
-    assert icon_then("user", "Ann</span>", "Read out by") in read
-    assert "<title>Read out at</title>" in read
+    assert re.search(r'</svg>LT19 · Ann · <span class="num">\d\d:\d\d</span>', read)
 
 
 def test_invigilator_and_examiner_remove_a_seat(
@@ -400,8 +382,7 @@ def test_invigilator_and_examiner_remove_a_seat(
     matches = f"{url('invigilator:report', exam)}?venue=LT19&seat=B15&label=Q3b"
     html = invigilator.get(matches).content.decode()
     assert (
-        f'commandfor="delete-report-{joined.pk}" command="show-modal">Delete this seat\'s report<'
-        in html
+        f'commandfor="delete-report-{joined.pk}" command="show-modal">Delete this report…<' in html
     )
     assert ">Delete the report from LT19 B15?</h2>" in html
     response = invigilator.post(
@@ -446,10 +427,10 @@ def test_match_step_groups_answered_and_open(invigilator: Client, exam: Exam) ->
     html = invigilator.get(
         url("invigilator:report", exam) + "?venue=LT19&seat=D4&label=3"
     ).content.decode()
-    assert html.index(">Answered</h2>") < html.index("Answered one?")
-    assert html.index("Answered one?") < html.index(">Open</h2>")
-    assert html.index(">Open</h2>") < html.index("Open one?")
+    assert html.index(">Already asked about Q3</h2>") < html.index("Answered one?")
+    assert html.index("Answered one?") < html.index("Open one?")
     assert "New clarification</summary>" in html
+    assert '<details class="group new-question" id="new-question">' in html
 
 
 def test_typed_question_puts_the_most_alike_match_first(invigilator: Client, exam: Exam) -> None:
@@ -462,11 +443,10 @@ def test_typed_question_puts_the_most_alike_match_first(invigilator: Client, exa
     untyped = invigilator.get(step_two).content.decode()
     assert untyped.index("calculator") < untyped.index("integer")
     typed = invigilator.get(step_two + "&text=Must+x+be+a+whole+number%3F").content.decode()
-    assert typed.index(">Under Q3</h2>") < typed.index("integer")
+    assert typed.index(">Already asked about Q3</h2>") < typed.index("integer")
     assert typed.index("integer") < typed.index("calculator")
-    assert ">Answered</h2>" not in typed
     alike = round(similarity("Must x be a whole number?", "Is x an integer?") * 100)
-    assert f'<span class="meta">{alike}% alike</span>' in typed
+    assert f'<span class="meta ml-auto">{alike}% alike</span>' in typed
     assert "% alike" not in untyped
     assert ">Must x be a whole number?</textarea>" in typed
 
@@ -477,10 +457,10 @@ def test_typed_question_offers_alike_clarifications_on_other_questions(
     report(exam, seat="C1", label="Q5", text="Is x an integer?")
     report(exam, seat="C2", label="Q6", text="Can we use a calculator?")
     step_two = url("invigilator:report", exam) + "?venue=LT19&seat=D4&label=Q3"
-    assert '<span class="badge">Q5</span>' not in invigilator.get(step_two).content.decode()
+    assert '<span class="label-chip">Q5</span>' not in invigilator.get(step_two).content.decode()
     html = invigilator.get(step_two + "&text=Is+x+an+integer+or+a+real%3F").content.decode()
-    assert html.index(">Under another question</h2>") < html.index("Is x an integer?")
-    assert '<span class="badge">Q5</span>' in html
+    assert html.index(">Under other questions</h2>") < html.index("Is x an integer?")
+    assert '<span class="label-chip">Q5</span>' in html
     assert "calculator" not in html
 
 
@@ -488,7 +468,7 @@ def test_typing_refreshes_only_the_matches(invigilator: Client, exam: Exam) -> N
     report(exam, seat="C1", text="Is x an integer?")
     query = "?venue=LT19&seat=D4&label=Q3&text=integer"
     html = invigilator.get(url("invigilator:report", exam) + query, headers=HTMX).content.decode()
-    assert '<button class="match">' in html
+    assert '<span class="match-action">Same question' in html
     assert "<h1" not in html
     assert "Save clarification" not in html
 
@@ -505,7 +485,7 @@ def test_deliver_badge_and_home_count_seats_not_questions(
     assert '<span class="count action" title="Seats to deliver">1</span>' in html
     client.force_login(staff)
     home = client.get(reverse("home")).content.decode()
-    assert "<strong>1</strong><span>seat to deliver</span>" in home
+    assert 'tabular-nums max-sm:hidden text-blue-700">1</td>' in home
 
 
 def test_opening_a_seat_to_deliver_shows_other_tas_it_is_taken(
@@ -524,7 +504,7 @@ def test_opening_a_seat_to_deliver_shows_other_tas_it_is_taken(
     invigilator.get(seat)
     html = ben.get(url("invigilator:to_deliver", exam)).content.decode()
     assert taken.format("Ann") in html
-    assert 'class="seat-card claimed"' in html
+    assert 'class="deliver-row claimed"' in html
     assert re.search(
         r'<div id="live" data-live data-refresh-in="([1-9]\d*)"', html
     )  # when the claim expires
@@ -591,7 +571,7 @@ def test_snooze_puts_off_the_alert_on_this_device(
     assert "data-alert" not in html
     assert '<span class="count urgent" title="To read out">1</span>' in html
     assert re.search(
-        r'<div id="tab-bar" data-live data-refresh-in="[1-9]\d*"', html
+        r'<div id="announcement-bar" data-live data-refresh-in="[1-9]\d*"', html
     )  # when it returns
     # Once the delay is over it returns, under a new key so that it vibrates again.
     settings.EXAMDESK_SNOOZE_FOR = timedelta(0)

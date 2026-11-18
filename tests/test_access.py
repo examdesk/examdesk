@@ -18,7 +18,6 @@ from examdesk.models import Clarification, Exam
 from tests.helpers import (
     HTMX,
     REFRESH,
-    icon_then,
     named,
     open_link,
     report,
@@ -81,7 +80,7 @@ def test_creating_an_exam_requires_staff(client: Client, staff: User) -> None:
     client.force_login(staff)
     response = client.post(reverse("create_exam"), {"name": "CS1231S Final"})
     exam = Exam.objects.get()
-    assert response["Location"] == url("examiner:members", exam)
+    assert response["Location"] == url("examiner:clarifications", exam)
     assert exam.owner == staff
     assert (exam.members.get().name, exam.members.get().role) == ("lee", "examiner")
     assert client.get(response["Location"]).status_code == 200
@@ -141,7 +140,7 @@ def test_a_refresh_gets_the_page_with_its_live_parts_marked(examiner: Client, ex
     report(exam, label="Q7")
     html = examiner.get(page, headers=REFRESH).content.decode()
     assert "<title>(2) CS2109S Final · Exam Desk</title>" in html
-    assert '<div id="live" data-live>' in html
+    assert '<div id="queue-list" data-live class="queue-list">' in html
     assert "Q7" in html
     badge = '<span id="clarifications-badge" data-live><span class="count action"'
     assert f'{badge} title="Open clarifications" data-open-count="2">2</span>' in html
@@ -229,7 +228,8 @@ def test_every_page_and_fragment_renders_with_data(
         for headers in ({}, REFRESH):
             assert client.get(page, headers=headers).status_code == 200, page
     matched = invigilator.get(pages[0][1]).content.decode()
-    assert '<button class="match">' in matched
+    assert '<button class="match match-button" name="clarification" value="' in matched
+    assert '<span class="match-action">Same question<svg' in matched
     assert "C1" in invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
     assert "<svg" in examiner.get(url("examiner:members", exam)).content.decode()
 
@@ -268,8 +268,9 @@ def test_home_shows_exam_cards_with_counts(client: Client, exam: Exam, staff: Us
     assert 'commandfor="create-dialog" command="show-modal"><svg' in html
     assert "Create exam</button>" in html
     assert '<span class="live-dot"></span>Live</span>' in html
-    assert "<strong>1</strong><span>open clarification</span>" in html
-    assert "<strong>1</strong><span>seat to deliver</span>" in html
+    assert '<td class="text-right font-semibold tabular-nums text-amber-700">1</td>' in html
+    assert 'tabular-nums max-sm:hidden text-blue-700">1</td>' in html
+    assert '<td class="text-muted max-md:hidden">Examiner</td>' in html
 
 
 def test_home_paginates_exams_newest_first(
@@ -317,13 +318,14 @@ def test_delivery_state_updates_on_refresh(
     services.mark_delivered(first, answer=answer, member=named(exam, "Bob"))  # another invigilator
     services.mark_delivered(second, answer=answer, member=named(exam, "Bob"))
     clarification_live = examiner.get(clarification_page, headers=REFRESH).content.decode()
-    assert clarification_live.count('<span class="badge state-delivered">Delivered</span>') == 2
+    seats = clarification_live[clarification_live.index('id="seats-title"') :]
+    assert seats.count('class="badge state-delivered mt-0.5"') == 2
     deliver_live = invigilator.get(deliver_page, headers=REFRESH).content.decode()
     assert "Unmark</button>" in deliver_live
-    assert 'text-base-content">Bob</strong>' in deliver_live
+    assert '<span class="meta">Bob · ' in deliver_live
     seat_live = examiner.get(seat_page, headers=REFRESH).content.decode()
-    assert icon_then("check", "Delivered by Bob at") in seat_live
-    assert icon_then("pen-line", "Ann</span>", "Reported by") in seat_live
+    assert "Delivered by Bob at" in seat_live
+    assert '<p class="meta">Ann · ' in seat_live
     assert f'<a href="{url("examiner:seats", exam)}"' in seat_live
 
 
@@ -377,7 +379,7 @@ def test_reset_link_stops_the_old_link_and_keeps_members(
 ) -> None:
     old = exam.invigilator_token
     response = examiner.post(url("examiner:reset_link", exam), {"role": "invigilator"})
-    assert response["Location"] == url("examiner:members", exam)
+    assert response["Location"] == url("examiner:members", exam) + "?invite=invigilator"
     exam.refresh_from_db()
     assert exam.invigilator_token != old
     assert Client().get(reverse("join", args=[old])).status_code == 404

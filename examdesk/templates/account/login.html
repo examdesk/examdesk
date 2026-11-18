@@ -1,7 +1,7 @@
 {% extends "examdesk/base.html" %}
 {% block title %}Sign in · Exam Desk{% endblock %}
 {% block content %}
-<c-centered-card icon="lock" title="Sign in">
+<c-centered-card title="Sign in">
   <c-error>{{ form.non_field_errors|join:" " }}</c-error>
   <form method="post" action="{% url 'account_login' %}">
     {% csrf_token %}

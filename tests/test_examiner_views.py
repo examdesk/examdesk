@@ -1,9 +1,11 @@
 """The examiner screens."""
 
 import re
+from pathlib import Path
 
 import pytest
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -12,7 +14,6 @@ from pytest_django.fixtures import Settings
 from examdesk import services
 from examdesk.models import Exam, Readout, Report
 from examdesk.similarity import similarity
-from examdesk.templatetags.examdesk_tags import icon
 from tests.helpers import (
     REFRESH,
     fresh,
@@ -50,11 +51,11 @@ def test_clarification_filters_come_back_on_the_plain_url(examiner: Client, exam
     report(exam, label="Q3")
     page = url("examiner:clarifications", exam)
     assert examiner.get(page).status_code == 200
-    examiner.get(page + "?state=all&label=Q3&sort=-seats")
+    examiner.get(page + "?state=all&label=Q3&sort=seats")
     examiner.get(page + "?state=open", headers=REFRESH)  # a refresh does not save
     response = examiner.get(page)
     assert response.status_code == 302
-    assert response["Location"] == page + "?state=all&label=Q3&sort=-seats"
+    assert response["Location"] == page + "?state=all&label=Q3&sort=seats"
     # Going back to the plain URL shows it as it was.
     back = examiner.get(page, headers={"HX-Request": "true", "HX-History-Restore-Request": "true"})
     assert back.status_code == 200
@@ -63,12 +64,13 @@ def test_clarification_filters_come_back_on_the_plain_url(examiner: Client, exam
 def test_a_saved_filter_forgets_a_label_that_is_gone(examiner: Client, exam: Exam) -> None:
     r = report(exam, label="Q3b")
     page = url("examiner:clarifications", exam)
-    examiner.get(page + "?state=all&label=Q3b&sort=-seats")
+    examiner.get(page + "?state=all&label=Q3b&sort=seats")
     services.relabel_clarification(r.clarification, "Q4")
     html = examiner.get(page, follow=True).content.decode()
     assert "not one of the available choices" not in html
-    assert '<option value="all" selected>' in html  # the other filters still apply
-    assert examiner.get(page)["Location"] == page + "?state=all&sort=-seats"
+    assert '<input type="hidden" name="state" value="all"' in html  # the other filters still apply
+    assert '<option value="seats" selected>' in html
+    assert examiner.get(page)["Location"] == page + "?state=all&sort=seats"
 
 
 def test_question_filter_picks_several_questions(examiner: Client, exam: Exam) -> None:
@@ -135,8 +137,13 @@ def test_members_page_shows_the_invigilator_link_then_the_examiner_link_with_a_w
     invigilator_link = reverse("join", args=[exam.invigilator_token])
     examiner_link = reverse("join", args=[exam.examiner_token])
     warning = "Full control of the exam."
-    assert html.index(invigilator_link) < html.index(examiner_link) < html.index(warning)
+    assert html.index(invigilator_link) < html.index(warning) < html.index(examiner_link)
     assert html.count(warning) == 1
+    assert '<dialog id="invite-dialog" class="modal" aria-labelledby' in html
+    invite = examiner.get(url("examiner:members", exam) + "?invite=examiner").content.decode()
+    assert '<dialog id="invite-dialog" class="modal" data-autoopen aria-labelledby' in invite
+    assert 'value="examiner" class="sr-only" checked>Examiners</label>' in invite
+    assert 'value="invigilator" class="sr-only">Invigilators</label>' in invite
     assert 'commandfor="invigilator-qr" command="show-modal"' in html
     assert 'commandfor="examiner-qr" command="show-modal"' in html
 
@@ -156,7 +163,7 @@ def test_examiner_announcements_page(invigilator: Client, examiner: Client, exam
     assert "Announce to all venues" not in queue
 
 
-def test_seats_paginate_by_venue_and_find_a_seat(
+def test_seats_list_every_venue_and_find_a_seat(
     examiner: Client, exam: Exam, settings: Settings
 ) -> None:
     settings.EXAMDESK_PAGE_SIZE = 2
@@ -164,19 +171,19 @@ def test_seats_paginate_by_venue_and_find_a_seat(
     report(exam, seat="B14")
     report(exam, seat="B2")
     seats = url("examiner:seats", exam)
-    first = examiner.get(seats).content.decode()
-    assert first.index('aria-label="LT19 B2:') < first.index('aria-label="LT19 B14:')
-    assert 'aria-label="LT20 A1:' not in first
-    assert 'aria-label="LT20 A1:' in examiner.get(seats + "?page=2").content.decode()
-    found = examiner.get(seats + "?seat=b+1").content.decode()
+    every = examiner.get(seats).content.decode()
+    assert every.index('aria-label="LT19 B2:') < every.index('aria-label="LT19 B14:')
+    assert 'aria-label="LT20 A1:' in every
+    assert 'href="#venue-lt20">LT20</a>' in every
+    found = examiner.get(seats + "?q=b+1").content.decode()
     assert 'value="B1"' in found
     assert 'aria-label="LT19 B14:' in found
     assert 'aria-label="LT19 B2:' not in found
     assert 'aria-label="LT20 A1:' not in found
-    assert "No seats match" in examiner.get(seats + "?seat=Z9").content.decode()
+    assert "No seats match" in examiner.get(seats + "?q=Z9").content.decode()
 
 
-def test_seats_page_tiles_by_venue(examiner: Client, exam: Exam) -> None:
+def test_seats_show_each_seat_by_its_least_advanced_question(examiner: Client, exam: Exam) -> None:
     done = report(exam)
     answer = services.answer_clarification(
         done.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
@@ -185,13 +192,21 @@ def test_seats_page_tiles_by_venue(examiner: Client, exam: Exam) -> None:
     report(exam, label="Q5", text="Five?")  # B14 asks again: open
     report(exam, venue="LT20", seat="A1", clarification=done.clarification)  # answered, to deliver
     html = examiner.get(url("examiner:seats", exam)).content.decode()
-    venues = re.findall(
-        '<h2 class="venue-heading">' + re.escape(icon("map-pin")) + r"(\w+)</h2>", html
+    assert re.findall(r'<section class="card-box scroll-mt-4" id="venue-(\w+)"', html) == [
+        "lt19",
+        "lt20",
+    ]
+    assert (
+        'aria-label="LT19 B14: waiting, 2 questions">B14<span class="seat-pill-count">2</span>'
+        in html
     )
-    assert venues == ["LT19", "LT20"]
-    assert 'class="seat-card state-open"' in html  # B14: its least advanced question
-    assert 'aria-label="LT19 B14: 1 open, 1 delivered"' in html
-    assert 'aria-label="LT20 A1: 1 to deliver"' in html
+    assert 'class="seat-pill state-to-deliver"' in html
+    assert 'aria-label="LT20 A1: to deliver">A1</a>' in html
+    assert 'aria-current="true">All<span class="num">2</span>' in html
+    to_deliver = examiner.get(url("examiner:seats", exam) + "?state=to-deliver").content.decode()
+    assert 'aria-label="LT20 A1:' in to_deliver
+    assert 'aria-label="LT19 B14:' not in to_deliver
+    assert "No seats to deliver" in to_deliver
     page = examiner.get(url("examiner:seat", exam) + "?venue=LT20&seat=A1").content.decode()
     assert ">Yes</p>" in page
     corrected = fresh(done.clarification).current_answer
@@ -215,11 +230,10 @@ def test_deleting_an_announcement_asks_first(
         posted, venue="LT19", member=named(exam, "Ann")
     )  # read out: still deletable
     page = examiner.get(url("examiner:announcements", exam)).content.decode()
-    assert 'aria-label="Delete announcement"' in page
     assert f'commandfor="delete-{posted.pk}" command="show-modal"' in page
     assert f'<dialog id="delete-{posted.pk}" class="modal" aria-labelledby' in page
     live = examiner.get(url("examiner:announcements", exam), headers=REFRESH)
-    assert 'aria-label="Delete announcement"' in live.content.decode()  # the live part alone
+    assert f'commandfor="delete-{posted.pk}"' in live.content.decode()  # the live part alone
     assert invigilator.post(url("examiner:delete_announcement", exam, posted.pk)).status_code == 403
     response = examiner.post(url("examiner:delete_announcement", exam, posted.pk), follow=True)
     html = response.content.decode()
@@ -242,7 +256,7 @@ def test_announcements_paginate_newest_first(
     assert "Ten minutes left" not in second
 
 
-def test_clarifications_sort_by_question_and_badge_counts_open(
+def test_clarifications_sort_by_question_and_tabs_count_each_state(
     examiner: Client, exam: Exam
 ) -> None:
     report(exam, label="Q10", text="Ten?")
@@ -251,25 +265,23 @@ def test_clarifications_sort_by_question_and_badge_counts_open(
     services.answer_clarification(
         answered.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
-    html = examiner.get(url("examiner:clarifications", exam) + "?sort=question").content.decode()
+    page = url("examiner:clarifications", exam)
+    html = examiner.get(page + "?sort=question").content.decode()
     assert html.index("Two?") < html.index("Ten?")
-    assert ' aria-sort="ascending"><a href="?sort=-question" class="sort">Question' in html
-    assert '<a href="?sort=seats" class="sort">Seats</a>' in html
-    refresh = examiner.get(url("examiner:clarifications", exam) + "?sort=question", headers=REFRESH)
-    assert '<a href="?sort=seats" class="sort">' in refresh.content.decode()
-    html = examiner.get(url("examiner:clarifications", exam) + "?sort=-question").content.decode()
-    assert html.index("Ten?") < html.index("Two?")
-    assert ' aria-sort="descending"><a href="?sort=question" class="sort">' in html
-    html = examiner.get(url("examiner:clarifications", exam) + "?state=all").content.decode()
-    assert ' aria-sort="descending"><a href="?state=all&amp;sort=-wait" class="sort">' in html
-    html = examiner.get(
-        url("examiner:clarifications", exam) + "?state=all&sort=state"
-    ).content.decode()
-    assert html.index("Two?") < html.index("Three?")
-    html = examiner.get(
-        url("examiner:clarifications", exam) + "?state=all&sort=-state"
-    ).content.decode()
-    assert html.index("Three?") < html.index("Two?")
+    assert "Three?" not in html
+    assert '<option value="question" selected>Question</option>' in html
+    tabs = re.findall(r'href="\?([^"]+)"[^>]*>(\w+)<span class="num">(\d+)</span>', html)
+    assert tabs == [
+        ("sort=question&amp;state=open", "Open", "2"),
+        ("sort=question&amp;state=answered", "Answered", "1"),
+        ("sort=question&amp;state=closed", "Closed", "0"),
+    ]
+    assert 'aria-current="true">Open<span class="num">2</span>' in html
+    html = examiner.get(page + "?state=all&sort=question").content.decode()
+    assert html.index("Two?") < html.index("Three?") < html.index("Ten?")
+    html = examiner.get(page + "?state=answered").content.decode()
+    assert "Three?" in html
+    assert "Two?" not in html
     assert 'title="Open clarifications" data-open-count="2">2</span>' in html
 
 
@@ -283,13 +295,12 @@ def test_clarification_page_links_keep_the_sort(
     first = examiner.get(clarifications + "?sort=question").content.decode()
     assert "Q2?" in first
     assert "Q3?" not in first
-    assert 'href="?sort=question&amp;page=2" rel="next">' in first
+    assert 'href="?sort=question&amp;page=2" rel="next"' in first
     second = examiner.get(clarifications + "?sort=question&page=2").content.decode()
     assert "Q3?" in second
     assert "Q2?" not in second
-    assert 'href="?sort=question&amp;page=1" rel="prev">' in second
-    assert "Page 2 of 2" in second
-    assert '<a href="?sort=seats" class="sort">' in second
+    assert 'href="?sort=question&amp;page=1" rel="prev"' in second
+    assert "<span>3\N{EN DASH}3 of 3</span>" in second
     refresh = examiner.get(clarifications + "?sort=question&page=2", headers=REFRESH)
     assert "Q3?" in refresh.content.decode()
 
@@ -312,7 +323,7 @@ def test_withdraw_answer_and_reopen(examiner: Client, exam: Exam) -> None:
     answer = services.answer_clarification(
         r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
-    assert "Withdraw answer</button>" in examiner.get(page).content.decode()
+    assert "Withdraw</button>" in examiner.get(page).content.decode()
     withdraw = url("examiner:withdraw_answer", exam, r.clarification_id)
     html = examiner.post(withdraw, {"expected_answer": answer.pk}, follow=True).content.decode()
     assert "Answer withdrawn." in html
@@ -327,7 +338,7 @@ def test_withdraw_answer_and_reopen(examiner: Client, exam: Exam) -> None:
         r.clarification, text="No", member=named(exam, "Prof"), expected_answer=None
     )
     services.mark_delivered(r, answer=delivered, member=named(exam, "Ann"))
-    assert "Withdraw answer</button>" not in examiner.get(page).content.decode()
+    assert "Withdraw</button>" not in examiner.get(page).content.decode()
 
 
 def test_move_stays_on_the_split_clarification_while_it_has_seats(
@@ -406,12 +417,13 @@ def test_queue_shows_seats_to_deliver_and_wait(examiner: Client, exam: Exam) -> 
         r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
     html = examiner.get(url("examiner:clarifications", exam) + "?state=all").content.decode()
-    assert "2 seats" in html
-    assert '<div class="meta">2 to deliver</div>' in html
-    assert re.search(
-        r'<span class="wait" data-wait-since="\d+" title="Asked at', html
-    )  # no late colour
-    assert 'class="row-target"' in html
+    assert '<span class="ml-auto font-medium text-blue-700">2 to deliver</span>' in html
+    assert 'title="Seats"' in html
+    assert "data-wait-since" not in html  # answered: no wait
+    open_one = report(exam, seat="D4", label="Q5").clarification
+    html = examiner.get(url("examiner:clarifications", exam) + "?state=open").content.decode()
+    assert re.search(r'<span class="wait ml-auto " data-wait-since="\d+" data-wait-level', html)
+    assert f'href="{url("examiner:clarification", exam, open_one.pk)}"' in html
 
 
 def test_clarification_page_lists_what_seats_asked_and_duplicates(
@@ -429,11 +441,11 @@ def test_clarification_page_lists_what_seats_asked_and_duplicates(
     html = examiner.get(
         url("examiner:clarification", exam, first.clarification_id)
     ).content.decode()
-    asked = html[html.index("What students asked") : html.index('id="answer-form"')]
-    assert "LT19 C1</span>" in asked
-    assert "Can x be negative?" in asked
-    assert "LT19 B14</span>" not in asked
-    duplicates = html[html.index("Possible duplicates") : html.index("</aside>")]
+    seats = html[html.index('id="seats-title"') : html.index("Possible duplicates")]
+    assert seats.index("LT19 B14</a>") < seats.index("LT19 C1</a>")
+    assert "Can x be negative?" in seats
+    assert "Is x an integer?" not in seats  # the wording, shown above
+    duplicates = html[html.index("Possible duplicates") : html.index('id="correction"')]
     assert "Is y real?" in duplicates
     assert "Elsewhere?" not in duplicates
     assert duplicates.index("Is x an integer or a real?") < duplicates.index("Is y real?")
@@ -479,18 +491,17 @@ def test_announced_seats_wait_on_the_seats_pages_until_read_out(
         text="Typo", member=named(exam, "Prof"), clarification=r.clarification
     )
     seats = examiner.get(url("examiner:seats", exam)).content.decode()
-    assert 'class="seat-card state-to-read-out"' in seats
-    assert 'aria-label="LT19 B14: 1 to read out"' in seats
+    assert 'aria-label="LT19 B14: waiting"' in seats
     seat = examiner.get(url("examiner:seat", exam) + "?venue=LT19&seat=B14").content.decode()
     assert icon_then("megaphone", "To read out</span>") in seat
     services.mark_read_out(announcement, venue="LT19", member=named(exam, "Ann"))
     seats = examiner.get(url("examiner:seats", exam)).content.decode()
-    assert 'aria-label="LT19 B14: 1 delivered"' in seats
+    assert 'aria-label="LT19 B14: delivered"' in seats
     page = examiner.get(url("examiner:clarification", exam, r.clarification_id)).content.decode()
-    assert '<span class="badge state-read-out">Read out</span>' in page
+    assert 'class="badge state-read-out mt-0.5"' in page
 
 
-def test_members_page_lists_each_member_by_venue(
+def test_members_page_lists_everyone_online_first(
     invigilator: Client, examiner: Client, exam: Exam
 ) -> None:
     assert invigilator.get(url("examiner:members", exam)).status_code == 403
@@ -499,9 +510,12 @@ def test_members_page_lists_each_member_by_venue(
     open_link(ben, exam.invigilator_token, "Ben")
     ben.get(url("invigilator:report", exam))
     html = examiner.get(url("examiner:members", exam)).content.decode()
-    html = html[html.index("<h1>Members") :]
+    html = html[html.index('<h1 class="truncate">People</h1>') :]
     assert html.count(">Online<") == 3  # Ann, Ben and Prof
-    assert html.index("LT19") < html.index("Ann") < html.index("No venue") < html.index("Ben")
+    assert html.index("Ann") < html.index('<span class="badge">LT19</span>') < html.index("Ben")
+    assert 'Invigilators<span class="num">2</span>' in html
+    invigilators = examiner.get(url("examiner:members", exam) + "?role=invigilator")
+    assert "Prof" not in invigilators.content.decode().split("<tbody>")[1]
     # Leaving, or a phone put away, shows when they were last seen.
     ben.post(url("leave_exam", exam))
     exam.members.exclude(name="Prof").update(
@@ -509,7 +523,7 @@ def test_members_page_lists_each_member_by_venue(
     )
     html = examiner.get(url("examiner:members", exam)).content.decode()
     assert html.count(">Online<") == 1
-    assert html.count("Last seen") == 2
+    assert html.count(">Last seen ") == 2
 
 
 def test_removing_a_member_signs_out_their_devices(
@@ -537,10 +551,37 @@ def test_a_removed_member_keeps_their_history_and_can_rejoin(
     examiner.post(url("examiner:remove_member", exam, ann.pk))
     assert f'commandfor="remove-member-{ann.pk}"' not in examiner.get(members).content.decode()
     page = url("examiner:clarification", exam, r.clarification_id)
-    assert '<div class="meta">Ann · ' in examiner.get(page).content.decode()
+    assert '<span class="meta">Ann · ' in examiner.get(page).content.decode()
     join = reverse("join", args=[exam.invigilator_token])
     assert "Ann is already on this exam" in invigilator.post(join, {"name": "Ann"}).content.decode()
     assert invigilator.post(join, {"name": "Ann", "same": "1"}).status_code == 302
     assert member(invigilator, exam).pk == ann.pk
     assert invigilator.get(url("invigilator:report", exam)).status_code == 200
     assert f'commandfor="remove-member-{ann.pk}"' in examiner.get(members).content.decode()
+
+
+def test_clarification_shows_five_seats_and_the_rest_under_show_more(
+    examiner: Client, exam: Exam
+) -> None:
+    first = report(exam, seat="A1")
+    for n in range(2, 8):
+        report(exam, seat=f"A{n}", clarification=first.clarification)
+    html = examiner.get(
+        url("examiner:clarification", exam, first.clarification_id)
+    ).content.decode()
+    more = html[html.index('<details class="group/more">') :]
+    assert "Show 2 more</summary>" in more
+    assert "LT19 A5</a>" not in more
+    assert "LT19 A6</a>" in more
+
+
+def test_photo_shows_as_the_question_without_wording(
+    examiner: Client, exam: Exam, media: Path, jpeg: bytes
+) -> None:
+    asked = report(exam, text="", photo=SimpleUploadedFile("p.jpg", jpeg, "image/jpeg"))
+    html = examiner.get(
+        url("examiner:clarification", exam, asked.clarification_id)
+    ).content.decode()
+    question = html[html.index('aria-label="Question"') : html.index('id="seats-title"')]
+    assert f'src="{url("photo", exam, asked.pk)}"' in question
+    assert html.count(f'src="{url("photo", exam, asked.pk)}"') == 1

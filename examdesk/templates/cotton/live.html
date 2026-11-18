@@ -1,3 +1,3 @@
-{# A part of the page showing exam data, which a refresh or a send from the page morphs in by id to keep focus and open <details>. `refresh_in`: seconds until it also refreshes. #}
+{# A part of the page showing exam data, which a refresh or a send from the page morphs in by id to keep focus and open <details>. `refresh_in`: seconds until it also refreshes. Other attributes pass through. #}
 <c-vars as="div" id="live" class refresh_in />
-<{{ as }} id="{{ id }}" data-live{% if class %} class="{{ class }}"{% endif %}{% if refresh_in %} data-refresh-in="{{ refresh_in }}"{% endif %}>{{ slot }}</{{ as }}>
+<{{ as }} id="{{ id }}" data-live{% if class %} class="{{ class }}"{% endif %}{% if refresh_in %} data-refresh-in="{{ refresh_in }}"{% endif %}{% if attrs.attrs_dict %} {{ attrs }}{% endif %}>{{ slot }}</{{ as }}>

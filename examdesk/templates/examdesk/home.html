@@ -1,40 +1,38 @@
 {% extends "examdesk/base.html" %}
+{% block appbar %}{% if not user.is_authenticated %}<a href="{% url 'account_login' %}" class="btn btn-ghost btn-sm">Sign in</a>{% endif %}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>Exams</h1>
-  {% if user.is_authenticated %}
-    <button type="button" class="btn btn-primary" commandfor="create-dialog" command="show-modal"><c-icon name="plus" />Create exam</button>
-  {% endif %}
-</div>
+<c-page-header title="Exams">
+  {% if user.is_authenticated %}<button type="button" class="btn btn-primary" commandfor="create-dialog" command="show-modal"><c-icon name="plus" />Create exam…</button>{% endif %}
+</c-page-header>
 {% if user.is_authenticated %}
   <c-dialog id="create-dialog" title="New exam" action="{% url 'create_exam' %}" submit="Create exam">
-    <label>Exam name
+    <label>Name
       <input name="name" placeholder="e.g. CS2109S Final" maxlength="200" required autocomplete="off" autofocus>
     </label>
   </c-dialog>
 {% endif %}
-{% if cards %}
-<div class="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-4">
-  {% for exam, open_count, to_deliver in cards %}
-    {# The title link covers the whole card. #}
-    <article class="relative flex flex-col gap-4 transition hover:border-gray-400 hover:shadow-sm has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-primary">
-      <div class="flex items-start justify-between gap-3">
-        <a href="{% url 'exam' exam.pk %}" class="font-semibold after:absolute after:inset-0 focus:outline-none">{{ exam.name }}</a>
-        <c-exam-status :exam="exam" />
-      </div>
-      <div class="flex gap-8">
-        <div class="metric"><strong>{{ open_count }}</strong><span>open clarification{{ open_count|pluralize }}</span></div>
-        <div class="metric"><strong>{{ to_deliver }}</strong><span>seat{{ to_deliver|pluralize }} to deliver</span></div>
-      </div>
-      <p class="meta border-t border-base-300 pt-3">Created {{ exam.created_at|date:"j M Y" }}</p>
-    </article>
-  {% endfor %}
+{% if exam_rows %}
+<div class="table-card">
+  <table>
+    <thead><tr><th>Exam</th><th class="w-28 text-right">Open</th><th class="w-28 text-right max-sm:hidden">To deliver</th><th class="w-32 max-md:hidden">Role</th><th class="w-36 max-md:hidden">Created</th><th class="w-10"></th></tr></thead>
+    <tbody>
+      {% for exam, open_count, to_deliver, role in exam_rows %}
+        <tr class="row-link">
+          <td><div class="flex items-center gap-2"><a href="{% url 'exam' exam.pk %}" class="row-target truncate font-semibold">{{ exam.name }}</a><c-exam-status :exam="exam" /></div></td>
+          <td class="text-right font-semibold tabular-nums {% if open_count %}text-amber-700{% else %}text-subtle{% endif %}">{{ open_count }}</td>
+          <td class="text-right font-semibold tabular-nums max-sm:hidden {% if to_deliver %}text-blue-700{% else %}text-subtle{% endif %}">{{ to_deliver }}</td>
+          <td class="text-muted max-md:hidden">{{ role.label }}</td>
+          <td class="text-muted max-md:hidden">{{ exam.created_at|date:"j M Y" }}</td>
+          <td class="text-right"><c-icon name="chevron-right" class="text-subtle" /></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 <c-pagination :page_obj="page_obj" />
 {% else %}
-  <c-empty icon="inbox" title="No exams yet" />
-{% endif %}
-{% if not user.is_authenticated %}
-  <p class="mt-6 text-center text-sm text-muted">Examiner? <a href="{% url 'account_login' %}">Sign in</a> to create an exam.</p>
+  <c-empty icon="inbox" title="No exams yet" class="boxed">
+    {% if user.is_authenticated %}<button type="button" class="btn btn-primary mt-4" commandfor="create-dialog" command="show-modal"><c-icon name="plus" />Create exam…</button>{% endif %}
+  </c-empty>
 {% endif %}
 {% endblock %}

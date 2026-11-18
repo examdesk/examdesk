@@ -1,7 +1,7 @@
 """The examiner's screens (laptop)."""
 
 import logging
-from collections import Counter, defaultdict
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -16,7 +16,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import connections
 from django.db.models import Prefetch, QuerySet, prefetch_related_objects
-from django.http import Http404, HttpResponse, HttpResponseBase
+from django.http import Http404, HttpResponse, HttpResponseBase, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.safestring import mark_safe
@@ -35,9 +35,10 @@ from ..forms import (
     TextForm,
     form_errors,
 )
-from ..labels import covers, natural, normalize_place, top_level
+from ..labels import covers, natural, normalize_place, place_order, top_level
 from ..matching import rank_similar, same_question, similar_enough
 from ..models import (
+    SEAT_STATES,
     Announcement,
     Clarification,
     Exam,
@@ -46,6 +47,7 @@ from ..models import (
     Member,
     Report,
     Role,
+    SeatState,
 )
 from ..seats import seat_from
 from .common import (
@@ -67,56 +69,42 @@ class ClarificationRow:
     clarification: Clarification
     reports: list[Report]
     unresolved: int
-    since: datetime | None  # when the longest-waiting seat asked
+    waiting_since: datetime | None
 
 
 # Wait is measured from the longest-waiting seat, so new reports don't bump a clarification.
 SORT_KEYS: dict[str, Callable[[ClarificationRow], Any]] = {
     "question": lambda row: natural(row.clarification.label),
     "seats": lambda row: -row.unresolved,
-    "state": lambda row: list(Clarification.State).index(row.clarification.state),
-    "wait": lambda row: (row.since is None, row.since or row.clarification.created_at),
-}
-FIRST_ORDER = {
-    "question": "ascending",
-    "seats": "descending",
-    "state": "ascending",
-    "wait": "descending",
+    "wait": lambda row: (
+        row.waiting_since is None,
+        row.waiting_since or row.clarification.created_at,
+    ),
 }
 
 
-def sort_links(sort: str) -> dict[str, dict[str, str]]:
-    """Each column header's `sort` and `aria-sort`. The sorted column's link reverses it."""
-    links = {}
-    flip = {"ascending": "descending", "descending": "ascending"}
-    for column, first in FIRST_ORDER.items():
-        order = first if sort == column else flip[first] if sort == f"-{column}" else ""
-        links[column] = {"sort": f"-{column}" if sort == column else column, "order": order}
-    return links
+def waiting_since(reports: list[Report]) -> datetime | None:
+    """When the longest-waiting seat asked."""
+    return min((r.created_at for r in reports if r.state in Report.UNRESOLVED), default=None)
 
 
-@require_GET
-@exam_view(examiner_only=True)
-def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Restores this device's last filters when opened without a query, except on Back."""
-    exam = member.exam
-    saved = session.filters(request.session, exam)
-    if not request.GET and saved and not request.htmx.history_restore_request:
-        return redirect(f"{request.path}?{saved}")
+def queue(request: HtmxRequest, exam: Exam, query: QueryDict) -> dict[str, Any]:
+    """The clarifications that `query` filters and sorts, a page of them, and the state tabs.
+
+    Saves `query` as this device's filters.
+    """
     used = set(exam.clarifications.values_list("label", flat=True))
     # Offer top-level labels too: Q3 selects Q3a and Q3b.
     labels = {label for used_label in used for label in (used_label, top_level(used_label))}
     # A saved filter may name a label that was since relabeled or deleted.
-    query = request.GET.copy()
+    query = query.copy()
     query.setlist("label", [label for label in query.getlist("label") if label in labels])
     if not is_refresh(request):
         session.save_filters(request.session, exam, query.urlencode())
-    form = ClarificationFilterForm(query, labels=sorted(labels, key=natural), sorts=SORT_KEYS)
+    form = ClarificationFilterForm(query, labels=sorted(labels, key=natural))
     filters = form.cleaned_data if form.is_valid() else {}
     state = filters.get("state") or Clarification.State.OPEN
     found = exam.clarifications.all()
-    if state != "all":
-        found = found.in_state(Clarification.State(state))
     if picked := filters.get("label"):
         found = found.filter(
             label__in=[label for label in used if any(covers(p, label) for p in picked)]
@@ -127,22 +115,50 @@ def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
         .prefetch_related(Prefetch("reports", Report.objects.with_state()))
     )
     rows = []
+    counts: Counter[str] = Counter()
     for clarification in found:
-        reports = list(clarification.reports.all())
-        unresolved = [r.created_at for r in reports if r.state in Report.UNRESOLVED]
-        rows.append(
-            ClarificationRow(clarification, reports, len(unresolved), min(unresolved, default=None))
-        )
+        tab = "closed" if clarification.closed_reason else clarification.state
+        counts[tab] += 1
+        if state in ("all", tab):
+            reports = list(clarification.reports.all())
+            unresolved = sum(r.state in Report.UNRESOLVED for r in reports)
+            rows.append(
+                ClarificationRow(clarification, reports, unresolved, waiting_since(reports))
+            )
+    counts["all"] = counts.total()
     sort = filters.get("sort") or "wait"
     rows.sort(key=SORT_KEYS["wait"])
     rows.sort(key=SORT_KEYS[sort.removeprefix("-")], reverse=sort.startswith("-"))  # ties by wait
-    filtered = state != "open" or bool(filters.get("label"))
-    context = {
+    return {
         "form": form,
-        "page_obj": Paginator(rows, settings.EXAMDESK_PAGE_SIZE).get_page(request.GET.get("page")),
-        "filtered": filtered,
-        "sorts": sort_links(sort),
+        "query": query,
+        "rows": rows,
+        "page_obj": Paginator(rows, settings.EXAMDESK_PAGE_SIZE).get_page(query.get("page")),
+        "state": state,
+        "tabs": [
+            (name, title, counts[name]) for name, title in ClarificationFilterForm.STATES.items()
+        ],
+        "filtered": bool(filters.get("label")),
     }
+
+
+@require_GET
+@exam_view(examiner_only=True)
+def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
+    """Restores this device's last filters when opened without a query, except on Back."""
+    exam = member.exam
+    saved = session.filters(request.session, exam)
+    if not request.GET and saved and not request.htmx.history_restore_request:
+        return redirect(f"{request.path}?{saved}")
+    context = queue(request, exam, request.GET)
+    no_open_clarifications = (
+        not context["rows"]
+        and not context["filtered"]
+        and context["state"] == Clarification.State.OPEN
+    )
+    invigilators = exam.members.active().filter(role=Role.INVIGILATOR)
+    if no_open_clarifications and not invigilators.exists():
+        context["invite_link"] = join_link(request, exam, Role.INVIGILATOR)
     template = "examdesk/examiner/clarifications.html"
     return render_live(request, member, template, context | suggestions(exam))
 
@@ -154,8 +170,10 @@ def clarification_page(
     form: AnswerForm | None = None,
     label_form: LabelForm | None = None,
 ) -> HttpResponse:
-    """A bound `label_form` reopens the relabel dialog with its errors."""
-    clarification = get_clarification(member.exam, clarification_id)
+    """The clarification beside the queue. The query filters the queue, or else this device's
+    last filters do. A bound `label_form` reopens the relabel dialog with its errors."""
+    exam = member.exam
+    clarification = get_clarification(exam, clarification_id)
     correcting = form is not None
     if form is None:
         current = clarification.current_answer
@@ -165,20 +183,29 @@ def clarification_page(
                 "expected_answer": current and current.pk,
             }
         )
+    query = request.GET or QueryDict(session.filters(request.session, exam))
+    context = queue(request, exam, query)
+    queued = [row.clarification for row in context["rows"]]
+    after = queued.index(clarification) + 1 if clarification in queued else 0
     reports = list(
         Report.objects.with_state().filter(clarification=clarification).select_related("member")
     )
-    related = list(unmerged_others(member.exam, clarification))
+    related = list(unmerged_others(exam, clarification))
     current = clarification.current_answer
-    context = {
+    context |= {
         "clarification": clarification,
-        # reports that add something to the wording
-        "asked": [r for r in reports if r.photo or (r.text and r.text != clarification.wording)],
+        "can_answer": exam.is_live and not clarification.closed_reason,
+        "next_in_queue": next((c for c in queued[after:] + queued if c != clarification), None),
+        "waiting_since": waiting_since(reports),
+        # without a wording, a photo stands for the question
+        "question_photo": None
+        if clarification.wording
+        else next((r for r in reports if r.photo), None),
         # with an AI service, loaded by `clarification_duplicates`
         "duplicates": []
-        if member.exam.has_ai_service
+        if exam.has_ai_service
         else possible_duplicates(clarification, rank_similar(clarification.texts, related)),
-        "form": form,
+        "answer_form": form,
         "reports": reports,
         "answers": clarification.answers.select_related("member"),
         "withdrawable": current and not current.deliveries.exists(),
@@ -186,9 +213,9 @@ def clarification_page(
         "canned": settings.EXAMDESK_CANNED_ANSWERS,
         "label_form": label_form or LabelForm(initial={"label": clarification.label}),
         "correcting": correcting,
-        **suggestions(member.exam),
+        **suggestions(exam),
     }
-    path = reverse("examiner:clarification", args=[member.exam.pk, clarification_id])
+    path = reverse("examiner:clarification", args=[exam.pk, clarification_id])
     template = "examdesk/examiner/clarification.html"
     response = render_live(request, member, template, context, path=path)
     response.status_code = 400 if label_form and label_form.errors else 200
@@ -485,74 +512,127 @@ def delete_announcement(request: HtmxRequest, member: Member, announcement_id: i
 
 
 @dataclass(frozen=True)
-class SeatTally:
+class SeatSummary:
+    venue: str
     seat: str
-    tally: list[tuple[Report.State, int]]  # in `Report.PROGRESS` order, without zeros
-
-    @property
-    def least(self) -> Report.State:
-        """The state of the seat's least advanced question."""
-        return self.tally[0][0]
+    state: SeatState
+    question_count: int
 
 
-@require_GET
-@exam_view(examiner_only=True)
-def seats(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Seat tiles by venue with a count per state. Read out counts as delivered. `?seat=` keeps the
-    seats that contain it."""
-    seat_query = normalize_place(request.GET.get("seat", ""))
-    counts: defaultdict[tuple[str, str], Counter[Report.State]] = defaultdict(Counter)
-    for r in Report.objects.of_exam(member.exam).filter(seat__contains=seat_query).with_state():
-        state = Report.State.DELIVERED if r.state == Report.State.READ_OUT else r.state
-        counts[r.venue, r.seat][state] += 1
-    tiles = []
-    for venue, seat in sorted(
-        counts, key=lambda place: (not place[0], natural(place[0]), natural(place[1]))
+@dataclass(frozen=True)
+class VenueSeats:
+    name: str
+    seats: list[SeatSummary]  # those the state filter keeps
+    seat_count: int  # of those the search keeps
+    state_counts: list[tuple[SeatState, int]]
+
+
+def seats_page(
+    request: HtmxRequest, member: Member, selected_seat: tuple[str, str] | None = None
+) -> HttpResponse:
+    """Every seat that asked something, by venue, filtered by `?state=` and `?q=`, and the
+    `selected_seat`'s questions beside them."""
+    state = request.GET.get("state", "")
+    state = state if state in SeatState.values else ""
+    seat_query = normalize_place(request.GET.get("q", ""))
+    order = list(SeatState)
+    seat_states: dict[tuple[str, str], SeatState] = {}
+    question_counts: Counter[tuple[str, str]] = Counter()
+    for report in (
+        Report.objects.of_exam(member.exam).filter(seat__contains=seat_query).with_state()
     ):
-        tally = [(s, counts[venue, seat][s]) for s in Report.PROGRESS if counts[venue, seat][s]]
-        tiles.append((venue, SeatTally(seat, tally)))
-    page_obj = Paginator(tiles, settings.EXAMDESK_PAGE_SIZE).get_page(request.GET.get("page"))
-    context = {"seat_query": seat_query, "page_obj": page_obj, "venues": group_by_venue(page_obj)}
+        place = (report.venue, report.seat)
+        question_counts[place] += 1
+        seat_state = SEAT_STATES[report.state]
+        seat_states[place] = min(seat_states.get(place, seat_state), seat_state, key=order.index)
+    venues = []
+    for venue, places in group_by_venue(
+        (place[0], place) for place in sorted(seat_states, key=place_order)
+    ):
+        seats = [
+            SeatSummary(*place, seat_states[place], question_counts[place]) for place in places
+        ]
+        counts = Counter(seat.state for seat in seats)
+        venues.append(
+            VenueSeats(
+                name=venue,
+                seats=[seat for seat in seats if state in ("", seat.state)],
+                seat_count=len(seats),
+                state_counts=[(s, counts[s]) for s in SeatState if counts[s]],
+            )
+        )
+    totals = Counter(seat_states.values())
+    filters = {"state": state, "q": seat_query}
+    context: dict[str, Any] = {
+        "venues": venues,
+        "tabs": [
+            ("", "All", len(seat_states)),
+            *((seat_state.value, seat_state.label, totals[seat_state]) for seat_state in SeatState),
+        ],
+        "state": state,
+        "seat_query": seat_query,
+        "filters": filters,
+        "seat_list_url": reverse(
+            "examiner:seats", args=[member.exam.pk], query={k: v for k, v in filters.items() if v}
+        ),
+    }
+    if selected_seat:
+        venue, seat = selected_seat
+        context |= {
+            "selected_seat": selected_seat,
+            "reports": Report.objects.at_seat(member.exam, venue, seat)
+            .with_state()
+            .with_deliveries()
+            .select_related("member"),
+        }
     return render_live(request, member, "examdesk/examiner/seats.html", context)
 
 
 @require_GET
 @exam_view(examiner_only=True)
+def seats(request: HtmxRequest, member: Member) -> HttpResponse:
+    return seats_page(request, member)
+
+
+@require_GET
+@exam_view(examiner_only=True)
 def seat(request: HtmxRequest, member: Member) -> HttpResponse:
-    """A seat's reports with their delivery history."""
-    venue, seat = seat_from(request)
-    reports = (
-        Report.objects.at_seat(member.exam, venue, seat)
-        .with_state()
-        .with_deliveries()
-        .select_related("member")
-    )
-    context = {"venue": venue, "seat": seat, "reports": reports}
-    return render_live(request, member, "examdesk/examiner/seat.html", context)
+    """The seats, with a seat's questions and their delivery history beside them."""
+    return seats_page(request, member, selected_seat=seat_from(request))
 
 
 @require_GET
 @exam_view(examiner_only=True)
 def members(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Members grouped by venue, online first. Joining and presence don't change the exam version,
-    so the list refreshes every `EXAMDESK_SEEN_EVERY` too."""
-    people = sorted(member.exam.members.active(), key=lambda m: (not m.online, m.name.casefold()))
-    venues = group_by_venue((person.venue or "", person) for person in people)
+    """Everyone on the exam, online first, optionally of one `?role=`. `?invite=<role>` opens the
+    join links on that role. Joining and presence don't change the exam version, so the list
+    refreshes every `EXAMDESK_SEEN_EVERY` too."""
+    everyone = list(member.exam.members.active())
+    role = request.GET.get("role", "")
+    role = role if role in Role.values else ""
+    people = [person for person in everyone if not role or person.role == role]
+    people.sort(key=lambda m: (not m.online, m.name.casefold()))
+    role_counts = Counter(person.role for person in everyone)
+    invite_role = request.GET.get("invite", "")
     context = {
-        "venues": venues,
-        "links": lambda: join_links(request, member.exam),  # lazy: refreshes don't show them
+        "people": people,
+        "role": role,
+        "tabs": [
+            ("", "Everyone", len(everyone)),
+            *((r.value, f"{r.label}s", role_counts[r]) for r in Role),
+        ],
+        "invite_role": invite_role if invite_role in Role.values else "",
+        # lazy: refreshes don't show them
+        "join_links": lambda: [join_link(request, member.exam, r) for r in Role],
         "presence_update_in": int(settings.EXAMDESK_SEEN_EVERY.total_seconds()),
     }
     return render_live(request, member, "examdesk/examiner/members.html", context)
 
 
-def join_links(request: HtmxRequest, exam: Exam) -> list[dict[str, Any]]:
-    links = []
-    for role in Role:
-        url = request.build_absolute_uri(reverse("join", args=[exam.token(role)]))
-        qr = mark_safe(segno.make(url, error="m").svg_inline(scale=5, omitsize=True))
-        links.append({"role": role, "url": url, "qr": qr})
-    return links
+def join_link(request: HtmxRequest, exam: Exam, role: Role) -> dict[str, Any]:
+    url = request.build_absolute_uri(reverse("join", args=[exam.token(role)]))
+    qr = mark_safe(segno.make(url, error="m").svg_inline(scale=5, omitsize=True))
+    return {"role": role, "url": url, "qr": qr}
 
 
 @require_POST
@@ -713,7 +793,7 @@ def reset_link(request: HtmxRequest, member: Member) -> HttpResponse:
         return HttpResponse("Unknown role.", status=400)
     services.reset_link(member.exam, Role(role))
     messages.success(request, f"Reset the {Role(role).label} link.")
-    return redirect("examiner:members", member.exam.pk)
+    return redirect(reverse("examiner:members", args=[member.exam.pk], query={"invite": role}))
 
 
 @require_POST

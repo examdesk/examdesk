@@ -56,10 +56,8 @@ REFRESH = HTMX | {"HX-Source": "div#refresh"}
 """Headers of a refresh of a page's live parts."""
 
 
-def seat_page(exam: Exam, venue: str, seat: str, report: Report | None = None) -> str:
-    return seat_url(
-        "invigilator:deliver_seat", exam.pk, venue, seat, report=report.pk if report else ""
-    )
+def seat_page(exam: Exam, venue: str, seat: str) -> str:
+    return seat_url("invigilator:deliver_seat", exam.pk, venue, seat)
 
 
 def member(client: Client, exam: Exam) -> Member:

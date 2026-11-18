@@ -1,42 +1,67 @@
 {% extends "examdesk/base.html" %}
+{% load examdesk_tags %}
 {% block content %}
-<div class="page-header">
-  <h1>Members</h1>
-</div>
-<c-live :refresh_in="presence_update_in">
-<section class="list-card mb-8" aria-labelledby="links-title">
-  <h2 class="px-4 py-3" id="links-title">Join links</h2>
-  {% for link in links %}
-    <c-join-link-row :link="link" :exam="member.exam" />
-  {% endfor %}
-</section>
-  {% for venue, people in venues %}
-    <section class="mb-6">
-      <c-venue-heading :venue="venue" />
-      <div class="table-card">
-        <table>
-          <thead><tr><th>Name</th><th class="w-32">Role</th><th class="w-40">Status</th><th class="w-16"><span class="sr-only">Actions</span></th></tr></thead>
-          <tbody>
-            {% for person in people %}
-              <tr>
-                <td><span class="font-medium">{{ person.name }}</span></td>
-                <td class="text-muted">{{ person.get_role_display }}</td>
-                <td>{% if person.online %}<span class="badge green"><span class="live-dot"></span>Online</span>{% else %}<span class="text-sm text-muted">Last seen {{ person.last_seen|time:"H:i" }}</span>{% endif %}</td>
-                <td>
-                  {% if person != member %}
-                    <button type="button" class="btn btn-ghost btn-danger btn-sm btn-square float-right" commandfor="remove-member-{{ person.pk }}" command="show-modal"
-                            aria-label="Remove {{ person.name }}" title="Remove"><c-icon name="user-minus" /></button>
-                    <c-dialog id="remove-member-{{ person.pk }}" title="Remove {{ person.name }}?" action="{% url 'examiner:remove_member' member.exam.pk person.pk %}" submit="Remove" danger>
-                      <p>Their devices lose access. They can rejoin with the current {{ person.get_role_display }} link.</p>
-                    </c-dialog>
-                  {% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  {% endfor %}
+<c-page-header title="People">
+  <button type="button" class="btn btn-primary" commandfor="invite-dialog" command="show-modal"><c-icon name="user-plus" />Invite</button>
+</c-page-header>
+
+<c-live id="people" :refresh_in="presence_update_in">
+  <nav class="tabs tabs-box tabs-sm mb-4 w-fit" aria-label="Role">
+    {% for value, title, count in tabs %}<a class="tab gap-1.5" href="{% querystring role=value|default:None invite=None %}"{% if value == role %} aria-current="true"{% endif %}>{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
+  </nav>
+  {% if people %}
+  <div class="table-card">
+    <table>
+      <thead><tr><th>Name</th><th class="w-36 max-sm:hidden">Role</th><th class="w-32">Venue</th><th class="w-40 max-sm:hidden">Status</th><th class="w-12"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        {% for person in people %}
+          <tr>
+            <td>
+              <div class="flex items-center gap-3">
+                <span class="initials relative">{{ person.name|initials }}{% if person.online %}<span class="live-dot absolute -right-0.5 -bottom-0.5 ring-2 ring-base-100" title="Online"></span>{% endif %}</span>
+                <div class="min-w-0">
+                  <p class="truncate font-medium">{{ person.name }}{% if person == member %} <span class="font-normal text-subtle">(you)</span>{% endif %}</p>
+                  <p class="meta sm:hidden">{{ person.get_role_display }} · {% if person.online %}Online{% else %}Last seen {{ person.last_seen|time:"H:i" }}{% endif %}</p>
+                </div>
+              </div>
+            </td>
+            <td class="text-muted max-sm:hidden">{{ person.get_role_display }}</td>
+            <td>{% if person.venue %}<span class="badge">{{ person.venue }}</span>{% else %}<span class="text-subtle">–</span>{% endif %}</td>
+            <td class="max-sm:hidden">{% if person.online %}<span class="inline-flex items-center gap-1.5 text-green-700"><span class="live-dot"></span>Online</span>{% else %}<span class="text-muted">Last seen {{ person.last_seen|time:"H:i" }}</span>{% endif %}</td>
+            <td class="text-right">
+              {% if person != member %}
+                <button type="button" class="btn btn-ghost btn-danger btn-xs btn-square" commandfor="remove-member-{{ person.pk }}" command="show-modal" aria-label="Remove {{ person.name }}…" title="Remove…"><c-icon name="user-minus" /></button>
+                <c-dialog id="remove-member-{{ person.pk }}" title="Remove {{ person.name }}?" action="{% url 'examiner:remove_member' member.exam.pk person.pk %}" submit="Remove" danger>
+                  <p>Their devices lose access. They can rejoin with the current {{ person.get_role_display|lower }} link.</p>
+                </c-dialog>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <c-empty icon="users" title="No one yet" class="boxed">
+      <button type="button" class="btn btn-primary mt-4" commandfor="invite-dialog" command="show-modal"><c-icon name="user-plus" />Invite</button>
+    </c-empty>
+  {% endif %}
 </c-live>
+
+<dialog id="invite-dialog" class="modal"{% if invite_role %} data-autoopen{% endif %} aria-labelledby="invite-title">
+  <div class="modal-box">
+    <div class="flex items-start justify-between gap-4 px-6 pt-5">
+      <div class="min-w-0">
+        <h2 id="invite-title" class="text-lg">Invite people</h2>
+        <p class="meta truncate">{{ member.exam.name }}</p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm btn-square -mt-1 -mr-2" commandfor="invite-dialog" command="close" aria-label="Close"><c-icon name="x" /></button>
+    </div>
+    <div class="tabs tabs-box tabs-sm fill mx-6 mt-4" role="radiogroup" aria-label="Role">
+      {% for link in join_links %}<label class="tab"><input type="radio" name="invite-role" value="{{ link.role.value }}" class="sr-only"{% if link.role.value == invite_role or not invite_role and forloop.first %} checked{% endif %}>{{ link.role.label }}s</label>{% endfor %}
+    </div>
+    {% for link in join_links %}<c-join-link-row :link="link" :exam="member.exam" />{% endfor %}
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>Close</button></form>
+</dialog>
 {% endblock %}

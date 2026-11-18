@@ -1,2 +1,2 @@
-{# A text link, or with `square` an icon button. #}
-<c-vars href label square />{% if square %}<a class="btn btn-outline btn-square" href="{{ href }}" aria-label="{{ label }}"><c-icon name="chevron-left" /></a>{% else %}<a href="{{ href }}" class="mb-3 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-base-content"><c-icon name="chevron-left" />{{ label }}</a>{% endif %}
+{# A text link back to the page this one belongs to. #}
+<c-vars href label /><a href="{{ href }}" class="mb-3 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-base-content"><c-icon name="chevron-left" />{{ label }}</a>

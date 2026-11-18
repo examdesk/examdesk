@@ -53,54 +53,52 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
     # The invigilator's first screen asks for their venue; then they report a new clarification.
     expect(invigilator.get_by_role("heading", name="Which venue are you in?")).to_be_visible()
     invigilator.get_by_label("My venue").fill("lt 19")
-    invigilator.get_by_role("button", name="Save").click()
+    invigilator.get_by_role("button", name="Save", exact=True).click()
     expect(invigilator.get_by_role("button", name="Venue: LT19")).to_be_visible()
     invigilator.get_by_role("combobox", name="Seat").fill("b 14")
     invigilator.get_by_role("combobox", name="Question").fill("3(b)")
-    invigilator.get_by_role("button", name="Next").click()
-    expect(invigilator.get_by_role("heading", name="LT19 B14 · Q3b")).to_be_visible()
+    invigilator.keyboard.press("Tab")
+    # No clarification asked about Q3 yet, so New clarification opens.
     invigilator.get_by_label("What is the student asking?").fill("Is x an integer?")
     invigilator.get_by_role("button", name="Save clarification").click()
-    expect(invigilator.get_by_role("heading", name="LT19 B14 · Q3b")).to_be_visible()
-    expect(invigilator.get_by_role("link", name="Report another question")).to_be_visible()
-    invigilator.get_by_role("link", name="Open").click()
-    expect(invigilator.locator(".badge.state-open", has_text="B14")).to_be_visible()
+    expect(invigilator.get_by_role("heading", name="Reported")).to_be_visible()
+    expect(invigilator.get_by_text("LT19 B14 · Q3b")).to_be_visible()
+    expect(invigilator.get_by_role("link", name="Report another")).to_be_visible()
+    invigilator.get_by_role("link", name="Waiting").click()
+    expect(invigilator.locator(".place-chip", has_text="B14")).to_be_visible()
 
-    # The examiner answers; the invigilator's Deliver badge and Open list follow.
+    # The examiner answers; the invigilator's Deliver badge and Waiting list follow.
     prof.get_by_role("link", name="Is x an integer?").click()
     prof.get_by_role("button", name="State your assumptions.").click()
     prof.get_by_role("button", name="Send", exact=True).click()
     prof.get_by_role("link", name="Seats").click()
     expect(invigilator.locator(".dock .count.action")).to_have_text("1")
-    expect(invigilator.get_by_text("No open clarifications in LT19")).to_be_visible()
-    invigilator.get_by_role("link", name="Deliver").click()
+    expect(invigilator.get_by_text("Nothing waiting in LT19")).to_be_visible()
+    invigilator.locator(".dock").get_by_role("link", name="Deliver").click()
     invigilator.get_by_role("link", name="LT19 B14: 1 to deliver").click()
     expect(invigilator.get_by_text("State your assumptions.", exact=True)).to_be_visible()
     invigilator.get_by_role("button", name="Delivered to B14").click()
     expect(invigilator.get_by_text("Delivered Q3b to LT19 B14.")).to_be_visible()
-    expect(
-        invigilator.locator(".clarification-body .meta", has_text="Delivered by Ann")
-    ).to_be_visible()
-    invigilator.get_by_role("link", name="Deliver").click()
+    expect(invigilator.get_by_text("All delivered to B14")).to_be_visible()
+    invigilator.locator(".dock").get_by_role("link", name="Deliver").click()
     expect(invigilator.get_by_text("Nothing to deliver in LT19")).to_be_visible()
     expect(invigilator.locator(".dock .count")).to_have_count(0)
-    expect(prof.locator("a.seat-card.state-delivered", has_text="B14")).to_be_visible()
+    expect(prof.locator("a.seat-pill.state-delivered", has_text="B14")).to_be_visible()
 
-    # A delivered seat, under Recently delivered, opens to its delivery and Unmark.
-    invigilator.get_by_text("Recently delivered (1)").click()
+    # A delivered seat, under Delivered recently, opens to its delivery and Unmark.
+    invigilator.get_by_text("Delivered recently").click()
     invigilator.get_by_role("link", name="LT19 B14: all delivered").click()
-    expect(
-        invigilator.locator(".clarification-body .meta", has_text="Delivered by Ann")
-    ).to_be_visible()
+    invigilator.locator("details[name=delivered] summary").click()
+    expect(invigilator.locator("details[name=delivered] .meta", has_text="Ann")).to_be_visible()
     invigilator.get_by_role("button", name="Unmark").click()
     expect(invigilator.get_by_text("Unmarked LT19 B14.")).to_be_visible()
     invigilator.get_by_role("button", name="Delivered to B14").click()
-    expect(prof.locator("a.seat-card.state-delivered", has_text="B14")).to_be_visible()
+    expect(prof.locator("a.seat-pill.state-delivered", has_text="B14")).to_be_visible()
 
     # An announcement: the invigilator's alert and badge, and the examiner's venue badges.
     prof.get_by_role("link", name="Announcements").click()
     prof.get_by_label("New announcement").fill("Q2: read f as g.")
-    prof.get_by_role("button", name="Announce", exact=True).click()
+    prof.get_by_role("button", name="Announce to all venues", exact=True).click()
     expect(prof.locator(".badge.state-to-read-out", has_text="LT19")).to_be_visible()
     expect(prof.locator('nav a[href$="/examiner/announcements/"] .count')).to_have_text("1")
     expect(invigilator.locator(".dock .count.urgent")).to_have_text("1")
@@ -109,7 +107,7 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
     alert.get_by_role("button", name="Read out in LT19").click()
     expect(invigilator.get_by_text("Marked as read out in LT19.")).to_be_visible()
     expect(alert).to_be_hidden()
-    invigilator.get_by_role("link", name="Announce").click()
+    invigilator.locator(".dock").get_by_role("link", name="Read out").click()
     expect(invigilator.get_by_role("button", name="Read out in LT19: unmark")).to_be_visible()
     expect(invigilator.locator(".dock .count")).to_have_count(0)
     expect(prof.locator(".badge.state-read-out", has_text="LT19")).to_be_visible()
@@ -117,10 +115,10 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
 
     # Closing the exam reloads every invigilator screen into the closed-exam page.
     prof.get_by_role("link", name="Settings").click()
-    prof.get_by_role("button", name="Close exam", exact=True).click()
-    prof.get_by_role("button", name="Close the exam").click()
+    prof.get_by_role("button", name="Close exam…").click()
+    prof.locator("dialog[open]").get_by_role("button", name="Close exam").click()
     expect(invigilator.get_by_text("This exam is closed.")).to_be_visible()
-    expect(invigilator.get_by_role("link", name="Deliver")).to_be_hidden()
+    expect(invigilator.locator(".dock").get_by_role("link", name="Deliver")).to_be_hidden()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -147,9 +145,8 @@ def test_question_filter_applies_its_picks_when_closed(
     chips.filter(has_text="Q10").get_by_role("button").click()
     expect(prof.get_by_text("Ten?")).to_be_hidden()
     expect(chips).to_have_count(1)
-    # A single select applies its pick at once, keeping the others.
-    prof.get_by_role("combobox", name="State").locator("..").click()  # its box
-    prof.get_by_role("option", name="All").click()
+    # A state tab keeps the other filters.
+    prof.get_by_role("link", name="All", exact=True).click()
     expect(prof).to_have_url(re.compile(r"state=all&label=Q3"))
     expect(chips).to_have_count(1)
 
@@ -164,15 +161,15 @@ def test_find_a_seat_as_you_type(
         report(exam, seat=seat)
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
     prof.wait_for_url("**/examiner/**")
-    prof.goto(f"{server}/exams/{exam.pk}/examiner/seats/?page=2")
-    # Each pause in typing searches, and the box keeps the focus.
+    prof.goto(f"{server}/exams/{exam.pk}/examiner/seats/?state=waiting")
+    # Each pause in typing searches within the state, and the box keeps the focus.
     search = prof.get_by_role("searchbox", name="Find a seat")
     search.press_sequentially("b")
-    expect(prof).to_have_url(re.compile(r"\?seat=b$"))
+    expect(prof).to_have_url(re.compile(r"\?state=waiting&q=b$"))
     prof.keyboard.type("1")
-    expect(prof).to_have_url(re.compile(r"\?seat=b1$"))
-    expect(prof).not_to_have_url(re.compile("page="))
+    expect(prof).to_have_url(re.compile(r"\?state=waiting&q=b1$"))
     expect(search).to_have_value("b1")
+    expect(search).to_be_focused()
     expect(prof.get_by_role("link", name=re.compile("^LT19 B14:"))).to_be_visible()
     expect(prof.get_by_role("link", name=re.compile("^LT19 B2:"))).to_be_hidden()
 
@@ -186,25 +183,32 @@ def test_a_send_updates_only_what_changed(server: str, browser: Browser, staff: 
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
     prof.set_viewport_size({"width": 1000, "height": 500})
     prof.get_by_role("link", name="Is x an integer?").click()
-    answer = prof.get_by_label("Answer")
+    answer = prof.get_by_role("textbox", name="Answer")
     expect(answer).to_be_visible()
     prof.evaluate("document.querySelector('header').kept = true")  # lost if it's replaced
     answer.fill("Draft not sent")
-    prof.get_by_role("button", name="Edit", exact=True).click()
-    prof.get_by_role("textbox", name="Wording").fill("Is x a whole number?")
-    prof.get_by_role("button", name="Save").click()
-    expect(prof.get_by_text("Is x a whole number?").first).to_be_visible()
-    expect(prof.locator("dialog[open]")).to_have_count(0)
+    prof.get_by_role("button", name="Edit wording").click()
+    wording = prof.get_by_role("textbox", name="Wording")
+    wording.fill("Is x whole?")
+    wording.press("Escape")
+    expect(wording).to_be_hidden()
+    expect(prof.get_by_role("button", name="Edit wording")).to_contain_text("Is x an integer?")
+    prof.get_by_role("button", name="Edit wording").click()
+    wording.fill("Is x a whole number?")
+    prof.get_by_role("button", name="Save wording").click()
+    expect(prof.get_by_role("button", name="Edit wording")).to_contain_text("Is x a whole number?")
+    expect(wording).to_be_hidden()
     expect(answer).to_have_value("Draft not sent")
     # Sending from partway down leaves the page where it was.
     answer.fill("Yes.")
-    prof.evaluate("document.getElementById('answer-form').scrollIntoView({block: 'center'})")
+    prof.evaluate("document.getElementById('correction').scrollIntoView({block: 'center'})")
     scrolled = prof.evaluate("scrollY")
     assert scrolled > 0
     prof.get_by_role("button", name="Send", exact=True).click()
     expect(prof.get_by_role("status").filter(has_text="Sent.")).to_be_visible()
     expect(prof.get_by_role("paragraph").filter(has_text="Yes.")).to_be_visible()
-    assert abs(prof.evaluate("scrollY") - scrolled) <= 1  # sub-pixel rounding
+    bottom = prof.evaluate("document.documentElement.scrollHeight - innerHeight")
+    assert abs(prof.evaluate("scrollY") - min(scrolled, bottom)) <= 1  # sub-pixel rounding
     assert prof.evaluate("document.querySelector('header').kept")
     # The sends replaced the page's history entry.
     prof.go_back()
@@ -219,17 +223,18 @@ def test_changes_by_others_show_live_around_unsent_text(
     first = report(exam)
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
     prof.get_by_role("link", name="Is x an integer?").click()
-    expect(prof.get_by_label("Answer")).to_be_visible()
+    expect(prof.get_by_role("textbox", name="Answer")).to_be_visible()
     services.answer_clarification(
         first.clarification, text="Yes.", member=named(exam, "Prof Two"), expected_answer=None
     )
     expect(prof.get_by_role("paragraph").filter(has_text="Yes.")).to_be_visible()
-    prof.get_by_role("button", name="Correct the answer").click()
-    prof.get_by_label("Answer").fill("Yes, a whole number.")
+    prof.get_by_role("button", name="Correct answer").click()
+    correction = prof.get_by_role("textbox", name="Corrected answer")
+    correction.fill("Yes, a whole number.")
     report(exam, seat="C1", clarification=first.clarification)
     expect(prof.get_by_role("link", name="LT19 C1")).to_be_visible()
-    expect(prof.get_by_label("Answer")).to_have_value("Yes, a whole number.")
-    expect(prof.get_by_label("Answer")).to_be_visible()
+    expect(correction).to_have_value("Yes, a whole number.")
+    expect(correction).to_be_visible()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -246,19 +251,20 @@ def test_pages_open_at_the_top_and_keep_the_exam_stream(
     requested: list[str] = []
     prof.on("request", lambda request: requested.append(request.url))
     prof.get_by_role("link", name="Is x an integer?").click()
-    expect(prof.get_by_label("Answer")).to_be_visible()
+    answer = prof.get_by_role("textbox", name="Answer")
+    expect(answer).to_be_visible()
     prof.evaluate("window.scrollTo(0, document.body.scrollHeight)")
     prof.evaluate("document.querySelector('a[href$=\"/examiner/members/\"]').click()")
-    expect(prof.get_by_role("heading", name="Members")).to_be_visible()
+    expect(prof.get_by_role("heading", name="People")).to_be_visible()
     assert prof.evaluate("scrollY") == 0
     assert not [url for url in requested if "/events/" in url]  # the exam's pages share one stream
     prof.go_back()
-    expect(prof.get_by_label("Answer")).to_be_visible()
+    expect(answer).to_be_visible()
     # A send that can't reach the server keeps its text and says so.
     prof.route(
         "**/*", lambda route: route.abort() if route.request.method == "POST" else route.continue_()
     )
-    prof.get_by_label("Answer").fill("Yes.")
+    answer.fill("Yes.")
     prof.get_by_role("button", name="Send", exact=True).click()
     expect(prof.get_by_text("Not sent.")).to_be_visible()
-    expect(prof.get_by_label("Answer")).to_have_value("Yes.")
+    expect(answer).to_have_value("Yes.")

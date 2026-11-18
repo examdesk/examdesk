@@ -1,24 +1,40 @@
 {% extends "examdesk/base.html" %}
 {% load examdesk_tags %}
 {% block content %}
-{% with pk=member.exam.pk %}
+{% with pk=member.exam.pk pages=file.pages.all %}
 <c-back href="{% url 'examiner:settings' pk %}" label="Settings" />
-<div class="page-header">
-  <h1 class="min-w-0 truncate">{{ file.name }}</h1>
-</div>
+<c-live id="file-header" class="contents">
+  {% with read=file.read_count total=pages|length %}
+  <c-page-header title="{{ file.name }}" subtitle="{{ total }} page{{ total|pluralize }} · {% if read == total %}all read{% else %}{{ read }} of {{ total }} read{% endif %}">
+    <button type="button" class="btn btn-danger" commandfor="delete-file" command="show-modal"><c-icon name="trash-2" />Delete…</button>
+  </c-page-header>
+  {% endwith %}
+  <c-dialog id="delete-file" title="Delete {{ file.name }}?" action="{% url 'examiner:delete_file' pk file.pk %}" submit="Delete" danger>
+    <p>The AI no longer uses it to draft answers.</p>
+  </c-dialog>
+</c-live>
+
+{% if file.pdf and pages|length > 1 %}
+  <nav class="page-nav" aria-label="Pages" hx-boost="false">
+    {% for page in pages %}<a href="#page-{{ page.number }}"{% if not page.is_read %} class="unread" title="Not read yet"{% endif %}>{{ page.number }}</a>{% endfor %}
+  </nav>
+{% endif %}
 
 <c-live id="pages" class="flex flex-col gap-6">
-{% for page in file.pages.all %}
-  <section class="card-box"{% if file.pdf %} aria-labelledby="page-{{ page.number }}"{% endif %}>
-    {% if file.pdf %}<div class="card-header"><h2 id="page-{{ page.number }}">Page {{ page.number }}</h2></div>{% endif %}
-    <div class="grid items-start gap-6{% if file.pdf %} lg:grid-cols-2{% endif %}">
-      {% if file.pdf %}<img src="{% url 'examiner:page_image' pk file.pk page.number %}" alt="Page {{ page.number }}" loading="lazy" class="w-full rounded-lg border border-base-300">{% endif %}
-      {% if page.is_read %}
-        <div class="markdown min-w-0 text-sm">{{ page.text|markdown }}</div>
-      {% else %}
-        <p class="text-sm text-muted">Not read yet.</p>
-      {% endif %}
-    </div>
+{% for page in pages %}
+  <section class="file-page" id="page-{{ page.number }}" aria-labelledby="page-{{ page.number }}-title">
+    {% if file.pdf %}
+      <header>
+        <h2 id="page-{{ page.number }}-title">Page {{ page.number }}</h2>
+      </header>
+      <div class="grid items-start gap-6 p-5 lg:grid-cols-2">
+        <img src="{% url 'examiner:page_image' pk file.pk page.number %}" alt="Page {{ page.number }}" loading="lazy" class="w-full rounded-lg border border-base-300 lg:sticky lg:top-32">
+        {% if page.is_read %}<div class="markdown min-w-0 text-sm">{{ page.text|markdown }}</div>{% else %}<p class="text-sm text-subtle">Not read yet</p>{% endif %}
+      </div>
+    {% else %}
+      <h2 id="page-{{ page.number }}-title" class="sr-only">Text</h2>
+      <div class="markdown p-5 text-sm">{{ page.text|markdown }}</div>
+    {% endif %}
   </section>
 {% endfor %}
 </c-live>

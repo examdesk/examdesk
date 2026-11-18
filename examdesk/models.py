@@ -79,6 +79,11 @@ class ExamFile(models.Model):
         """Requires the pages prefetched."""
         return [page for page in self.pages.all() if not page.is_read]
 
+    @property
+    def read_count(self) -> int:
+        """Requires the pages prefetched."""
+        return sum(page.is_read for page in self.pages.all())
+
 
 class FilePage(models.Model):
     """Text files have one page, read on upload."""
@@ -285,6 +290,24 @@ class Report(models.Model):
         """Deliveries of answers since corrected. Requires `with_deliveries()`."""
         current = self.clarification.current_answer_id
         return [d for d in self.all_deliveries if d.answer_id != current]
+
+
+class SeatState(models.TextChoices):
+    """The state of a seat's least advanced question, in progress order. Read out counts as
+    delivered."""
+
+    WAITING = "waiting", "Waiting"
+    TO_DELIVER = "to-deliver", "To deliver"
+    DELIVERED = "delivered", "Delivered"
+
+
+SEAT_STATES: dict[Report.State, SeatState] = {
+    Report.State.OPEN: SeatState.WAITING,
+    Report.State.TO_READ_OUT: SeatState.WAITING,
+    Report.State.TO_DELIVER: SeatState.TO_DELIVER,
+    Report.State.DELIVERED: SeatState.DELIVERED,
+    Report.State.READ_OUT: SeatState.DELIVERED,
+}
 
 
 class Delivery(models.Model):

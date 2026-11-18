@@ -292,7 +292,8 @@ def test_pdf_pages_wait_for_the_ai_to_read_them(
     connect(exam)
     page = upload(examiner, exam, "paper.pdf", pdf(2))
     [file] = exam.files.all()
-    assert "Reading · 2 pages left" in page
+    assert "Reading 0 of 2 pages" in page
+    assert 'value="0" max="2" aria-label="Pages read"' in page
     assert url("examiner:read_page", exam, file.pk, 2) in page
     assert Path(file.pdf.path).exists()
     with django_capture_on_commit_callbacks(execute=True):
@@ -313,10 +314,11 @@ def test_reads_pdf_pages_with_the_service(
     assert image["image_url"]["url"].startswith("data:image/png;base64,")
     assert "never put the text in a code block" in prompt["text"]
     page = examiner.get(url("examiner:settings", exam)).content.decode()
-    assert "Reading · 1 page left" in page
+    assert "Reading 1 of 2 pages" in page
     read(examiner, exam, file, 1)
     page = examiner.get(url("examiner:settings", exam)).content.decode()
     assert "data-read-pages" not in page
+    assert "2 pages</p>" in page
 
 
 @pytest.mark.django_db(transaction=True)
@@ -367,7 +369,9 @@ def test_examiner_sees_each_page_and_what_the_ai_read(
     file.pages.filter(number=1).update(text="1A. Is $x$ an integer?", is_read=True)
     page = examiner.get(url("examiner:file", exam, file.pk)).content.decode()
     assert '1A. Is <span class="math inline"><math' in page
-    assert "Not read yet." in page
+    assert '<p class="text-sm text-subtle">Not read yet</p>' in page
+    assert "2 pages · 1 of 2 read" in page
+    assert '<a href="#page-2" class="unread" title="Not read yet">2</a>' in page
     assert url("examiner:page_image", exam, file.pk, 2) in page
     image = examiner.get(url("examiner:page_image", exam, file.pk, 2))
     assert image["Content-Type"] == "image/png"

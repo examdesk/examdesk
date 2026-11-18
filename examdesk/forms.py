@@ -97,7 +97,7 @@ class ReportStartForm(BaseForm):
     )
     label = LabelField(
         label="Question",
-        widget=datalist_input("labels", {"placeholder": "e.g. 3b, 3(b)(ii) or General"}),
+        widget=datalist_input("labels", {"placeholder": "e.g. 3b"}),
     )
 
 
@@ -175,26 +175,38 @@ class ExamFileForm(BaseForm):
 
 
 class ClarificationFilterForm(BaseForm):
+    STATES = {
+        "all": "All",
+        Clarification.State.OPEN: "Open",
+        Clarification.State.ANSWERED: "Answered",
+        "closed": "Closed",
+    }
+
     label = forms.MultipleChoiceField(
         required=False,
-        widget=forms.SelectMultiple(attrs={"aria-label": "Questions", "placeholder": "Questions"}),
+        widget=forms.SelectMultiple(
+            attrs={"aria-label": "Questions", "placeholder": "All questions"}
+        ),
     )
     state = forms.ChoiceField(
-        choices=[*Clarification.State.choices, ("all", "All")],
+        choices=STATES,
         required=False,
-        widget=forms.Select(attrs={"aria-label": "State"}),
+        widget=forms.HiddenInput(attrs={"form": "queue-filters"}),
     )
-    sort = forms.ChoiceField(required=False, widget=forms.HiddenInput)
+    sort = forms.ChoiceField(
+        choices={
+            "wait": "Longest wait",
+            "seats": "Most seats",
+            "question": "Question",
+            "-wait": "Newest",
+        },
+        required=False,
+        widget=forms.Select(attrs={"aria-label": "Sort", "data-native": True}),
+    )
 
-    def __init__(
-        self, *args: Any, labels: Iterable[str], sorts: Iterable[str], **kwargs: Any
-    ) -> None:
-        """`sorts` are column names; `-` before one reverses it."""
+    def __init__(self, *args: Any, labels: Iterable[str], **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.fields["label"].choices = [(label, label) for label in labels]  # type: ignore[attr-defined]
-        self.fields["sort"].choices = [  # type: ignore[attr-defined]
-            (f"{sign}{key}", key) for key in sorts for sign in ("", "-")
-        ]
 
 
 class TextForm(BaseForm):

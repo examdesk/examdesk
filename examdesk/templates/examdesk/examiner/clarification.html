@@ -1,213 +1,233 @@
 {% extends "examdesk/base.html" %}
 {% load examdesk_tags %}
+{% block main_class %}split-view{% endblock %}
 {% block content %}
 {% with pk=member.exam.pk editable=member.exam.is_live label=clarification.label %}
-<c-back href="{% url 'examiner:clarifications' pk %}" label="Clarifications" />
-<c-live id="clarification">
-<div class="page-header">
-  <div>
-    <h1 class="flex flex-wrap items-center gap-2.5">{{ label }} <c-state-badge :state="clarification.state" /></h1>
-    {% if clarification.merged_into_id %}<p>Merged into <a href="{% url 'examiner:clarification' pk clarification.merged_into_id %}">{{ clarification.merged_into|titled }}</a></p>{% endif %}
-  </div>
-  {% if editable %}
-    <button type="button" class="btn btn-outline btn-sm" popovertarget="more-menu" style="anchor-name: --more-menu"><c-icon name="ellipsis" />More</button>
-    <ul class="menu-panel w-64" id="more-menu" popover style="position-anchor: --more-menu">
-      {% if not clarification.closed_reason and others %}<li><button type="button" commandfor="merge-dialog" command="show-modal"><c-icon name="git-merge" />Merge into another…</button></li>{% endif %}
-      <li><button type="button" commandfor="relabel-dialog" command="show-modal"><c-icon name="pen-line" />Change question…</button></li>
-    </ul>
-  {% endif %}
-</div>
+<c-page-header title="Clarifications" class="max-lg:hidden" />
+<div class="clarifications-layout">
+  {% include "examdesk/examiner/includes/queue.html" %}
 
-<div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-<div class="flex min-w-0 flex-col gap-6">
-  <section class="card-box">
-    <div class="flex items-start justify-between gap-4">
-      <p class="text-lg leading-7 font-medium">{{ clarification.wording|default:"No description." }}</p>
-      {% if editable %}<button type="button" class="btn btn-ghost btn-sm shrink-0" commandfor="wording-dialog" command="show-modal">Edit</button>{% endif %}
-    </div>
-    {% if asked %}
-      <details class="group mt-5">
-      <summary class="eyebrow flex w-fit cursor-pointer list-none items-center gap-1.5"><c-icon name="chevron-right" class="transition-transform group-open:rotate-90" />What students asked ({{ asked|length }})</summary>
-      <ul class="mt-3 flex flex-col gap-4">
-        {% for report in asked %}
-          <li class="flex gap-3">
-            <span class="badge h-fit shrink-0">{{ report.venue }} {{ report.seat }}</span>
-            <div class="min-w-0 text-sm">
-              {{ report.text }}
-              {% if report.photo %}
-                {% url 'photo' pk report.pk as photo %}
-                <a href="{{ photo }}" target="_blank" class="mt-1 block w-fit"><img class="max-h-88 rounded-lg border border-base-300" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}"></a>
-              {% endif %}
-            </div>
-          </li>
-        {% endfor %}
-      </ul>
-      </details>
-    {% endif %}
-  </section>
-
-  {% if clarification.current_answer %}
-  <section class="card-box">
-    <div class="card-header"><h2>Answer</h2><span class="meta">{{ clarification.current_answer.member.name }} · {{ clarification.current_answer.created_at|time:"H:i" }}</span></div>
-    <p class="prose-answer rounded-lg bg-base-200 px-4 py-3">{{ clarification.current_answer.text }}</p>
-    {% if editable and not clarification.closed_reason %}
-      <div class="mt-4 flex flex-wrap gap-2">
-        <button type="button" class="btn btn-outline btn-sm" data-show="correction"{% if correcting %} hidden{% endif %}>Correct the answer</button>
-        {% if withdrawable %}
-          <form method="post" action="{% url 'examiner:withdraw_answer' pk clarification.pk %}">
-            {% csrf_token %}
-            <input type="hidden" name="expected_answer" value="{{ clarification.current_answer_id }}">
-            <button class="btn btn-outline btn-sm">Withdraw answer</button>
-          </form>
+  <c-live id="clarification-pane" class="clarification-pane" data-clarification>
+    <div class="clarification-header">
+      <a href="{% url 'examiner:clarifications' pk %}" class="btn btn-ghost btn-sm btn-square -ml-2 lg:hidden" aria-label="Clarifications"><c-icon name="arrow-left" /></a>
+      <h2 class="flex min-w-0 items-center gap-2.5">
+        {% if editable %}
+          <button type="button" class="label-chip h-6 cursor-pointer gap-1 text-sm hover:bg-base-300/60{% if not label %} font-medium text-subtle{% endif %}" commandfor="relabel-dialog" command="show-modal" title="Change question">{{ label|default:"No question" }}<c-icon name="chevron-down" class="size-3.5 text-subtle" /></button>
+        {% elif label %}<span class="label-chip h-6 text-sm">{{ label }}</span>{% endif %}
+        <c-state-badge :state="clarification.state" />
+      </h2>
+      <span class="meta inline-flex items-center gap-2.5">
+        <span class="inline-flex items-center gap-1"><c-icon name="users" />{{ reports|length }} seat{{ reports|length|pluralize }}</span>
+        {% if waiting_since and clarification.state == 'open' %}<span class="wait {{ waiting_since|wait_level }}" data-wait-since="{{ waiting_since|date:'U' }}" data-wait-level title="Asked at {{ waiting_since|time:'H:i' }}"><c-icon name="clock" />{{ waiting_since|wait }}</span>{% endif %}
+      </span>
+      <div class="ml-auto flex items-center gap-1.5">
+        {% if can_answer and others %}<button type="button" class="btn btn-outline btn-sm" commandfor="merge-dialog" command="show-modal"><c-icon name="git-merge" /><span class="max-sm:sr-only">Merge…</span></button>{% endif %}
+        {% if next_in_queue %}
+          <a href="{% url 'examiner:clarification' pk next_in_queue.pk %}" class="btn btn-sm {% if clarification.state == 'open' %}btn-ghost{% else %}btn-primary{% endif %}" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body" title="Next (J)">Next<c-icon name="chevron-right" /></a>
         {% endif %}
       </div>
-    {% endif %}
-  </section>
-  {% endif %}
+    </div>
 
-  {% if editable and not clarification.closed_reason %}
-  <section class="card-box" id="correction"{% if clarification.current_answer and not correcting %} hidden{% endif %}>
-    <div class="card-header"><h2>{% if clarification.current_answer %}Correct the answer{% else %}Answer{% endif %}</h2></div>
-    <form method="post" action="{% url 'examiner:answer_clarification' pk clarification.pk %}" id="answer-form">
-      {% csrf_token %}
-      <input type="hidden" name="expected_answer" value="{{ form.expected_answer.value|default_if_none:'' }}">
-      <div class="mb-2 flex flex-wrap gap-1.5">
-        {% if member.exam.has_ai_service %}<button type="button" class="btn btn-outline btn-xs" data-draft="{% url 'examiner:draft_answer' pk clarification.pk %}"><c-icon name="sparkles" />Draft with AI</button>{% endif %}
-        {% for text in canned %}
-          <button type="button" class="btn btn-outline btn-xs font-normal" onclick="this.form.text.value = this.textContent">{{ text }}</button>
-        {% endfor %}
-      </div>
-      <textarea name="text" maxlength="{{ config.text_max }}" id="answer-text" rows="4" required aria-label="Answer" aria-describedby="send-hint"{% if not clarification.current_answer or correcting %} autofocus{% endif %}>{{ form.text.value|default:"" }}</textarea>
-      {% if member.exam.has_ai_service %}<p class="meta mt-1" role="status" data-draft-failed hidden>Couldn't draft an answer.</p>{% endif %}
-      <div class="card-footer justify-between">
-        <small id="send-hint" class="max-sm:hidden"><kbd>Ctrl</kbd> <kbd>Enter</kbd> or <kbd>⌘</kbd> <kbd>Enter</kbd> sends</small>
-        <div class="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
-          {% if clarification.current_answer %}<button type="button" class="btn btn-outline" data-hide="correction">Cancel</button>{% else %}<button type="button" class="btn btn-outline" commandfor="announce-dialog" command="show-modal"><c-icon name="megaphone" />Announce to all venues…</button>{% endif %}
-          <button class="btn btn-primary"><c-icon name="arrow-right" />{% if clarification.current_answer %}Send correction{% else %}Send{% endif %}</button>
-        </div>
-      </div>
-    </form>
-  </section>
-  {% endif %}
+    <div class="clarification-body">
+      {% if clarification.merged_into_id %}
+        <div class="flash mb-0"><c-icon name="git-merge" /><span>Merged into <a href="{% url 'examiner:clarification' pk clarification.merged_into_id %}">{{ clarification.merged_into|titled }}</a></span></div>
+      {% endif %}
 
-  {% if editable and clarification.closed_reason %}
-    <section class="card-box flex flex-wrap items-center justify-between gap-3">
-      <p class="text-sm text-muted">Reopen it to answer or edit.</p>
-      <form method="post" action="{% url 'examiner:reopen_clarification' pk clarification.pk %}">
+      <section aria-label="Question">
+        {% if editable %}
+          <form method="post" action="{% url 'examiner:reword_clarification' pk clarification.pk %}" data-inline-edit data-saved-text="{{ clarification.wording }}">
+            {% csrf_token %}
+            <button type="button" class="wording-view group" data-edit title="Edit wording"><span class="sr-only">Edit wording: </span>
+              {% if clarification.wording %}<span class="wording-text">{{ clarification.wording }}</span>{% else %}<span class="text-sm font-medium text-primary">Add wording</span>{% endif %}
+              <c-icon name="pencil" class="wording-edit-icon" />
+            </button>
+            <div class="wording-editor" data-editor hidden>
+              <textarea name="text" maxlength="{{ config.text_max }}" rows="1" aria-label="Wording" class="field-sizing-content min-h-0 resize-none px-2 py-1 text-lg leading-7 font-medium">{{ clarification.wording }}</textarea>
+              <div class="flex shrink-0 gap-1">
+                <button class="btn btn-primary btn-sm btn-square" aria-label="Save wording" title="Save"><c-icon name="check" /></button>
+                <button type="button" class="btn btn-ghost btn-sm btn-square" data-cancel-edit aria-label="Cancel" title="Cancel"><c-icon name="x" /></button>
+              </div>
+            </div>
+          </form>
+        {% elif clarification.wording %}
+          <p class="wording-text">{{ clarification.wording }}</p>
+        {% endif %}
+        {% if question_photo %}
+          {% url 'photo' pk question_photo.pk as photo %}
+          <a href="{{ photo }}" target="_blank" class="mt-3 block w-fit"><img class="max-h-80 rounded-lg border border-base-300" src="{{ photo }}" alt="Photo, {{ question_photo.venue }} {{ question_photo.seat }}"></a>
+        {% endif %}
+      </section>
+
+      {% if clarification.current_answer %}
+        <section class="rounded-box border border-green-600/20 bg-green-50/50 p-4" aria-labelledby="answer-title">
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <h2 id="answer-title" class="flex items-center gap-1.5 text-meta text-green-800"><c-icon name="check" />Answer</h2>
+            <span class="meta">{{ clarification.current_answer.member.name }} · {{ clarification.current_answer.created_at|time:"H:i" }}</span>
+          </div>
+          <p class="prose-answer">{{ clarification.current_answer.text }}</p>
+          {% if can_answer %}
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button type="button" class="btn btn-outline btn-sm" data-show="correction"{% if correcting %} hidden{% endif %}><c-icon name="pen-line" />Correct answer</button>
+              {% if withdrawable %}
+                <form method="post" action="{% url 'examiner:withdraw_answer' pk clarification.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="expected_answer" value="{{ clarification.current_answer_id }}">
+                  <button class="btn btn-ghost btn-sm"><c-icon name="undo-2" />Withdraw</button>
+                </form>
+              {% endif %}
+            </div>
+          {% endif %}
+          {% if answers|length > 1 %}
+            <details class="group mt-3 border-t border-green-600/15 pt-3">
+              <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-meta font-medium text-muted"><c-icon name="chevron-right" class="transition-transform group-open:rotate-90" />Earlier answers ({{ answers|length|add:"-1" }})</summary>
+              <div class="mt-3 flex flex-col gap-2">
+              {% for answer in answers %}{% if answer.pk != clarification.current_answer_id %}
+                <blockquote><s class="text-muted">{{ answer.text|linebreaksbr }}</s><footer>{{ answer.member.name }} · {{ answer.created_at|time:"H:i" }}</footer></blockquote>
+              {% endif %}{% endfor %}
+              </div>
+            </details>
+          {% endif %}
+        </section>
+      {% endif %}
+      {% if reports %}
+        <section class="list-card" aria-labelledby="seats-title">
+          <header><h2 id="seats-title">Seats</h2><span class="count">{{ reports|length }}</span></header>
+          {% for report in reports|slice:":5" %}{% partial seat_row %}{% endfor %}
+          {% if reports|length > 5 %}
+            <details class="group/more">
+              <summary class="flex cursor-pointer list-none justify-center px-4 py-2.5 text-meta font-medium text-primary hover:bg-base-200/60 group-open/more:hidden">Show {{ reports|length|add:"-5" }} more</summary>
+              <div class="divide-y divide-base-300">{% for report in reports|slice:"5:" %}{% partial seat_row %}{% endfor %}</div>
+            </details>
+      {% endif %}
+      </section>
+      {% endif %}
+
+      {% if can_answer %}
+        {% if member.exam.has_ai_service %}
+          {# Keeps what it found through morphs; finds again, in place, when the exam changes. #}
+          <div id="duplicates" class="empty:hidden" hx-morph-skip-children hx-get="{% url 'examiner:clarification_duplicates' pk clarification.pk %}?version={{ member.exam.version }}" hx-trigger="load" hx-swap="innerMorph" hx-sync="this:queue last">
+            <p class="meta flex items-center gap-2" role="status"><span class="loading loading-spinner loading-xs"></span>Finding duplicates</p>
+          </div>
+        {% else %}
+          {% partial duplicates %}
+        {% endif %}
+      {% endif %}
+    </div>
+
+    {% if can_answer %}
+      <form method="post" action="{% url 'examiner:answer_clarification' pk clarification.pk %}" class="answer-composer" id="correction"{% if clarification.current_answer and not correcting %} hidden{% endif %}>
         {% csrf_token %}
-        <button class="btn btn-outline">Reopen</button>
+        <input type="hidden" name="expected_answer" value="{{ answer_form.expected_answer.value|default_if_none:'' }}">
+        <div class="mb-2 flex flex-wrap gap-1.5">
+          {% if member.exam.has_ai_service %}<button type="button" class="btn btn-outline btn-xs" data-draft="{% url 'examiner:draft_answer' pk clarification.pk %}"><c-icon name="sparkles" />Draft with AI</button>{% endif %}
+          {% for text in canned %}
+            <button type="button" class="btn btn-outline btn-xs font-normal" onclick="this.form.text.value = this.textContent; this.form.text.focus()">{{ text }}</button>
+          {% endfor %}
+        </div>
+        <textarea name="text" maxlength="{{ config.text_max }}" id="answer-text" rows="3" required aria-label="{% if clarification.current_answer %}Corrected answer{% else %}Answer{% endif %}" placeholder="{% if clarification.current_answer %}Corrected answer{% else %}Answer{% endif %}"{% if correcting %} autofocus{% endif %}>{{ answer_form.text.value|default:"" }}</textarea>
+        {% if member.exam.has_ai_service %}<p class="meta mt-1" role="status" data-draft-failed hidden>Couldn't draft an answer.</p>{% endif %}
+        <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
+          <small class="mr-auto max-sm:hidden"><kbd>Ctrl</kbd> <kbd>Enter</kbd> or <kbd>⌘</kbd> <kbd>Enter</kbd> sends</small>
+          {% if clarification.current_answer %}
+            <button type="button" class="btn btn-ghost btn-sm" data-hide="correction">Cancel</button>
+          {% else %}
+            <button type="button" class="btn btn-outline btn-sm" commandfor="announce-dialog" command="show-modal"><c-icon name="megaphone" />Announce to all venues…</button>
+          {% endif %}
+          <button class="btn btn-primary btn-sm"><c-icon name="send" />{% if clarification.current_answer %}Send correction{% else %}Send{% endif %}</button>
+        </div>
       </form>
-    </section>
-  {% endif %}
-
-  {% if answers|length > 1 %}
-    <details class="card-box group">
-      <summary class="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium"><c-icon name="chevron-right" class="transition-transform group-open:rotate-90" />Earlier answers ({{ answers|length|add:"-1" }})</summary>
-      <div class="mt-4 flex flex-col gap-3">
-      {% for answer in answers %}{% if answer.pk != clarification.current_answer_id %}
-        <blockquote>
-          <s class="text-muted">{{ answer.text|linebreaksbr }}</s>
-          <footer>{{ answer.member.name }} · {{ answer.created_at|time:"H:i" }}</footer>
-        </blockquote>
-      {% endif %}{% endfor %}
+    {% elif editable and clarification.closed_reason %}
+      <div class="answer-composer flex flex-wrap items-center justify-between gap-3">
+        <p class="text-sm text-muted">{{ clarification.state.label }}. Reopen it to answer.</p>
+        <form method="post" action="{% url 'examiner:reopen_clarification' pk clarification.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-outline btn-sm"><c-icon name="rotate-ccw" />Reopen</button>
+        </form>
       </div>
-    </details>
-  {% endif %}
+    {% endif %}
+
+    {% if editable %}
+      <c-dialog id="relabel-dialog" title="Change question" action="{% url 'examiner:relabel_clarification' pk clarification.pk %}" submit="Change question" :autoopen="label_form.errors">
+        <div class="field">{{ label_form.label.as_field_group }}</div>
+      </c-dialog>
+    {% endif %}
+    {% if can_answer %}
+      <c-dialog id="announce-dialog" title="Announce to all venues?" action="{% url 'examiner:announce_clarification' pk clarification.pk %}" submit="Announce to all venues">
+        <blockquote data-quote="answer-text"></blockquote>
+        <p>This clarification closes.</p>
+        <input type="hidden" name="text" data-quote="answer-text">
+      </c-dialog>
+      <c-dialog id="merge-dialog" title="Merge into another clarification" action="{% url 'examiner:merge_clarifications' pk %}" submit="Merge">
+        <input type="hidden" name="source" value="{{ clarification.pk }}">
+        <input type="hidden" name="next" value="{% url 'examiner:clarification' pk clarification.pk %}">
+        <select name="target" aria-label="Merge into" required>
+          <option value="">Pick a clarification…</option>
+          {% for other in others %}<option value="{{ other.pk }}">{{ other|titled }}</option>{% endfor %}
+        </select>
+      </c-dialog>
+    {% endif %}
+  </c-live>
 </div>
 
-<aside class="flex min-w-0 flex-col gap-6">
+{% partialdef seat_row %}
+  <div class="row-item items-start">
+    <div class="min-w-0 flex-1">
+      <p class="flex flex-wrap items-baseline gap-x-2"><a href="{% seat_url 'examiner:seat' pk report.venue report.seat %}" class="font-medium hover:underline">{{ report.venue }} {{ report.seat }}</a><span class="meta">{{ report.member.name }} · {{ report.created_at|time:"H:i" }}</span></p>
+      {% if report.text and report.text != clarification.wording %}<button type="button" class="mt-0.5 line-clamp-2 cursor-pointer text-left text-sm text-muted" onclick="this.classList.toggle('line-clamp-2')">{{ report.text }}</button>{% endif %}
+      {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<a href="{{ photo }}" target="_blank" class="mt-2 block w-fit"><img class="h-20 rounded-md border border-base-300" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}"></a>{% endif %}
+    </div>
+    <c-state-badge :state="report.state" class="mt-0.5" />
+    {% if can_answer %}
+      <button type="button" class="btn btn-ghost btn-xs btn-square" popovertarget="report-menu-{{ report.pk }}" style="anchor-name: --report-{{ report.pk }}" aria-label="{{ report.venue }} {{ report.seat }}: actions"><c-icon name="ellipsis" /></button>
+      <ul class="menu-panel w-48" id="report-menu-{{ report.pk }}" popover style="position-anchor: --report-{{ report.pk }}">
+        <li><button type="button" commandfor="move-{{ report.pk }}" command="show-modal"><c-icon name="arrow-right-left" />Move…</button></li>
+        <li><button type="button" class="text-error" commandfor="delete-report-{{ report.pk }}" command="show-modal"><c-icon name="trash-2" />Delete…</button></li>
+      </ul>
+      <c-delete-report-dialog :report="report" next="{% url 'examiner:clarification' pk clarification.pk %}" />
+      <c-dialog id="move-{{ report.pk }}" title="Move {{ report.venue }} {{ report.seat }}" action="{% url 'examiner:move_report' pk report.pk %}" submit="Move">
+        <select name="target" aria-label="Move to">
+          {% if reports|length > 1 %}<option value="new">New clarification</option>{% endif %}
+          {% for other in others %}<option value="{{ other.pk }}">{{ other|titled }}</option>{% endfor %}
+        </select>
+      </c-dialog>
+    {% endif %}
+  </div>
+{% endpartialdef %}
+
 {% partialdef duplicates %}{% if duplicates %}{% with pk=member.exam.pk %}
   <section class="list-card group" aria-labelledby="duplicates-title">
-    <form method="post" action="{% url 'examiner:merge_clarifications' pk %}" id="merge-selected" class="flex items-center justify-between gap-3 px-4 py-3">
+    <form method="post" action="{% url 'examiner:merge_clarifications' pk %}" id="merge-selected" class="flex min-h-12 items-center gap-2 px-4 py-2.5">
       {% csrf_token %}
       <input type="hidden" name="target" value="{{ clarification.pk }}">
       <input type="hidden" name="next" value="{% url 'examiner:clarification' pk clarification.pk %}">
-      <h2 id="duplicates-title">Possible duplicates</h2>
-      <button class="btn btn-primary btn-xs hidden group-has-checked:inline-flex"><c-icon name="git-merge" />Merge into this</button>
+      <input type="checkbox" class="checkbox checkbox-sm checkbox-primary mr-1 rounded-sm" data-select-all="merge-selected" aria-label="Select all possible duplicates">
+      <h2 id="duplicates-title" class="flex items-center gap-1.5">{% if confirmed_by_ai %}<c-icon name="sparkles" class="text-primary" />{% endif %}Possible duplicates</h2>
+      <span class="count">{{ duplicates|length }}</span>
+      <button class="btn btn-primary btn-xs ml-auto hidden group-has-checked:inline-flex"><c-icon name="git-merge" />Merge into this</button>
     </form>
     {% for other, percent in duplicates %}
+      {% url 'examiner:clarification' pk other.pk as other_url %}
       <div class="row-item items-start">
-        <input type="checkbox" class="checkbox checkbox-sm mt-0.5 rounded-sm" form="merge-selected" name="source" value="{{ other.pk }}" aria-labelledby="duplicate-{{ other.pk }}"{% if other.closed_reason %} disabled{% endif %}>
+        <input type="checkbox" class="checkbox checkbox-sm checkbox-primary mt-0.5 rounded-sm" form="merge-selected" name="source" value="{{ other.pk }}" aria-labelledby="duplicate-{{ other.pk }}"{% if other.closed_reason %} disabled{% endif %}>
         <div class="min-w-0 flex-1">
-          <a href="{% url 'examiner:clarification' pk other.pk %}" id="duplicate-{{ other.pk }}" class="text-sm font-medium hover:underline">{{ other|titled:80 }}</a>
-          <div class="mt-1 flex items-center gap-2"><c-state-badge :state="other.state" />{% if confirmed_by_ai %}<span class="meta flex items-center gap-1"><c-icon name="sparkles" />{{ percent }}% match</span>{% else %}<span class="meta">{{ percent }}% alike</span>{% endif %}</div>
+          <a href="{{ other_url }}" id="duplicate-{{ other.pk }}" class="line-clamp-2 font-medium hover:underline" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">{% if other.label %}<span class="label-chip mr-1.5">{{ other.label }}</span>{% endif %}{{ other.summary }}</a>
+          <p class="meta">{{ percent }}% {% if confirmed_by_ai %}match{% else %}alike{% endif %}</p>
         </div>
+        <c-state-badge :state="other.state" class="mt-0.5" />
         {% if not other.closed_reason or not clarification.current_answer %}
-          <button type="button" class="btn btn-ghost btn-xs" commandfor="merge-{{ other.pk }}" command="show-modal">Merge into it</button>
-          <c-dialog id="merge-{{ other.pk }}" title="Merge into {{ other.label }}?" action="{% url 'examiner:merge_clarifications' pk %}" submit="Merge clarifications">
+          <button type="button" class="btn btn-ghost btn-xs btn-square" commandfor="merge-{{ other.pk }}" command="show-modal" aria-label="Merge into {{ other.label|default:'this clarification' }}…" title="Merge into it…"><c-icon name="git-merge" /></button>
+          <c-dialog id="merge-{{ other.pk }}" title="Merge into {{ other.label|default:'this clarification' }}?" action="{% url 'examiner:merge_clarifications' pk %}" submit="Merge">
             <input type="hidden" name="source" value="{{ clarification.pk }}">
             <input type="hidden" name="target" value="{{ other.pk }}">
             <input type="hidden" name="next" value="{% url 'examiner:clarification' pk clarification.pk %}">
             <blockquote>{{ other.summary }}</blockquote>
           </c-dialog>
+        {% else %}
+          <span class="w-6 shrink-0" aria-hidden="true"></span>
         {% endif %}
       </div>
     {% endfor %}
   </section>
 {% endwith %}{% endif %}{% endpartialdef %}
-
-<section class="list-card">
-  <div class="flex items-center justify-between px-4 py-3"><h2>Seats</h2><span class="count">{{ reports|length }}</span></div>
-  {% for report in reports %}
-    <div class="row-item">
-      <div class="min-w-0 flex-1">
-        <a href="{% seat_url 'examiner:seat' pk report.venue report.seat %}" class="font-medium hover:underline">{{ report.venue }} {{ report.seat }}</a>
-        <div class="meta">{{ report.member.name }} · {{ report.created_at|time:"H:i" }}</div>
-      </div>
-      <span class="badge state-{{ report.state|slugify }}">{{ report.state.label }}</span>
-      {% if editable and not clarification.closed_reason %}
-        <div class="-mr-2 flex shrink-0">
-          <button type="button" class="btn btn-ghost btn-xs px-1.5" commandfor="move-{{ report.pk }}" command="show-modal">Move</button>
-          <button type="button" class="btn btn-ghost btn-danger btn-xs px-1.5" commandfor="delete-report-{{ report.pk }}" command="show-modal">Delete</button>
-        </div>
-        <c-delete-report-dialog :report="report" next="{% url 'examiner:clarification' pk clarification.pk %}" />
-        <c-dialog id="move-{{ report.pk }}" title="Move {{ report.venue }} {{ report.seat }}" action="{% url 'examiner:move_report' pk report.pk %}" submit="Move seat">
-          <select name="target" aria-label="Move to">
-            {% if reports|length > 1 %}<option value="new">New clarification</option>{% endif %}
-            {% for other in others %}<option value="{{ other.pk }}">{{ other|titled }}</option>{% endfor %}
-          </select>
-        </c-dialog>
-      {% endif %}
-    </div>
-  {% endfor %}
-</section>
-
-{% if editable and not clarification.closed_reason %}
-  {% if member.exam.has_ai_service %}
-    {# Keeps what it found through morphs; finds again, in place, when the exam changes. #}
-    <div id="duplicates" hx-morph-skip-children hx-get="{% url 'examiner:clarification_duplicates' pk clarification.pk %}?version={{ member.exam.version }}" hx-trigger="load" hx-swap="innerMorph" hx-sync="this:queue last">
-      <p class="meta flex items-center gap-2" role="status"><span class="loading loading-spinner loading-xs"></span>Finding duplicates</p>
-    </div>
-  {% else %}
-    {% partial duplicates %}
-  {% endif %}
-{% endif %}
-</aside>
-</div>
-
-{% if editable %}
-  <c-dialog id="wording-dialog" title="Edit wording" action="{% url 'examiner:reword_clarification' pk clarification.pk %}" submit="Save">
-    <textarea name="text" maxlength="{{ config.text_max }}" rows="3" aria-label="Wording">{{ clarification.wording }}</textarea>
-  </c-dialog>
-  <c-dialog id="relabel-dialog" title="Change question" action="{% url 'examiner:relabel_clarification' pk clarification.pk %}" submit="Change question" :autoopen="label_form.errors">
-    <div class="field">{{ label_form.label.as_field_group }}</div>
-  </c-dialog>
-{% endif %}
-{% if editable and not clarification.closed_reason %}
-  <c-dialog id="announce-dialog" title="Announce to all venues?" action="{% url 'examiner:announce_clarification' pk clarification.pk %}" submit="Announce to all venues">
-    <p>This clarification closes.</p>
-    <blockquote data-quote="answer-text"></blockquote>
-    <input type="hidden" name="text" data-quote="answer-text">
-  </c-dialog>
-  <c-dialog id="merge-dialog" title="Merge into another clarification" action="{% url 'examiner:merge_clarifications' pk %}" submit="Merge clarifications">
-    <input type="hidden" name="source" value="{{ clarification.pk }}">
-    <input type="hidden" name="next" value="{% url 'examiner:clarification' pk clarification.pk %}">
-    <select name="target" aria-label="Merge into" required>
-      <option value="">Pick a clarification…</option>
-      {% for other in others %}<option value="{{ other.pk }}">{{ other|titled }}</option>{% endfor %}
-    </select>
-  </c-dialog>
-{% endif %}
-</c-live>
 {% endwith %}
 {% endblock %}

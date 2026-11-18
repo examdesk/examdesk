@@ -1,41 +1,96 @@
 {% extends "examdesk/base.html" %}
 {% load examdesk_tags %}
+{% block main_class %}split-view{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>Seats</h1>
-</div>
-<div class="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
-  <form method="get" action="{{ request.path }}" role="search" class="relative w-60" hx-get="{{ request.path }}" hx-trigger="input delay:300ms, submit" hx-target="body" hx-push-url="true">
-    <c-icon name="search" class="pointer-events-none absolute top-1/2 left-3 z-10 -translate-y-1/2 text-subtle" />
-    <input type="search" name="seat" value="{{ seat_query }}" class="h-9 pl-9 text-sm" placeholder="Find a seat, e.g. B14" aria-label="Find a seat" autocapitalize="characters" autocomplete="off">
-  </form>
-  <p class="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted" aria-label="Legend">
-    <span class="inline-flex items-center gap-1.5"><span class="h-3 w-1 rounded-full bg-amber-500"></span>Open</span>
-    <span class="inline-flex items-center gap-1.5"><span class="h-3 w-1 rounded-full bg-blue-600"></span>To deliver</span>
-    <span class="inline-flex items-center gap-1.5"><span class="h-3 w-1 rounded-full bg-green-600"></span>Delivered or read out</span>
-  </p>
-</div>
-<c-live>
-  {% for venue, tiles in venues %}
-    <section>
-    <c-venue-heading :venue="venue" />
-    <div class="seat-grid">
-      {% for tile in tiles %}
-        <a class="seat-card state-{{ tile.least|slugify }}" href="{% seat_url 'examiner:seat' member.exam.pk venue tile.seat %}"
-           aria-label="{{ venue }} {{ tile.seat }}:{% for state, count in tile.tally %} {{ count }} {{ state.label|lower }}{% if not forloop.last %},{% endif %}{% endfor %}">
-          <strong>{{ tile.seat }}</strong>
-          <span class="flex flex-wrap gap-x-2.5">
-            {% for state, count in tile.tally %}
-              <span class="seat-state state-{{ state|slugify }}"><c-icon name="{{ state|state_icon }}" title="{{ state.label }}" />{{ count }}</span>
-            {% endfor %}
-          </span>
-        </a>
-      {% endfor %}
+{% with pk=member.exam.pk %}
+<c-page-header title="Seats" />
+<div class="seats-layout">
+  <div class="seats-list-pane">
+    <div class="seats-toolbar">
+      <c-live id="seat-tabs" class="contents">
+        {% if state %}<input type="hidden" name="state" value="{{ state }}" form="seat-search">{% endif %}
+        <nav class="tabs tabs-box tabs-sm no-scrollbar max-w-full flex-nowrap overflow-x-auto" aria-label="State">
+          {% for name, title, count in tabs %}<a class="tab shrink-0 gap-1.5" href="{% querystring state=name|default:None %}" hx-target="#seat-list" hx-select="#seat-list" hx-select-oob="#seat-tabs" hx-swap="outerHTML show:none"{% if name == state %} aria-current="true"{% endif %}>{% if name %}<span class="state-dot state-{{ name }}"></span>{% endif %}{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
+        </nav>
+      </c-live>
+      <form method="get" action="{% url 'examiner:seats' pk %}" role="search" id="seat-search" class="relative w-full sm:ml-auto sm:w-56"
+            hx-get="{% url 'examiner:seats' pk %}" hx-trigger="input delay:300ms, submit" hx-target="#seat-list" hx-select="#seat-list" hx-select-oob="#seat-tabs" hx-swap="outerHTML show:none" hx-push-url="true">
+        <c-icon name="search" class="pointer-events-none absolute top-1/2 left-3 z-10 -translate-y-1/2 text-subtle" />
+        <input type="search" name="q" value="{{ seat_query }}" class="h-9 pl-9 text-sm" placeholder="Find a seat" aria-label="Find a seat" autocapitalize="characters" autocomplete="off">
+      </form>
     </div>
-    </section>
-  {% empty %}
-    {% if seat_query %}<c-empty icon="search" title="No seats match" />{% else %}<c-empty icon="users" title="No seat has asked anything yet" />{% endif %}
-  {% endfor %}
-  <c-pagination :page_obj="page_obj" />
-</c-live>
+    <c-live id="seat-list" class="flex flex-col gap-4">
+      {% if venues|length > 1 %}
+        <nav class="flex flex-wrap gap-1.5" aria-label="Venues" hx-boost="false">
+          {% for venue in venues %}<a class="venue-link" href="#venue-{{ venue.name|default:'none'|slugify }}">{{ venue.name|default:"No venue" }}</a>{% endfor %}
+        </nav>
+      {% endif %}
+      {% for venue in venues %}{% with slug=venue.name|default:'none'|slugify %}
+        <section class="card-box scroll-mt-4" id="venue-{{ slug }}" aria-labelledby="venue-{{ slug }}-title">
+          <header class="card-header flex-wrap justify-start gap-x-3">
+            <h2 id="venue-{{ slug }}-title" class="flex items-center gap-1.5"><c-icon name="map-pin" class="text-subtle" />{{ venue.name|default:"No venue" }}</h2>
+            <span class="meta">{{ venue.seat_count }} seat{{ venue.seat_count|pluralize }}</span>
+            <span class="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-muted">
+              {% for seat_state, count in venue.state_counts %}<span class="inline-flex items-center gap-1.5"><span class="state-dot state-{{ seat_state }}"></span>{{ count }} {{ seat_state.label|lower }}</span>{% endfor %}
+            </span>
+          </header>
+          {% if venue.seats %}
+            <div class="seat-pills">
+              {% for seat in venue.seats %}
+                <a class="seat-pill state-{{ seat.state }}" href="{% seat_url 'examiner:seat' pk seat.venue seat.seat state=filters.state q=filters.q %}"{% if selected_seat.0 == seat.venue and selected_seat.1 == seat.seat %} aria-current="page"{% endif %}
+                   hx-target="#seat-pane" hx-select="#seat-pane" hx-swap="outerHTML show:top showTarget:body"
+                   aria-label="{{ seat.venue }} {{ seat.seat }}: {{ seat.state.label|lower }}{% if seat.question_count > 1 %}, {{ seat.question_count }} questions{% endif %}">{{ seat.seat }}{% if seat.question_count > 1 %}<span class="seat-pill-count">{{ seat.question_count }}</span>{% endif %}</a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-sm text-subtle">{% if state == "waiting" %}No seats waiting{% elif state == "to-deliver" %}No seats to deliver{% else %}No seats delivered yet{% endif %}</p>
+          {% endif %}
+        </section>
+      {% endwith %}{% empty %}
+        {% if seat_query %}<c-empty icon="search" title="No seats match" class="boxed" />{% else %}<c-empty icon="users" title="No seat has asked anything yet" class="boxed" />{% endif %}
+      {% endfor %}
+    </c-live>
+  </div>
+
+  <c-live id="seat-pane" class="seat-pane" data-seat="{% if selected_seat %}{{ selected_seat.0 }} {{ selected_seat.1 }}{% endif %}">
+    {% if selected_seat %}
+      {% with venue=selected_seat.0 seat=selected_seat.1 %}
+      <div class="flex items-center gap-2 border-b border-base-300 px-5 py-3.5">
+        <a href="{{ seat_list_url }}" class="btn btn-ghost btn-sm btn-square -ml-2 lg:hidden" aria-label="Seats"><c-icon name="arrow-left" /></a>
+        <h2 class="flex items-baseline gap-2 tabular-nums">{{ seat }}<span class="inline-flex items-center gap-1 text-sm font-medium text-subtle"><c-icon name="map-pin" />{{ venue }}</span></h2>
+        <a href="{{ seat_list_url }}" hx-target="#seat-pane" hx-select="#seat-pane" hx-swap="outerHTML show:none" class="btn btn-ghost btn-sm btn-square ml-auto max-lg:hidden" aria-label="Close" title="Close"><c-icon name="x" /></a>
+      </div>
+      <div class="flex flex-col gap-3 p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        {% for report in reports %}
+          {% with clarification=report.clarification %}
+          <article class="card-box">
+            <div class="mb-2 flex items-start gap-3">
+              <a href="{% url 'examiner:clarification' pk clarification.pk %}" class="line-clamp-3 min-w-0 flex-1 font-medium hover:underline">{% if clarification.label %}<span class="label-chip mr-1.5">{{ clarification.label }}</span>{% endif %}{{ clarification.summary }}</a>
+              <c-state-badge :state="report.state" class="mt-0.5" />
+            </div>
+            <p class="meta">{{ report.member.name }} · {{ report.created_at|time:"H:i" }}</p>
+            {% if report.text and report.text != clarification.wording %}<p class="mt-2 text-sm text-muted">{{ report.text }}</p>{% endif %}
+            {% if clarification.current_answer %}
+              <div class="mt-3 rounded-lg bg-base-200/70 px-3 py-2.5">
+                <p class="prose-answer text-sm">{{ clarification.current_answer.text }}</p>
+                {% if report.current_delivery and report.state == "delivered" %}<p class="meta mt-1.5 flex items-center gap-1"><c-icon name="check" class="text-green-600" />Delivered by {{ report.current_delivery.member.name }} at {{ report.current_delivery.created_at|time:"H:i" }}</p>{% endif %}
+              </div>
+            {% endif %}
+            {% for delivery in report.superseded_deliveries %}
+              <div class="mt-2 border-l-2 border-base-300 pl-3">
+                <p class="text-sm text-muted"><s>{{ delivery.answer.text|linebreaksbr }}</s></p>
+                <small>Delivered by {{ delivery.member.name }} at {{ delivery.created_at|time:"H:i" }}, since corrected</small>
+              </div>
+            {% endfor %}
+          </article>
+          {% endwith %}
+        {% empty %}
+          <c-empty icon="user" title="This seat has not asked anything" />
+        {% endfor %}
+      </div>
+      {% endwith %}
+    {% endif %}
+  </c-live>
+</div>
+{% endwith %}
 {% endblock %}

@@ -11,7 +11,7 @@
   default: true;
   color-scheme: light;
   --color-base-100: #ffffff;
-  --color-base-200: #f6f7f9;
+  --color-base-200: #f5f6f8;
   --color-base-300: #e4e7ec;
   --color-base-content: #101828;
   --color-primary: #1d4ed8;
@@ -44,13 +44,16 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --color-muted: #475467;
   --color-subtle: #667085;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.25rem;
 }
 
 @layer base {
+  :root { --pane-width: 26rem; } /* every side pane: the queue, a seat, the composer */
   html { -webkit-tap-highlight-color: transparent; }
-  body { @apply bg-base-200 font-sans text-[15px] leading-6 text-base-content antialiased; }
-  /* Phones: 16px text avoids zoom on focus; 44px touch targets. */
-  body:has(> main.invigilator) { @apply text-base; --size-field: 0.275rem; }
+  body { @apply min-h-dvh bg-base-200 font-sans text-sm leading-6 text-base-content antialiased; }
+  /* Invigilator screens are phones: 16px text avoids zoom on focus; 44px touch targets. */
+  body.invigilator { @apply text-base; --size-field: 0.275rem; }
   :focus-visible { @apply outline-2 outline-offset-2 outline-primary; }
   ::selection { @apply bg-primary/15; }
 }
@@ -59,10 +62,8 @@
   /* Type */
   h1 { @apply text-xl font-semibold tracking-tight text-base-content; }
   h2 { @apply text-base font-semibold text-base-content; }
-  .eyebrow { @apply text-xs font-medium tracking-wide text-subtle uppercase; }
-  /* Not upper-cased: Q3b is not Q3B. */
-  .group-heading { @apply mb-2 flex items-center gap-2 text-sm font-semibold text-muted; }
-  small, .meta { @apply text-[13px] leading-5 text-subtle; }
+  .section-title { @apply mb-2 flex items-center gap-2 text-meta font-semibold text-muted; }
+  small, .meta { @apply text-meta text-subtle; }
   p { @apply text-pretty; }
   .prose-answer { @apply text-pretty whitespace-pre-wrap; }
   /* Markdown read from a file's page */
@@ -80,54 +81,67 @@
   .num { @apply tabular-nums; }
 
   /* Links */
-  main a:not([class], .menu *) {
+  main a:not([class], .menu-panel *) {
     @apply font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary;
   }
+  .link-button { @apply cursor-pointer font-medium text-primary hover:underline; }
 
-  /* Page layout */
+  /* Page frame: one width for the app bar and the page */
+  .page-container { @apply mx-auto w-full max-w-7xl px-4 sm:px-6; }
+  body.invigilator .page-container { @apply max-w-2xl sm:px-4; }
   .page-header {
-    @apply mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-3;
+    @apply mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 sm:mb-6;
     > div:first-child { @apply min-w-0; }
-    p { @apply mt-1 text-sm text-muted; }
+    p { @apply mt-0.5 text-meta text-subtle; }
   }
+  /* Settings: the exam on the left, the AI service and its files on the right. */
+  .settings-layout { @apply grid items-start gap-6 lg:grid-cols-2; }
+  .settings-column { @apply flex flex-col gap-6; }
+  /* Examiner announcements: the list beside a sticky composer from lg. */
+  .announcements-layout { @apply grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_var(--pane-width)]; }
+  .announcement-composer { @apply lg:sticky lg:top-20 lg:order-last; }
   .vstack { @apply flex flex-col gap-3; }
 
-  /* Cards; `article` is one by default. */
-  article, .card-box { @apply rounded-box border border-base-300 bg-base-100 p-5; }
-  article > header { @apply mb-3 font-semibold; }
-  article.tight { @apply p-4; }
+  /* Surfaces: a card (header, body, footer), a list card of rows, or a table card. The padding
+     steps up from phones; header and footer bleed to the card's edges. */
+  .card-box { @apply rounded-box border border-base-300 bg-base-100 p-4 sm:p-5; }
+  .card-box.danger { @apply border-red-600/25; }
   .card-header {
-    @apply -mx-5 -mt-5 mb-5 flex items-center justify-between gap-4 border-b border-base-300 px-5 py-3.5;
+    @apply -mx-4 -mt-4 mb-4 flex min-h-12 items-center justify-between gap-3 border-b border-base-300 px-4 py-2.5 sm:-mx-5 sm:-mt-5 sm:mb-5 sm:px-5;
   }
   .card-footer {
-    @apply -mx-5 -mb-5 mt-5 flex flex-wrap items-center justify-end gap-2 rounded-b-box border-t border-base-300 bg-base-200/60 px-5 py-3;
+    @apply -mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-b-box border-t border-base-300 bg-base-200/50 px-4 py-3 sm:-mx-5 sm:-mb-5 sm:mt-5 sm:px-5;
   }
   .list-card {
     @apply overflow-hidden rounded-box border border-base-300 bg-base-100;
     > * + * { @apply border-t border-base-300; }
   }
+  /* A list card's heading row: its title and count. */
+  .list-card > header { @apply flex min-h-12 items-center gap-2 px-4 py-2.5 sm:px-5; }
   .row-item { @apply flex items-center gap-3 px-4 py-3; }
-
-  .link-button { @apply cursor-pointer font-medium text-primary hover:underline; }
 
   /* Forms */
   .field { @apply mb-4 flex flex-col gap-1.5; }
   .field > label { @apply text-sm font-medium text-base-content; }
-  label:has(> input:not([type=checkbox], [type=file]), > textarea) { @apply mb-4 flex flex-col gap-1.5 text-sm font-medium; }
-  .errorlist, [aria-invalid=true] ~ small { @apply text-[13px] text-error; }
+  label:has(> input:not([type=checkbox], [type=radio], [type=file]), > textarea) { @apply mb-4 flex flex-col gap-1.5 text-sm font-medium; }
+  .errorlist, [aria-invalid=true] ~ small { @apply text-meta text-error; }
   input[list]::-webkit-calendar-picker-indicator { display: none !important; }
 
-  .icon {
-    @apply inline-block size-[1.15em] shrink-0 align-[-.2em];
-  }
+  .icon { @apply inline-block size-[1.15em] shrink-0 align-[-.2em]; }
 
   /* Counts */
   .count {
-    @apply inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-100 px-1.5 text-xs font-semibold text-gray-700 tabular-nums;
-    &.action { @apply bg-primary text-white; }
-    &.urgent { @apply bg-error text-white; }
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-base-200 px-1.5 text-xs font-semibold text-muted tabular-nums ring-1 ring-base-300 ring-inset;
+    &.action { @apply bg-primary text-white ring-0; }
+    &.urgent { @apply bg-error text-white ring-0; }
   }
   .live-dot { @apply inline-flex size-2 rounded-full bg-green-600; }
+  .state-dot {
+    @apply inline-block size-2 shrink-0 rounded-full;
+    &.state-waiting { @apply bg-amber-500; }
+    &.state-to-deliver { @apply bg-blue-600; }
+    &.state-delivered { @apply bg-green-600; }
+  }
 
   /* Flash messages and the offline banner */
   .flash {
@@ -135,133 +149,173 @@
     @apply border-base-300 bg-base-100;
     &.success { @apply border-green-600/25 bg-green-50 text-green-800; }
     &.error { @apply border-red-600/25 bg-red-50 text-red-800; }
+    &.warning { @apply border-amber-600/25 bg-amber-50 text-amber-900; }
     .icon { @apply mt-0.5 size-4; }
   }
-  .offline { @apply sticky top-3 z-30 shadow-sm; }
+  .offline { @apply sticky top-18 z-30 shadow-sm; }
   /* Messages float over the page, so an action doesn't move it. An error stays until dismissed. */
   .toast { @apply pointer-events-none; }
   .toast > .alert {
     @apply text-sm shadow-lg;
-    &.success { @apply alert-success; }
     &.error { @apply pointer-events-auto alert-error; }
     .icon { @apply size-4; }
   }
 
   /* Empty states */
   .empty {
-    @apply flex flex-col items-center rounded-box border border-dashed border-base-300 bg-base-100 px-6 py-12 text-center;
-    > .icon { @apply mb-3 size-9 rounded-full bg-base-200 p-2 text-subtle; }
+    @apply flex flex-col items-center px-6 py-14 text-center;
+    > .icon { @apply mb-3 size-10 rounded-full bg-base-200 p-2.5 text-subtle; }
     > strong { @apply font-semibold; }
     > p { @apply mt-1 max-w-sm text-sm text-muted; }
+    &.boxed { @apply rounded-box border border-dashed border-base-300 bg-base-100; }
+    &.success > .icon { @apply bg-green-600 text-white; }
   }
 
   /* Tables */
   .table-card { @apply overflow-x-auto rounded-box border border-base-300 bg-base-100; }
   table { @apply w-full text-left text-sm; }
-  thead th { @apply border-b border-base-300 bg-base-200/60 px-4 py-2.5 text-xs font-medium tracking-wide whitespace-nowrap text-subtle uppercase; }
-  thead th a.sort {
-    @apply inline-flex items-center gap-1 hover:text-base-content;
-    .icon { @apply size-3.5; }
-  }
-  thead th[aria-sort] { @apply text-base-content; }
+  thead th { @apply border-b border-base-300 bg-base-200/50 px-4 py-2.5 text-xs font-medium whitespace-nowrap text-subtle; }
   tbody td { @apply border-b border-base-300 px-4 py-3 align-middle; }
   tbody tr:last-child td { @apply border-b-0; }
   /* Rows made clickable by app.js; a stretched link would escape the row in Safari */
-  tr.row-link {
-    @apply cursor-pointer transition-colors hover:bg-base-200/60;
-    .row-target { @apply font-medium text-base-content no-underline hover:underline; }
-  }
+  tr.row-link { @apply cursor-pointer transition-colors hover:bg-base-200/60; .row-target { @apply text-base-content hover:underline; } }
 
   /* Waits */
-  .wait { @apply inline-flex items-center gap-1 text-sm tabular-nums whitespace-nowrap text-muted; }
-  .wait:is(.late, .very-late) { @apply rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset; }
-  .wait.late { @apply bg-amber-50 text-amber-800 ring-amber-600/25; }
-  .wait.very-late { @apply bg-red-50 text-red-700 ring-red-600/20; }
+  .wait { @apply inline-flex items-center gap-1 tabular-nums whitespace-nowrap text-subtle; }
+  .wait.late { @apply font-medium text-amber-700; }
+  .wait.very-late { @apply font-medium text-red-600; }
 
-  /* App bar, examiner tabs, account menu */
+  /* App bar: brand, exam, tabs, account. Tabs wrap to a second row below lg. */
   .appbar { @apply sticky top-0 z-20 border-b border-base-300 bg-base-100/95 backdrop-blur; }
-  .brand { @apply flex items-center gap-2 font-semibold whitespace-nowrap text-base-content; }
-  .brand-mark { @apply grid size-8 place-items-center rounded-lg bg-primary text-white; .icon { @apply size-5; } }
-  .crumb-sep { @apply text-base-300; }
-  .avatar-button {
-    @apply grid size-8 cursor-pointer place-items-center rounded-full bg-base-200 text-xs font-semibold text-muted ring-1 ring-base-300 hover:bg-base-300/60;
-  }
+  .appbar-row { @apply flex min-h-14 flex-wrap items-center gap-x-4; }
+  .brand { @apply flex shrink-0 items-center gap-2 font-semibold whitespace-nowrap text-base-content; }
+  /* A person's initials, and the account menu's button showing them */
+  .avatar-button, .initials { @apply grid size-8 shrink-0 place-items-center rounded-full bg-base-200 text-xs font-semibold text-muted ring-1 ring-base-300; }
+  .avatar-button { @apply cursor-pointer hover:bg-base-300/60; }
   .tabs-nav {
-    @apply -mb-px flex gap-6 overflow-x-auto;
-    > a { @apply flex items-center gap-2 border-b-2 border-transparent py-3 text-sm font-medium whitespace-nowrap text-muted hover:text-base-content; }
+    @apply no-scrollbar order-last -mx-4 flex w-[calc(100%+2rem)] gap-5 overflow-x-auto px-4 lg:order-none lg:mx-2 lg:w-auto lg:self-stretch lg:px-0;
+    > a { @apply -mb-px flex items-center gap-1.5 border-b-2 border-transparent py-3 text-sm font-medium whitespace-nowrap text-muted hover:text-base-content; }
     > a[aria-current=page] { @apply border-primary text-base-content; }
-  }
-  .chip-button {
-    @apply inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-base-300 bg-base-100 px-3 text-sm font-medium whitespace-nowrap hover:bg-base-200;
-    .icon { @apply size-4 text-subtle; }
   }
 
   /* Dialogs */
   .modal-body > p, .modal-body > small { @apply m-0 text-sm text-muted; }
   .modal-body > :is(label, .field) { @apply mb-0; }
 
-  /* Seat tiles, striped by state */
-  .seat-grid { @apply mb-6 grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2.5; }
-  .seat-card {
-    @apply relative flex flex-col items-start gap-1.5 overflow-hidden rounded-lg border border-base-300 bg-base-100 py-3 pr-3 pl-4 transition hover:border-gray-400 hover:shadow-sm;
-    &::before { content: ""; @apply absolute inset-y-0 left-0 w-1 bg-blue-600; }
-    > strong { @apply text-lg leading-tight font-semibold tabular-nums; }
-    &:is(.state-open, .state-to-read-out)::before { @apply bg-amber-500; }
-    &.state-delivered::before { @apply bg-green-600; }
-    &.done { @apply text-subtle; &::before { @apply bg-base-300; } }
-    &.claimed { @apply bg-base-200/70; &::before { @apply bg-blue-300; } }
+  /* Split views (Clarifications, Seats): a list beside the open item. From lg they fill the window
+     and each pane scrolls on its own; below lg the list and the item are separate screens. */
+  main.split-view { @apply py-4 sm:py-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:py-4; > .page-header { @apply lg:mb-4; } }
+  body:has(> main.split-view) { @apply lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden; }
+  .clarifications-layout {
+    @apply lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[var(--pane-width)_minmax(0,1fr)] lg:overflow-hidden lg:rounded-box lg:border lg:border-base-300 lg:bg-base-100;
+    &:has(.clarification-pane[data-clarification]) .queue,
+    &:not(:has(.clarification-pane[data-clarification])) .clarification-pane { @apply max-lg:hidden; }
   }
-  .seat-claim { @apply inline-flex max-w-full items-center gap-1 text-xs text-muted; .icon { @apply size-3.5 shrink-0; } }
-  .seat-state {
-    @apply inline-flex items-center gap-1 text-xs font-medium tabular-nums;
-    &:is(.state-open, .state-to-read-out) { @apply text-amber-700; }
-    &.state-to-deliver { @apply text-blue-700; }
-    &.state-delivered { @apply text-green-700; }
+  .queue { @apply flex min-h-0 flex-col lg:border-r lg:border-base-300; }
+  .queue-toolbar { @apply flex flex-col gap-2 pb-3 lg:border-b lg:border-base-300 lg:p-3; }
+  /* The rows scroll; the pages sit below them, outside the scroll. */
+  .queue-list { @apply flex min-h-0 flex-1 flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 lg:rounded-none lg:border-0; }
+  .queue-rows { @apply min-h-0 flex-1 lg:overflow-y-auto; }
+  .queue-row {
+    @apply relative block border-b border-base-300 px-4 py-3 text-base-content last:border-b-0 hover:bg-base-200/60;
+    &[aria-current=page] { @apply bg-primary/6; &::before { content: ""; @apply absolute inset-y-0 left-0 w-0.5 bg-primary; } }
+    > p { @apply line-clamp-2 text-sm leading-5 font-medium; }
   }
-  .venue-heading { @apply mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-muted; }
+  .queue-pagination { @apply flex shrink-0 items-center justify-between gap-2 border-t border-base-300 px-4 py-2 text-meta text-subtle; }
+  /* A question label (Q3b), and a place: a venue and seat */
+  .label-chip, .place-chip { @apply inline-flex items-center bg-base-200 text-xs font-semibold tabular-nums ring-1 ring-base-300 ring-inset; }
+  .label-chip { @apply h-5 rounded px-1.5 text-base-content; }
+  .clarification-pane { @apply flex min-h-0 min-w-0 flex-col; }
+  .clarification-header { @apply flex flex-wrap items-center gap-x-3 gap-y-2 pb-4 lg:border-b lg:border-base-300 lg:px-6 lg:py-3.5; }
+  .clarification-body { @apply flex flex-col gap-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-5; }
+  /* Sections keep their height, so the pane scrolls instead of squashing them. */
+  .clarification-body > *, .clarification-header, .answer-composer { @apply shrink-0; }
+  .answer-composer { @apply mt-6 rounded-box border border-base-300 bg-base-100 p-4 lg:mt-0 lg:rounded-none lg:border-0 lg:border-t lg:px-6; }
+  /* The wording, edited in place in a text box of the same size. Not `text-pretty`: it would
+     break lines where the text box doesn't. */
+  .wording-text { @apply text-lg leading-7 font-medium text-wrap whitespace-pre-wrap; }
+  .wording-view {
+    @apply -mx-2 flex w-[calc(100%+1rem)] cursor-text items-start gap-2 rounded-lg px-2 py-1 text-left hover:bg-base-200/70;
+    > .wording-text { @apply min-w-0 flex-1; }
+    > .wording-edit-icon { @apply mt-1.5 ml-auto size-4 shrink-0 text-subtle opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100; }
+  }
+  .wording-editor { @apply -mx-2 flex items-start gap-2; }
+  .place-chip { @apply h-6 shrink-0 gap-1.5 rounded-md px-2 whitespace-nowrap; }
 
-  /* Invigilator seat page */
-  .clarification {
-    @apply mb-3 rounded-box border border-base-300 bg-base-100;
-    > summary { @apply flex cursor-pointer list-none items-center gap-3 px-4 py-3.5; }
-    > summary::-webkit-details-marker { display: none; }
-    > summary .chevron { @apply ml-auto size-4 text-subtle transition-transform; }
-    &[open] > summary .chevron { @apply rotate-180; }
-    > .clarification-body { @apply border-t border-base-300 p-4; }
-    &.done > summary { @apply text-subtle; }
+  /* Examiner seats: venues of seat pills, coloured by each seat's least advanced question, and a
+     seat's questions in a pane beside them from lg. */
+  .seats-layout {
+    @apply lg:grid lg:min-h-0 lg:flex-1 lg:gap-4;
+    &:has(.seat-pane:not([data-seat=""])) { @apply lg:grid-cols-[minmax(0,1fr)_var(--pane-width)]; .seats-list-pane { @apply max-lg:hidden; } }
   }
-  .show-panel { @apply mb-4 rounded-lg bg-base-200 px-5 py-6 text-3xl leading-tight font-semibold tracking-tight text-pretty whitespace-pre-wrap; }
+  .seats-list-pane { @apply flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1; }
+  .seats-toolbar { @apply flex flex-wrap items-center gap-3; }
+  .venue-link { @apply inline-flex h-7 items-center rounded-full border border-base-300 bg-base-100 px-3 text-meta font-medium text-muted hover:text-base-content; }
+  .seat-pills { @apply flex flex-wrap gap-1.5; }
+  .seat-pill {
+    @apply inline-flex h-8 min-w-12 items-center justify-center gap-1 rounded-md px-2 text-meta font-semibold tabular-nums ring-1 ring-inset transition-[filter] hover:brightness-95;
+    &.state-waiting { @apply bg-amber-100 text-amber-900 ring-amber-300/80; }
+    &.state-to-deliver { @apply bg-blue-100 text-blue-900 ring-blue-300/80; }
+    &.state-delivered { @apply bg-green-50 text-green-800 ring-green-200; }
+    &[aria-current=page] { @apply ring-2 ring-primary; }
+  }
+  .seat-pill-count { @apply rounded-full bg-white/70 px-1 text-xs leading-4 font-semibold; }
+  .seat-pane {
+    @apply mt-4 flex flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 lg:mt-0 lg:min-h-0;
+    &[data-seat=""] { display: none; }
+  }
+  /* Invigilator: the answer, large enough to show the student */
+  .answer-to-show { @apply px-1 py-4 text-3xl leading-tight font-semibold tracking-tight text-pretty whitespace-pre-wrap; }
 
-  /* Report step 2 matches */
-  .match {
-    @apply mb-2.5 flex w-full items-start gap-3 rounded-box border border-base-300 bg-base-100 p-4 text-left;
-    &:is(a, button) { @apply cursor-pointer transition hover:border-gray-400 hover:shadow-sm; }
-    > .chevron { @apply mt-0.5 ml-auto size-4 shrink-0 text-subtle; }
+  /* Invigilator screens. Seat and question first, large; matches are whole tappable rows. */
+  .report-form .ts-control { @apply min-h-14 text-lg font-semibold; }
+  .report-form:not(:has(#matches[data-searched])) .new-question { display: none; }
+  .match { @apply block w-full px-4 py-3.5 text-left; }
+  .match-button {
+    @apply cursor-pointer transition-colors active:bg-base-200 hover:bg-base-200/60;
+    > .match-action { @apply mt-2.5 inline-flex items-center gap-1 text-sm font-semibold text-primary; }
   }
-  /* A match the seat already asked, with a button to delete its report */
-  .match-group {
-    @apply mb-2.5 overflow-hidden rounded-box border border-base-300 bg-base-100;
-    > .match { @apply mb-0 rounded-none border-0; }
-    > footer { @apply flex items-center justify-end border-t border-base-300 bg-base-200/50 px-4 py-2 text-[13px] text-subtle; }
+  /* The screen's main action, pinned above the tab bar while its section is on screen. */
+  .action-bar { @apply sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 mt-4 bg-base-200/90 px-4 py-3 backdrop-blur; }
+  .deliver-row {
+    @apply flex min-h-16 items-center gap-4 border-b border-base-300 px-4 py-3 text-base-content last:border-b-0 active:bg-base-200 hover:bg-base-200/60;
+    > strong { @apply w-14 shrink-0 text-xl font-semibold tabular-nums; }
+    &.claimed { @apply bg-base-200/60; }
+    &.done > strong { @apply text-subtle; }
+  }
+  .venue-picker-button {
+    @apply inline-flex h-8 cursor-pointer items-center gap-1 rounded-full bg-base-200 px-2.5 text-sm font-semibold whitespace-nowrap ring-1 ring-base-300 ring-inset hover:bg-base-300/60;
+    .icon { @apply size-4 text-subtle; }
   }
 
-  /* Announcement alert above the tab bar */
-  .invigilator-alert {
-    @apply fixed inset-x-0 z-10 mx-auto max-w-2xl px-4 pb-3;
-    bottom: calc(4rem + env(safe-area-inset-bottom));
-    > div { @apply rounded-box border border-amber-600/25 bg-amber-50 p-4 shadow-lg; }
+  /* Announcement banner under the invigilator app bar */
+  .announcement-bar {
+    @apply border-t border-amber-600/20 bg-amber-50;
+    > div { @apply flex max-h-[40dvh] flex-col gap-2.5 overflow-y-auto py-3; }
+    .announcement-text { @apply text-gray-900; }
   }
-  body:has(.invigilator-alert) main { @apply pb-72; }
+  .announcement-text { @apply text-lg leading-snug font-semibold whitespace-pre-wrap; }
 
   .qr { @apply block shrink-0 rounded-lg border border-base-300 bg-white p-2; > svg { @apply size-full; } }
+  /* A file's pages: links to each under the app bar, then each page image beside its text. */
+  .page-nav {
+    @apply no-scrollbar sticky top-14 z-10 -mx-4 mb-4 flex gap-1 overflow-x-auto bg-base-200/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6;
+    > a { @apply grid h-8 min-w-8 shrink-0 place-items-center rounded-md px-2 text-meta font-medium text-muted tabular-nums hover:bg-base-100 hover:text-base-content; }
+    > a.unread { @apply text-amber-700; }
+  }
+  .file-page {
+    @apply scroll-mt-28 overflow-hidden rounded-box border border-base-300 bg-base-100;
+    > header { @apply flex items-center gap-3 border-b border-base-300 px-5 py-3; }
+  }
+  /* Invite dialog: one panel per role, shown by the checked role tab. */
+  #invite-dialog:has([value=invigilator]:checked) [data-role=examiner],
+  #invite-dialog:has([value=examiner]:checked) [data-role=invigilator] { display: none; }
   .copy-field {
-    @apply flex min-w-0 items-center gap-2 rounded-field border border-base-300 bg-base-200/60 py-1 pr-1 pl-3 font-mono text-[13px];
+    @apply flex min-w-0 items-center gap-2 rounded-field border border-base-300 bg-base-200/60 py-1 pr-1 pl-3 font-mono text-meta;
     > span { @apply min-w-0 flex-1 truncate text-muted; }
   }
-  .danger-zone { @apply rounded-box border border-red-600/25 bg-base-100; }
-  .metric { @apply flex flex-col; > strong { @apply text-2xl font-semibold tracking-tight tabular-nums; } > span { @apply text-[13px] text-subtle; } }
   blockquote { @apply rounded-lg border-l-4 border-base-300 bg-base-200/60 px-4 py-3 text-sm; }
-  blockquote footer { @apply mt-1 text-[13px] text-subtle; }
+  blockquote footer { @apply mt-1 text-meta text-subtle; }
 
   /* Tom Select, styled from scratch instead of with its stylesheet */
   .ts-wrapper { @apply relative w-full; }
@@ -269,17 +323,19 @@
     @apply flex min-h-10 w-full cursor-text flex-wrap items-center gap-1 rounded-field border border-base-300 bg-base-100 px-3 py-1 text-sm shadow-xs;
     > input { @apply h-6 min-w-16 flex-1 bg-transparent outline-none; }
   }
+  body.invigilator .ts-control { @apply min-h-12 text-base; }
   .ts-wrapper.multi .ts-control {
     @apply px-2;
     .item { @apply flex items-center rounded-md bg-base-200 py-0.5 pl-2 text-xs font-medium ring-1 ring-base-300 ring-inset; }
     .remove { @apply cursor-pointer px-1.5 text-muted no-underline hover:text-base-content; }
   }
-  /* Single select */
-  .ts-wrapper.single .ts-control {
-    @apply cursor-pointer flex-nowrap pr-9;
+  /* A select shows a chevron; a text box with suggestions doesn't. */
+  .ts-wrapper.single .ts-control { @apply cursor-pointer flex-nowrap; .item { @apply truncate; } }
+  select + .ts-wrapper.single .ts-control {
+    @apply pr-9;
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.75rem center / 1rem;
-    .item { @apply truncate; }
   }
+  input + .ts-wrapper.single .ts-control { @apply cursor-text; }
   .ts-wrapper.input-hidden .ts-control > input { @apply absolute -left-[10000px] opacity-0; }
   .ts-wrapper.focus .ts-control { @apply border-primary ring-3 ring-primary/15; }
   .filters .ts-control { @apply min-h-9; }
@@ -297,6 +353,9 @@
    changes to daisyUI classes sit directly in `utilities`, which beats its sublayers. */
 @layer utilities {
   .btn { @apply gap-2 font-medium shadow-none; }
+  /* daisyUI tabs: outlined, a count after the title; `fill` spreads them over the width */
+  .tabs-box { @apply ring-1 ring-base-300 ring-inset; > .tab { @apply flex-nowrap whitespace-nowrap; } .num { @apply text-subtle; } }
+  .tabs.fill > .tab { @apply flex-1; }
   .btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .btn-outline {
     @apply border-base-300 bg-base-100 text-base-content shadow-xs hover:border-base-300 hover:bg-base-200 hover:text-base-content;
@@ -305,14 +364,17 @@
     @apply border-base-300 bg-base-100 text-error shadow-xs hover:border-error/30 hover:bg-red-50 hover:text-error;
   }
   .btn-ghost { @apply text-muted hover:bg-base-200 hover:text-base-content; }
+  .announcement-bar .btn-ghost { @apply text-amber-900 hover:bg-amber-100 hover:text-amber-900; }
   .btn-ghost.btn-danger { @apply border-transparent bg-transparent shadow-none text-error hover:bg-red-50 hover:text-error; }
+  .btn-read-out { @apply border-amber-700 bg-amber-600 text-white hover:border-amber-700 hover:bg-amber-700; }
+  body.invigilator .btn:not(.btn-xs) { @apply min-h-11; }
   .btn .icon { @apply size-4; }
   .btn-lg .icon { @apply size-5; }
   .btn[aria-busy=true]::before, form.htmx-request .btn:not([type=button])::before { content: ""; @apply loading loading-spinner loading-sm; }
-  /* While a link's page loads (app.js): <main> dims after 100 ms, and a bar at the top eases towards 90%,
-     completes when the page arrives, then fades. Transitions, not keyframes, so each state continues
-     from the current width. */
-  main[aria-busy=true] { @apply opacity-50 transition-opacity delay-100 duration-200; }
+  /* While a link or GET form loads (app.js): the part it replaces dims after 150 ms, and a bar at
+     the top eases towards 90%, completes when the page arrives, then fades. Transitions, not
+     keyframes, so each state continues from the current width. */
+  :is(main, [data-live])[aria-busy=true] { @apply opacity-60 transition-opacity delay-150 duration-150; }
   #page-loading-bar {
     @apply pointer-events-none fixed inset-x-0 top-0 z-60 h-0.5 origin-left bg-primary opacity-0;
     transform: scaleX(0);
@@ -331,6 +393,7 @@
   }
   select { @apply select w-full; }
   textarea { @apply textarea w-full text-[15px] leading-6; }
+  body.invigilator textarea { @apply text-base; }
   :is(input:not([type=checkbox], [type=radio], [type=file], .ts-control > *), select, textarea, .input, .select, .textarea) {
     @apply border-base-300 shadow-xs;
   }
@@ -348,6 +411,7 @@
     &.state-delivered, &.state-read-out, &.state-answered, &.green { @apply bg-green-50 text-green-700 ring-green-600/20; }
     &.closed, &.state-announced, &.state-merged { @apply bg-gray-100 text-gray-600 ring-gray-500/15; }
   }
+  .toast > .alert.success { @apply border-gray-900 bg-gray-900 text-white; }
   .menu-panel {
     @apply menu w-56 rounded-box border border-base-300 bg-base-100 p-1.5 text-sm shadow-lg;
     /* A popover below its button's right edge. */
@@ -357,9 +421,11 @@
     position-try-fallbacks: flip-block;
     &:not(:popover-open) { display: none; }
     li > :is(a, button) { @apply rounded-md px-3 py-2; }
+    li > .text-error:hover { @apply bg-red-50; }
     .menu-title { @apply px-3 pt-2 pb-1 text-xs font-medium text-subtle normal-case; }
   }
   .modal-box { @apply max-w-md rounded-2xl p-6 shadow-xl; }
+  #invite-dialog > .modal-box { @apply max-w-xl overflow-hidden p-0; }
   .modal-box.full-screen { @apply h-dvh max-h-none w-full max-w-none rounded-none; }
   .modal-box:has(.ts-wrapper) { @apply overflow-visible; } /* its menu may reach past the box */
   .modal-box > h2 { @apply mb-1 text-lg; }
@@ -373,7 +439,8 @@
     > [aria-current=page]::after { display: none; }
     .icon { @apply size-6; }
     .dock-label { @apply text-[11px] font-medium; }
-    .count { @apply absolute top-1 left-[calc(50%+.35rem)] h-[1.1rem] min-w-[1.1rem] px-1 text-[11px] ring-2 ring-base-100; }
+    .count { @apply absolute top-1 left-[calc(50%+.35rem)] h-[1.1rem] min-w-[1.1rem] px-1 text-[11px] text-white ring-2 ring-base-100; }
+    .count:not(.action, .urgent) { @apply bg-gray-500; }
   }
 }
 
@@ -381,5 +448,9 @@
    daisyUI's do, then fades after 4 s (app.js then removes it). On invigilator screens toasts sit
    above the tab bar. */
 .toast > .alert.success { animation: toast 250ms ease-out, fade-out 300ms 4s forwards; }
-body:has(> main.invigilator) > .toast { bottom: calc(var(--spacing) * 24); }
+body.invigilator > .toast { bottom: calc(var(--spacing) * 20 + env(safe-area-inset-bottom)); }
 @keyframes fade-out { to { opacity: 0; visibility: hidden; } }
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+}

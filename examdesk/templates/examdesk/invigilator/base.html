@@ -1,53 +1,61 @@
 {% extends "examdesk/base.html" %}
 {% block appbar %}
   {% if member.is_examiner %}<a href="{% url 'examiner:clarifications' member.exam.pk %}" class="btn btn-ghost btn-sm max-sm:hidden">Examiner view</a>{% endif %}
-  <button type="button" class="chip-button" commandfor="venue-dialog" command="show-modal" title="Change my venue"
-          aria-label="Venue: {{ member.venue|default:'All venues' }}"><c-icon name="map-pin" />{{ member.venue|default:"All venues" }}</button>
+  <button type="button" class="venue-picker-button" commandfor="venue-dialog" command="show-modal" title="Change my venue"
+          aria-label="Venue: {{ member.venue|default:'All venues' }}"><c-icon name="map-pin" />{{ member.venue|default:"All venues" }}<c-icon name="chevron-down" class="size-3.5" /></button>
 {% endblock %}
 {% block nav %}{% endblock %}
+{% block main_class %}pt-5 pb-32{% endblock %}
 
-{% block after_main %}
+{% block below_appbar %}
 {% with pk=member.exam.pk %}
-<c-live id="tab-bar" :refresh_in="snooze_ends_in">
+<c-live id="announcement-bar" :refresh_in="snooze_ends_in">
 {% if alert %}
-  <div class="invigilator-alert" role="alert" data-alert="{{ alert_key }}">
-    <div>
-      <p class="flex items-center gap-2 text-sm font-semibold text-amber-800">
-        <c-icon name="megaphone" />New announcement
+  <div class="announcement-bar" role="alert" data-alert="{{ alert_key }}">
+    <div class="page-container">
+      <p class="flex items-center gap-1.5 text-meta font-semibold text-amber-800">
+        <c-icon name="megaphone" />New announcement{% if alert.label %} · {{ alert.label }}{% endif %}
         {% if counts.announcements > 1 %}<a class="ml-auto font-medium underline underline-offset-2" href="{% url 'invigilator:announcements' pk %}">{{ counts.announcements|add:"-1" }} more</a>{% endif %}
       </p>
-      <p class="prose-answer mt-1.5 mb-3 text-lg leading-snug font-medium text-gray-900">{{ alert.text }}</p>
-      <div class="flex gap-2">
+      <p class="announcement-text">{{ alert.text }}</p>
+      <div class="flex items-center gap-4">
         <div class="flex-1">
           {% if member.venue %}
             <c-read-out-button :announcement="alert" :member="member" next="{{ page_url }}" />
           {% else %}
-            <a class="btn btn-block btn-outline" href="{% url 'invigilator:announcements' pk %}">Open Announcements</a>
+            <a class="btn btn-read-out btn-block" href="{% url 'invigilator:announcements' pk %}"><c-icon name="check" />Mark as read out</a>
           {% endif %}
         </div>
         <form method="post" action="{% url 'invigilator:snooze_announcement' pk alert.pk %}">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ page_url }}">
-          <button class="btn btn-outline">Remind me later</button>
+          <button class="btn btn-ghost">Remind me later</button>
         </form>
       </div>
     </div>
   </div>
 {% endif %}
+</c-live>
+{% endwith %}
+{% endblock %}
+
+{% block after_main %}
+{% with pk=member.exam.pk %}
+<c-live id="tab-bar">
 <nav class="dock" aria-label="Invigilator">
   <a href="{% url 'invigilator:report' pk %}" {% if tab == "report" %}aria-current="page"{% endif %}>
-    <c-icon name="pen-line" /><span class="dock-label">Report</span>
+    <c-icon name="square-pen" /><span class="dock-label">Report</span>
   </a>
   <a href="{% url 'invigilator:open_clarifications' pk %}" {% if tab == "open_clarifications" %}aria-current="page"{% endif %}>
-    <c-icon name="clock" /><span class="dock-label">Open</span>
-    {% if counts.open_clarifications %}<span class="count" title="Open clarifications">{{ counts.open_clarifications }}</span>{% endif %}
+    <c-icon name="hourglass" /><span class="dock-label">Waiting</span>
+    {% if counts.open_clarifications %}<span class="count" title="Waiting for an answer">{{ counts.open_clarifications }}</span>{% endif %}
   </a>
   <a href="{% url 'invigilator:to_deliver' pk %}" {% if tab == "to_deliver" %}aria-current="page"{% endif %}>
     <c-icon name="send" /><span class="dock-label">Deliver</span>
     {% if counts.to_deliver %}<span class="count action" title="Seats to deliver">{{ counts.to_deliver }}</span>{% endif %}
   </a>
   <a href="{% url 'invigilator:announcements' pk %}" {% if tab == "announcements" %}aria-current="page"{% endif %}>
-    <c-icon name="megaphone" /><span class="dock-label">Announce</span>
+    <c-icon name="megaphone" /><span class="dock-label">Read out</span>
     {% if counts.announcements %}<span class="count urgent" title="To read out">{{ counts.announcements }}</span>{% endif %}
   </a>
 </nav>

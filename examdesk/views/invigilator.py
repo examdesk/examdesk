@@ -15,7 +15,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import connections
-from django.db.models import Prefetch
+from django.db.models import Exists, OuterRef, Prefetch
 from django.http import Http404, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -25,7 +25,7 @@ from django.views.decorators.http import require_GET, require_POST
 from .. import ai, services, session
 from ..access import HtmxRequest, admit, exam_view
 from ..forms import PhotoForm, ReportForm, ReportStartForm, VenueForm, form_errors
-from ..labels import natural, top_level
+from ..labels import natural, place_order, top_level
 from ..matching import rank_similar, same_question, similar_enough
 from ..models import (
     Announcement,
@@ -88,7 +88,6 @@ def deliver_seat_url(member: Member, report: Report, back: str = "") -> str:
         member.exam.pk,
         report.venue,
         report.seat,
-        report=report.pk,
         back=back,
     )
 
@@ -125,7 +124,8 @@ def find_matches(
 
 @exam_view(live_only=True)
 def report(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Step 1: seat and question. Step 2: join a match or create a clarification."""
+    """The seat and question, then the clarifications already asked about it: join one or create
+    a new one. Typing what the student asks ranks them by similarity."""
     exam = member.exam
     if request.method == "POST":
         form = ReportForm(request.POST, request.FILES)
@@ -147,47 +147,33 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
                 )
                 return redirect("invigilator:report_saved", exam.pk, saved.pk)
         start_form = ReportStartForm(request.POST)
+        query = request.POST
         context: dict[str, Any] = {
             "report_form": form,
             "client_key": request.POST.get("client_key"),
         }
     else:
-        # Step 1 submits a label; without one, prefill the last report's seat and question.
-        mine = Report.objects.filter(member=member).select_related("clarification")
-        last = (mine.filter(venue=member.venue) if member.venue else mine).last()
-        start_form = ReportStartForm(
-            request.GET if "label" in request.GET else None,
-            initial={
-                "venue": request.GET.get("venue") or (last and last.venue) or member.venue,
-                "seat": request.GET.get("seat") or (last and last.seat),
-                "label": request.GET.get("label") or (last and last.clarification.label),
-            },
-        )
-        if not start_form.is_bound and start_form.initial["seat"]:
-            del start_form.fields["seat"].widget.attrs["autofocus"]
-            start_form.fields["label"].widget.attrs["autofocus"] = True
+        query = request.GET
+        submitted = "seat" in query or "label" in query
+        start_form = ReportStartForm(query if submitted else None, initial={"venue": member.venue})
         context = {"client_key": uuid.uuid4()}
-    if start_form.is_valid() and "edit" not in request.GET:
-        text = (request.POST or request.GET).get("text", "")
+    text = query.get("text", "")
+    if start_form.is_bound and query.get("label") and start_form.is_valid():
         seat = start_form.cleaned_data
         here, elsewhere = find_matches(exam, seat["venue"], seat["seat"], seat["label"], text)
-        groups = (
-            [(f"Under {top_level(seat['label'])}", here)]
-            if text.strip()
-            else [
-                ("Answered", [m for m in here if m.clarification.current_answer_id]),
-                (
-                    "Open",
-                    [m for m in here if not m.clarification.current_answer_id],
-                ),
-            ]
-        )
-        groups.append(("Under another question", elsewhere))
-        context |= {"matching": True, "text": text, "any_match": bool(here), "groups": groups}
-        if request.htmx.request_type == "partial":  # typing in the question re-ranks the matches
-            context |= {"member": member, "start_form": start_form}
-            return render(request, "examdesk/invigilator/report.html#matches", context)
-    context |= {"start_form": start_form}
+        if not text.strip():  # answered first
+            here.sort(key=lambda match: not match.clarification.current_answer_id)
+        context |= {
+            "groups": [
+                (f"Already asked about {top_level(seat['label'])}", here),
+                ("Under other questions", elsewhere),
+            ],
+        }
+    context |= {"start_form": start_form, "text": text}
+    # typing re-ranks the matches
+    if request.htmx.request_type == "partial" and not is_refresh(request):
+        context |= {"member": member}
+        return render(request, "examdesk/invigilator/report.html#matches", context)
     return invigilator_page(request, member, "report", context)
 
 
@@ -244,6 +230,7 @@ class SeatTile:
     venue: str
     seat: str
     to_deliver: int
+    next_report: Report | None = None  # the first question to deliver, for its answer
     claim: SeatClaim | None = None  # someone else delivering to it
 
 
@@ -263,15 +250,15 @@ def to_deliver(request: HtmxRequest, member: Member) -> HttpResponse:
         if undelivered := [report for report in reports if not report.delivered]:
             claim = claims.get((venue, seat))
             claim = claim if claim and claim.holds(undelivered) else None
-            undelivered_tiles.append(SeatTile(venue, seat, len(undelivered), claim))
+            undelivered_tiles.append(SeatTile(venue, seat, len(undelivered), undelivered[0], claim))
         else:
             last = max(report.delivered_at for report in reports if report.delivered_at)
             delivered.append((last, SeatTile(venue, seat, 0)))
-    undelivered_tiles.sort(key=lambda tile: (natural(tile.venue), natural(tile.seat)))
+    undelivered_tiles.sort(key=lambda tile: place_order((tile.venue, tile.seat)))
     delivered.sort(key=lambda pair: pair[0], reverse=True)
     context = {
         "undelivered": group_by_venue((tile.venue, tile) for tile in undelivered_tiles),
-        "delivered": group_by_venue((tile.venue, tile) for _, tile in delivered),
+        "delivered": [tile for _, tile in delivered],
         "delivered_count": len(delivered),
         # Claims expire without a new exam version.
         "claim_expires_in": min(
@@ -289,7 +276,7 @@ def to_deliver(request: HtmxRequest, member: Member) -> HttpResponse:
 @require_GET
 @exam_view(live_only=True)
 def deliver_seat(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Opens on `report`, else the first undelivered one. Opening it claims the seat."""
+    """A seat's answers to deliver and the next seat. Opening the page claims the seat."""
     venue, seat = seat_from(request)
     reports = list(
         Report.objects.at_seat(member.exam, venue, seat).answered().with_state().with_deliveries()
@@ -300,15 +287,22 @@ def deliver_seat(request: HtmxRequest, member: Member) -> HttpResponse:
         if claim and claim.member_id != member.pk and claim.holds(undelivered):
             taken_from = claim
         services.claim_seat(member, venue=venue, seat=seat)
-    wanted = request.GET.get("report")
-    current = next((r for r in reports if str(r.pk) == wanted), None) or next(
-        iter(undelivered), reports[0] if reports else None
+    seats_to_deliver = sorted(
+        set(Report.objects.to_deliver().in_venue_of(member).values_list("venue", "seat"))
+        - {(venue, seat)},
+        key=place_order,
+    )
+    # after this one in seat order, wrapping around to the first
+    next_seat = next(
+        (place for place in seats_to_deliver if place_order(place) > place_order((venue, seat))),
+        seats_to_deliver[0] if seats_to_deliver else None,
     )
     context = {
         "venue": venue,
         "seat": seat,
         "reports": reports,
-        "current": current,
+        "undelivered": undelivered,
+        "next_seat": next_seat,
         "back": back_to_report(request),
         "taken_from": taken_from,
     }
@@ -346,9 +340,16 @@ def unmark_delivered(request: HtmxRequest, member: Member, delivery_id: int) -> 
 @require_GET
 @exam_view(live_only=True)
 def announcements(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Each announcement with its readout in the member's venue, if any."""
-    found = member.exam.announcements.prefetch_related(
-        Prefetch("readouts", Readout.objects.select_related("member"))
+    """Each announcement with its readout in the member's venue, if any; those still to read out
+    there first."""
+    found = (
+        member.exam.announcements.annotate(
+            read_out_here=Exists(
+                Readout.objects.filter(announcement=OuterRef("pk"), venue=member.venue)
+            )
+        )
+        .order_by("read_out_here", "-created_at", "-pk")
+        .prefetch_related(Prefetch("readouts", Readout.objects.select_related("member")))
     )
     page_obj = Paginator(found, settings.EXAMDESK_PAGE_SIZE).get_page(request.GET.get("page"))
     items = [
