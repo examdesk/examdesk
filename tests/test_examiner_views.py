@@ -399,7 +399,7 @@ def test_announce_from_a_clarification_uses_the_answer_box(examiner: Client, exa
     clarification = report(exam).clarification
     html = examiner.get(url("examiner:clarification", exam, clarification.pk)).content.decode()
     assert 'commandfor="announce-dialog" command="show-modal"><svg' in html
-    assert "Announce to all venues…</button>" in html
+    assert "Announce…</button>" in html
     assert '<blockquote data-quote="answer-text"></blockquote>' in html
     assert '<input type="hidden" name="text" data-quote="answer-text">' in html
     response = examiner.post(

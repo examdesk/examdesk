@@ -16,14 +16,11 @@
         {% elif label %}<span class="label-chip h-6 text-sm">{{ label }}</span>{% endif %}
         <c-state-badge :state="clarification.state" />
       </h2>
-      <span class="meta inline-flex items-center gap-2.5">
-        <span class="inline-flex items-center gap-1"><c-icon name="users" />{{ reports|length }} seat{{ reports|length|pluralize }}</span>
-        {% if waiting_since and clarification.state == 'open' %}<span class="wait {{ waiting_since|wait_level }}" data-wait-since="{{ waiting_since|date:'U' }}" data-wait-level title="Asked at {{ waiting_since|time:'H:i' }}"><c-icon name="clock" />{{ waiting_since|wait }}</span>{% endif %}
-      </span>
+      {% if waiting_since and clarification.state == 'open' %}<span class="meta wait {{ waiting_since|wait_level }}" data-wait-since="{{ waiting_since|date:'U' }}" data-wait-level title="Asked at {{ waiting_since|time:'H:i' }}">{{ waiting_since|wait }}</span>{% endif %}
       <div class="ml-auto flex items-center gap-1.5">
-        {% if can_answer and others %}<button type="button" class="btn btn-outline btn-sm" commandfor="merge-dialog" command="show-modal"><c-icon name="git-merge" /><span class="max-sm:sr-only">Merge…</span></button>{% endif %}
+        {% if can_answer and others %}<button type="button" class="btn btn-ghost btn-sm" commandfor="merge-dialog" command="show-modal"><c-icon name="git-merge" /><span class="max-sm:sr-only">Merge…</span></button>{% endif %}
         {% if next_in_queue %}
-          <a href="{% url 'examiner:clarification' pk next_in_queue.pk %}" class="btn btn-sm {% if clarification.state == 'open' %}btn-ghost{% else %}btn-primary{% endif %}" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body" title="Next (J)">Next<c-icon name="chevron-right" /></a>
+          <a href="{% url 'examiner:clarification' pk next_in_queue.pk %}" class="btn btn-sm {% if clarification.state == 'open' %}btn-ghost{% else %}btn-primary{% endif %}" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body" title="Next (J)"><span class="max-sm:sr-only">Next</span><c-icon name="chevron-right" /></a>
         {% endif %}
       </div>
     </div>
@@ -60,46 +57,48 @@
 
       {% if clarification.current_answer %}
         <section class="rounded-box border border-green-600/20 bg-green-50/50 p-4" aria-labelledby="answer-title">
-          <div class="mb-2 flex items-center justify-between gap-3">
+          <div class="mb-1 flex min-h-8 flex-wrap items-center gap-x-2">
             <h2 id="answer-title" class="flex items-center gap-1.5 text-meta text-green-800"><c-icon name="check" />Answer</h2>
             <span class="meta">{{ clarification.current_answer.member.name }} · {{ clarification.current_answer.created_at|time:"H:i" }}</span>
+            {% if can_answer %}
+              <div class="-mr-2 ml-auto flex gap-1">
+                <button type="button" class="btn btn-ghost btn-sm" data-show="correction" title="Correct answer"{% if correcting %} hidden{% endif %}><c-icon name="pen-line" /><span class="max-sm:sr-only">Correct answer</span></button>
+                {% if withdrawable %}
+                  <form method="post" action="{% url 'examiner:withdraw_answer' pk clarification.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="expected_answer" value="{{ clarification.current_answer_id }}">
+                    <button class="btn btn-ghost btn-sm"><c-icon name="undo-2" />Withdraw</button>
+                  </form>
+                {% endif %}
+              </div>
+            {% endif %}
           </div>
           <p class="prose-answer">{{ clarification.current_answer.text }}</p>
-          {% if can_answer %}
-            <div class="mt-3 flex flex-wrap gap-2">
-              <button type="button" class="btn btn-outline btn-sm" data-show="correction"{% if correcting %} hidden{% endif %}><c-icon name="pen-line" />Correct answer</button>
-              {% if withdrawable %}
-                <form method="post" action="{% url 'examiner:withdraw_answer' pk clarification.pk %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="expected_answer" value="{{ clarification.current_answer_id }}">
-                  <button class="btn btn-ghost btn-sm"><c-icon name="undo-2" />Withdraw</button>
-                </form>
-              {% endif %}
-            </div>
-          {% endif %}
           {% if answers|length > 1 %}
             <details class="group mt-3 border-t border-green-600/15 pt-3">
               <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-meta font-medium text-muted"><c-icon name="chevron-right" class="transition-transform group-open:rotate-90" />Earlier answers ({{ answers|length|add:"-1" }})</summary>
-              <div class="mt-3 flex flex-col gap-2">
+              <ul class="mt-2 flex flex-col gap-1.5 pl-5 text-sm">
               {% for answer in answers %}{% if answer.pk != clarification.current_answer_id %}
-                <blockquote><s class="text-muted">{{ answer.text|linebreaksbr }}</s><footer>{{ answer.member.name }} · {{ answer.created_at|time:"H:i" }}</footer></blockquote>
+                <li><s class="text-muted">{{ answer.text|linebreaksbr }}</s> <span class="meta whitespace-nowrap">{{ answer.member.name }} · {{ answer.created_at|time:"H:i" }}</span></li>
               {% endif %}{% endfor %}
-              </div>
+              </ul>
             </details>
           {% endif %}
         </section>
       {% endif %}
       {% if reports %}
-        <section class="list-card" aria-labelledby="seats-title">
-          <header><h2 id="seats-title">Seats</h2><span class="count">{{ reports|length }}</span></header>
-          {% for report in reports|slice:":5" %}{% partial seat_row %}{% endfor %}
-          {% if reports|length > 5 %}
-            <details class="group/more">
-              <summary class="flex cursor-pointer list-none justify-center px-4 py-2.5 text-meta font-medium text-primary hover:bg-base-200/60 group-open/more:hidden">Show {{ reports|length|add:"-5" }} more</summary>
-              <div class="divide-y divide-base-300">{% for report in reports|slice:"5:" %}{% partial seat_row %}{% endfor %}</div>
-            </details>
-      {% endif %}
-      </section>
+        <section aria-labelledby="seats-title">
+          <h2 id="seats-title" class="section-title">Seats<span class="count">{{ reports|length }}</span></h2>
+          <div class="pane-list">
+            {% for report in reports|slice:":5" %}{% partial seat_row %}{% endfor %}
+            {% if reports|length > 5 %}
+              <details class="group/more">
+                <summary class="cursor-pointer list-none py-2.5 text-meta font-medium text-primary hover:underline group-open/more:hidden">Show {{ reports|length|add:"-5" }} more</summary>
+                <div class="pane-list">{% for report in reports|slice:"5:" %}{% partial seat_row %}{% endfor %}</div>
+              </details>
+            {% endif %}
+          </div>
+        </section>
       {% endif %}
 
       {% if can_answer %}
@@ -119,21 +118,20 @@
         {% csrf_token %}
         <input type="hidden" name="expected_answer" value="{{ answer_form.expected_answer.value|default_if_none:'' }}">
         <div class="mb-2 flex flex-wrap gap-1.5">
-          {% if member.exam.has_ai_service %}<button type="button" class="btn btn-outline btn-xs" data-draft="{% url 'examiner:draft_answer' pk clarification.pk %}"><c-icon name="sparkles" />Draft with AI</button>{% endif %}
+          {% if member.exam.has_ai_service %}<button type="button" class="reply-chip text-primary" data-draft="{% url 'examiner:draft_answer' pk clarification.pk %}"><c-icon name="sparkles" />Draft with AI</button>{% endif %}
           {% for text in canned %}
-            <button type="button" class="btn btn-outline btn-xs font-normal" onclick="this.form.text.value = this.textContent; this.form.text.focus()">{{ text }}</button>
+            <button type="button" class="reply-chip" onclick="this.form.text.value = this.textContent; this.form.text.focus()">{{ text }}</button>
           {% endfor %}
         </div>
         <textarea name="text" maxlength="{{ config.text_max }}" id="answer-text" rows="3" required aria-label="{% if clarification.current_answer %}Corrected answer{% else %}Answer{% endif %}" placeholder="{% if clarification.current_answer %}Corrected answer{% else %}Answer{% endif %}"{% if correcting %} autofocus{% endif %}>{{ answer_form.text.value|default:"" }}</textarea>
         {% if member.exam.has_ai_service %}<p class="meta mt-1" role="status" data-draft-failed hidden>Couldn't draft an answer.</p>{% endif %}
         <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
-          <small class="mr-auto max-sm:hidden"><kbd>Ctrl</kbd> <kbd>Enter</kbd> or <kbd>⌘</kbd> <kbd>Enter</kbd> sends</small>
           {% if clarification.current_answer %}
             <button type="button" class="btn btn-ghost btn-sm" data-hide="correction">Cancel</button>
           {% else %}
-            <button type="button" class="btn btn-outline btn-sm" commandfor="announce-dialog" command="show-modal"><c-icon name="megaphone" />Announce to all venues…</button>
+            <button type="button" class="btn btn-ghost btn-sm" title="Announce to all venues" commandfor="announce-dialog" command="show-modal"><c-icon name="megaphone" />Announce…</button>
           {% endif %}
-          <button class="btn btn-primary btn-sm"><c-icon name="send" />{% if clarification.current_answer %}Send correction{% else %}Send{% endif %}</button>
+          <button class="btn btn-primary btn-sm" title="Ctrl+Enter or ⌘+Enter"><c-icon name="send" />{% if clarification.current_answer %}Send correction{% else %}Send{% endif %}</button>
         </div>
       </form>
     {% elif editable and clarification.closed_reason %}
@@ -174,9 +172,9 @@
     <div class="min-w-0 flex-1">
       <p class="flex flex-wrap items-baseline gap-x-2"><a href="{% seat_url 'examiner:seat' pk report.venue report.seat %}" class="font-medium hover:underline">{{ report.venue }} {{ report.seat }}</a><span class="meta">{{ report.member.name }} · {{ report.created_at|time:"H:i" }}</span></p>
       {% if report.text and report.text != clarification.wording %}<button type="button" class="mt-0.5 line-clamp-2 cursor-pointer text-left text-sm text-muted" onclick="this.classList.toggle('line-clamp-2')">{{ report.text }}</button>{% endif %}
-      {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<a href="{{ photo }}" target="_blank" class="mt-2 block w-fit"><img class="h-20 rounded-md border border-base-300" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}"></a>{% endif %}
     </div>
-    <c-state-badge :state="report.state" class="mt-0.5" />
+    {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<a href="{{ photo }}" target="_blank" class="-my-1 shrink-0"><img class="size-7 rounded border border-base-300 object-cover" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}"></a>{% endif %}
+    {% if report.state != "open" %}<c-state-badge :state="report.state" class="mt-0.5" />{% endif %}
     {% if can_answer %}
       <button type="button" class="btn btn-ghost btn-xs btn-square" popovertarget="report-menu-{{ report.pk }}" style="anchor-name: --report-{{ report.pk }}" aria-label="{{ report.venue }} {{ report.seat }}: actions"><c-icon name="ellipsis" /></button>
       <ul class="menu-panel w-48" id="report-menu-{{ report.pk }}" popover style="position-anchor: --report-{{ report.pk }}">
@@ -195,25 +193,23 @@
 {% endpartialdef %}
 
 {% partialdef duplicates %}{% if duplicates %}{% with pk=member.exam.pk %}
-  <section class="list-card group" aria-labelledby="duplicates-title">
-    <form method="post" action="{% url 'examiner:merge_clarifications' pk %}" id="merge-selected" class="flex min-h-12 items-center gap-2 px-4 py-2.5">
+  <section class="group" aria-labelledby="duplicates-title">
+    <form method="post" action="{% url 'examiner:merge_clarifications' pk %}" id="merge-selected" class="mb-2 flex min-h-6 items-center gap-2">
       {% csrf_token %}
       <input type="hidden" name="target" value="{{ clarification.pk }}">
       <input type="hidden" name="next" value="{% url 'examiner:clarification' pk clarification.pk %}">
-      <input type="checkbox" class="checkbox checkbox-sm checkbox-primary mr-1 rounded-sm" data-select-all="merge-selected" aria-label="Select all possible duplicates">
-      <h2 id="duplicates-title" class="flex items-center gap-1.5">{% if confirmed_by_ai %}<c-icon name="sparkles" class="text-primary" />{% endif %}Possible duplicates</h2>
-      <span class="count">{{ duplicates|length }}</span>
+      {% if duplicates|length > 1 %}<input type="checkbox" class="checkbox checkbox-sm checkbox-primary mr-1 rounded-sm" data-select-all="merge-selected" aria-label="Select all possible duplicates">{% endif %}
+      <h2 id="duplicates-title" class="section-title mb-0">{% if confirmed_by_ai %}<c-icon name="sparkles" class="text-primary" />{% endif %}Possible duplicates<span class="count">{{ duplicates|length }}</span></h2>
       <button class="btn btn-primary btn-xs ml-auto hidden group-has-checked:inline-flex"><c-icon name="git-merge" />Merge into this</button>
     </form>
+    <div class="pane-list">
     {% for other, percent in duplicates %}
       {% url 'examiner:clarification' pk other.pk as other_url %}
       <div class="row-item items-start">
         <input type="checkbox" class="checkbox checkbox-sm checkbox-primary mt-0.5 rounded-sm" form="merge-selected" name="source" value="{{ other.pk }}" aria-labelledby="duplicate-{{ other.pk }}"{% if other.closed_reason %} disabled{% endif %}>
-        <div class="min-w-0 flex-1">
-          <a href="{{ other_url }}" id="duplicate-{{ other.pk }}" class="line-clamp-2 font-medium hover:underline" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">{% if other.label %}<span class="label-chip mr-1.5">{{ other.label }}</span>{% endif %}{{ other.summary }}</a>
-          <p class="meta">{{ percent }}% {% if confirmed_by_ai %}match{% else %}alike{% endif %}</p>
-        </div>
-        <c-state-badge :state="other.state" class="mt-0.5" />
+        <a href="{{ other_url }}" id="duplicate-{{ other.pk }}" class="line-clamp-2 min-w-0 flex-1 hover:underline" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">{% if other.label %}<span class="label-chip mr-1.5">{{ other.label }}</span>{% endif %}{{ other.summary }}</a>
+        <span class="meta mt-0.5 shrink-0">{{ percent }}% {% if confirmed_by_ai %}match{% else %}alike{% endif %}</span>
+        {% if other.state != "open" %}<c-state-badge :state="other.state" class="mt-0.5" />{% endif %}
         {% if not other.closed_reason or not clarification.current_answer %}
           <button type="button" class="btn btn-ghost btn-xs btn-square" commandfor="merge-{{ other.pk }}" command="show-modal" aria-label="Merge into {{ other.label|default:'this clarification' }}…" title="Merge into it…"><c-icon name="git-merge" /></button>
           <c-dialog id="merge-{{ other.pk }}" title="Merge into {{ other.label|default:'this clarification' }}?" action="{% url 'examiner:merge_clarifications' pk %}" submit="Merge">
@@ -227,6 +223,7 @@
         {% endif %}
       </div>
     {% endfor %}
+    </div>
   </section>
 {% endwith %}{% endif %}{% endpartialdef %}
 {% endwith %}

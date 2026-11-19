@@ -21,7 +21,7 @@
       <a class="queue-row" href="{% url 'examiner:clarification' pk item.pk %}"{% if item.pk == clarification.pk %} aria-current="page"{% endif %} hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">
         <div class="mb-1 flex items-center gap-2 text-meta text-subtle">
           {% if item.label %}<span class="label-chip">{{ item.label }}</span>{% endif %}
-          {% if state != "open" %}<c-state-badge :state="item.state" />{% endif %}
+          {% if item.state != "open" and item.state != state %}<c-state-badge :state="item.state" />{% endif %}
           {% if row.reports|length > 1 %}<span class="inline-flex items-center gap-1" title="Seats"><c-icon name="users" />{{ row.reports|length }}</span>{% endif %}
           {% if item.photo_report_id %}<c-icon name="image" title="Photo" />{% endif %}
           {% if item.state == "open" and row.waiting_since %}
