@@ -53,7 +53,7 @@
   html { -webkit-tap-highlight-color: transparent; }
   body { @apply min-h-dvh bg-base-200 font-sans text-sm leading-6 text-base-content antialiased; }
   /* Invigilator screens are phones: 16px text avoids zoom on focus; 44px touch targets. */
-  body.invigilator { @apply text-base; --size-field: 0.275rem; }
+  :is(body.invigilator, .landing-phone) { @apply text-base; --size-field: 0.275rem; }
   :focus-visible { @apply outline-2 outline-offset-2 outline-primary; }
   ::selection { @apply bg-primary/15; }
 }
@@ -81,7 +81,7 @@
   .num { @apply tabular-nums; }
 
   /* Links */
-  main a:not([class], .menu-panel *) {
+  main a:not([class], .menu-panel *, .landing-stage *) {
     @apply font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary;
   }
   .link-button { @apply cursor-pointer font-medium text-primary hover:underline; }
@@ -331,7 +331,7 @@
     @apply flex min-h-10 w-full cursor-text flex-wrap items-center gap-1 rounded-field border border-base-300 bg-base-100 px-3 py-1 text-sm shadow-xs;
     > input { @apply h-6 min-w-16 flex-1 bg-transparent outline-none; }
   }
-  body.invigilator .ts-control { @apply min-h-12 text-base; }
+  :is(body.invigilator, .landing-phone) .ts-control { @apply min-h-12 text-base; }
   .ts-wrapper.multi .ts-control {
     @apply px-2;
     .item { @apply flex items-center rounded-md bg-base-200 py-0.5 pl-2 text-xs font-medium ring-1 ring-base-300 ring-inset; }
@@ -355,6 +355,134 @@
     .no-results { @apply px-3 py-1.5 text-muted; }
   }
   .ts-hidden-accessible { @apply sr-only!; } /* beats daisyUI's select, a layer above */
+
+  /* Landing page (landing.html, landing.js). Sections on the grey page; the hero white above its
+     demo. Each demo is a stage drawn at a fixed size in pixels (`--stage-width`, `--stage-height`)
+     and scaled to its box, which keeps its proportions. */
+  .landing-hero-section {
+    @apply relative isolate overflow-hidden px-4 pt-14 pb-12 sm:px-6 sm:pt-20 sm:pb-16;
+    background: linear-gradient(to bottom, var(--color-base-100) 60%, var(--color-base-200) 60%);
+  }
+  .landing-seats {
+    @apply pointer-events-none absolute inset-x-0 top-0 -z-10 h-[40rem] w-full max-sm:hidden;
+    /* Clear of the headline, and gone by the invigilator line under the buttons. */
+    mask-image: radial-gradient(ellipse 70% 75% at 50% 42%, transparent 42%, #000 78%, transparent 100%), linear-gradient(#000 55%, transparent 80%);
+    mask-composite: intersect;
+  }
+  .landing-intro {
+    @apply mx-auto grid max-w-4xl justify-items-center gap-6 text-center;
+    > h1 { @apply text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl; }
+  }
+  .landing-logo { @apply size-14; }
+  .landing-heading { @apply text-3xl font-semibold tracking-tight text-balance sm:text-[2.5rem] sm:leading-tight; }
+
+  /* A phone beside its steps: the steps on the left, or on the right when reversed; on phones,
+     the phone first. */
+  .landing-split {
+    @apply mx-auto grid max-w-5xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-16;
+    > .landing-stage-box { @apply max-lg:order-first; }
+  }
+  .landing-split-reverse { @apply lg:grid-cols-[340px_minmax(0,1fr)]; }
+
+  .landing-stage-box {
+    @apply relative mx-auto w-full;
+    max-width: calc(var(--stage-width) * 1px);
+    aspect-ratio: var(--stage-width) / var(--stage-height);
+  }
+  .landing-stage-box:has(.landing-phone-stage), .landing-stage-box:has(.landing-hero-stage) {
+    --stage-width: 340; --stage-height: 680;
+  }
+  .landing-stage-box:has(.landing-window-stage) {
+    --stage-width: 600; --stage-height: 640;
+    @variant lg { --stage-width: 1152; --stage-height: 680; }
+  }
+  .landing-stage-box:has(.landing-hero-stage) {
+    @variant lg { --stage-width: 1152; --stage-height: 760; }
+  }
+  .landing-stage {
+    @apply absolute top-0 left-0 origin-top-left text-left;
+    width: calc(var(--stage-width) * 1px);
+    height: calc(var(--stage-height) * 1px);
+    scale: var(--stage-scale, 1);
+    & * { scrollbar-width: none; transition-property: none !important; }
+    & [data-shown="0"] { display: none !important; }
+    & [data-focus="1"] { @apply border-primary ring-3 ring-primary/15; }
+  }
+  .landing-hero-stage > .landing-hero-window { @apply hidden lg:absolute lg:top-0 lg:left-0 lg:flex lg:h-[660px] lg:w-[822px]; }
+  .landing-hero-phone { @apply absolute top-0 left-0 lg:top-20 lg:left-[812px]; }
+  /* From lg, the device in use (`data-active`: phone, window or both) stands out and the other one fades under
+     a white overlay. Opacity would show the page behind it through. */
+  .landing-hero-stage {
+    @variant lg {
+      > :is(.landing-hero-window, .landing-hero-phone)::after {
+        @apply pointer-events-none absolute inset-0 z-50 rounded-[inherit] bg-base-100 opacity-0 content-[''];
+      }
+      &[data-active=phone] > .landing-hero-window, &[data-active=window] > .landing-hero-phone {
+        @apply grayscale-60 after:opacity-55;
+      }
+      @variant motion-safe {
+        > :is(.landing-hero-window, .landing-hero-phone) { transition: filter 0.5s !important; }
+        > :is(.landing-hero-window, .landing-hero-phone)::after { transition: opacity 0.5s; }
+      }
+    }
+  }
+
+  /* The examiner's window: its app bar over a page. Below lg, only the open clarification, as
+     the app shows it on a small screen. */
+  .landing-window {
+    @apply relative flex h-full flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-100;
+    box-shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 16px 40px -12px rgb(16 24 40 / 0.16), 0 48px 96px -40px rgb(16 24 40 / 0.22);
+  }
+  .landing-window-page {
+    @apply min-h-0 flex-1 bg-base-200 p-4;
+    --pane-width: 22rem;
+    @variant max-lg { @apply bg-base-100 px-5; }
+  }
+  /* The invigilator's phone. Its text and controls are sized as on invigilator screens (`body.invigilator`). */
+  .landing-phone {
+    @apply h-[680px] w-[340px] rounded-[44px] bg-gray-900 p-2.5;
+    box-shadow: 0 2px 4px rgb(16 24 40 / 0.1), 0 24px 48px -16px rgb(16 24 40 / 0.35);
+  }
+  .landing-phone-screen { @apply relative flex h-full flex-col overflow-hidden rounded-[36px] bg-base-200; }
+  .landing-phone-screen > .appbar { @apply pt-5; }
+  .landing-phone-page { @apply relative min-h-0 flex-1 overflow-hidden px-4 pt-5; }
+
+  .landing-pointer {
+    @apply pointer-events-none invisible absolute top-0 left-0 z-60 opacity-0;
+    > span { @apply absolute -top-2.5 -left-2.5 size-5 rounded-full border-2 border-primary opacity-0; }
+  }
+  .landing-tap { @apply pointer-events-none invisible absolute top-0 left-0 z-60 -mt-5 -ml-5 size-10 rounded-full bg-gray-900/25 opacity-0; }
+  /* A toast at the foot of the window or phone it's in. */
+  .landing-toast {
+    @apply invisible absolute bottom-6 left-1/2 z-50 -translate-x-1/2 opacity-0;
+    > .alert { @apply text-sm whitespace-nowrap shadow-lg; }
+  }
+  .landing-hero-stage .landing-pointer { @apply max-lg:hidden; }
+  .landing-dialog {
+    @apply invisible absolute inset-0 z-40 grid place-items-center bg-gray-900/40 opacity-0;
+    > .modal-box { @apply w-full bg-base-100 text-sm; }
+  }
+
+  /* A demo's steps: a bar under it, each step's track filling as it plays. */
+  .landing-step-bar {
+    @apply relative mt-6 grid touch-none auto-cols-fr grid-flow-col gap-2 select-none max-sm:pb-7 sm:gap-3;
+    button { @apply grid w-full cursor-pointer content-start gap-2 text-left text-sm font-medium text-muted hover:text-base-content aria-[current=true]:text-base-content; }
+    /* The step's name, under its track; on phones only the current one's, under the bar. */
+    button > span:first-child { @apply order-last max-sm:hidden; }
+    [aria-current=true] > span:first-child { @apply max-sm:absolute max-sm:inset-x-0 max-sm:bottom-0 max-sm:block max-sm:text-center; }
+  }
+  .landing-step-track {
+    @apply block h-1 w-full overflow-hidden rounded-full bg-base-300;
+    > span { @apply block h-full origin-left scale-x-0 bg-primary; }
+  }
+  /* A list of steps beside a demo: the current one raised, its track along its foot. */
+  .landing-step-list {
+    @apply grid gap-2;
+    button { @apply grid w-full cursor-pointer gap-3 rounded-box border border-transparent p-4 text-left text-muted hover:bg-base-100/60 aria-[current=true]:border-base-300 aria-[current=true]:bg-base-100; }
+    strong { @apply font-semibold text-base-content; }
+    .landing-step-track { @apply h-0.5 bg-transparent; }
+    [aria-current=false] .landing-step-track { @apply invisible; }
+  }
 }
 
 /* daisyUI nests its classes in sublayers of `utilities`, where they beat `components`. Our
@@ -375,7 +503,7 @@
   .announcement-bar .btn-ghost { @apply text-amber-900 hover:bg-amber-100 hover:text-amber-900; }
   .btn-ghost.btn-danger { @apply border-transparent bg-transparent shadow-none text-error hover:bg-red-50 hover:text-error; }
   .btn-read-out { @apply border-amber-700 bg-amber-600 text-white hover:border-amber-700 hover:bg-amber-700; }
-  body.invigilator .btn:not(.btn-xs) { @apply min-h-11; }
+  :is(body.invigilator, .landing-phone) .btn:not(.btn-xs) { @apply min-h-11; }
   .btn .icon { @apply size-4; }
   .btn-lg .icon { @apply size-5; }
   .btn[aria-busy=true]::before, form.htmx-request .btn:not([type=button])::before { content: ""; @apply loading loading-spinner loading-sm; }
@@ -401,7 +529,7 @@
   }
   select { @apply select w-full; }
   textarea { @apply textarea w-full text-[15px] leading-6; }
-  body.invigilator textarea { @apply text-base; }
+  :is(body.invigilator, .landing-phone) textarea { @apply text-base; }
   :is(input:not([type=checkbox], [type=radio], [type=file], .ts-control > *), select, textarea, .input, .select, .textarea) {
     @apply border-base-300 shadow-xs;
   }
@@ -419,7 +547,7 @@
     &.state-delivered, &.state-read-out, &.state-answered, &.green { @apply bg-green-50 text-green-700 ring-green-600/20; }
     &.closed, &.state-announced, &.state-merged { @apply bg-gray-100 text-gray-600 ring-gray-500/15; }
   }
-  .toast > .alert.success { @apply border-gray-900 bg-gray-900 text-white; }
+  :is(.toast, .landing-toast) > .alert.success { @apply border-gray-900 bg-gray-900 text-white; }
   .menu-panel {
     @apply menu w-56 rounded-box border border-base-300 bg-base-100 p-1.5 text-sm shadow-lg;
     /* A popover below its button's right edge. */
@@ -439,6 +567,10 @@
   .modal-box > h2 { @apply mb-1 text-lg; }
   .modal-action { @apply mt-6 gap-2; }
   .modal-backdrop { @apply bg-gray-900/40; }
+  /* daisyUI's dock is fixed to the window; in a landing demo it sits at the foot of the phone. */
+  .landing-phone .dock { @apply relative shrink-0; }
+  /* A dialog in a demo shows as daisyUI shows an open one. */
+  .landing-dialog > .modal-box { @apply translate-0 scale-100 opacity-100; }
   .dock {
     @apply border-t border-base-300 bg-base-100/95 backdrop-blur;
     padding-inline: max(0.5rem, (100% - var(--container-2xl)) / 2 + 1rem);
@@ -458,6 +590,20 @@
 .toast > .alert.success { animation: toast 250ms ease-out, fade-out 300ms 4s forwards; }
 body.invigilator > .toast { bottom: calc(var(--spacing) * 20 + env(safe-area-inset-bottom)); }
 @keyframes fade-out { to { opacity: 0; visibility: hidden; } }
+
+/* The headline's logo: the lit seat pops in, then the rest rises in. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-intro > :not(svg) { animation: landing-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .landing-intro > :nth-child(2) { animation-delay: 0.45s; }
+  .landing-intro > :nth-child(3) { animation-delay: 0.55s; }
+  .landing-intro > :nth-child(4) { animation-delay: 0.65s; }
+  .landing-intro > :nth-child(5) { animation-delay: 0.75s; }
+  .landing-intro > :nth-child(6) { animation-delay: 0.85s; }
+  .landing-logo rect { animation: landing-rise 0.5s ease-out both; }
+  .landing-logo g { transform-box: fill-box; transform-origin: 0 100%; animation: landing-pop 0.7s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+}
+@keyframes landing-rise { from { opacity: 0; translate: 0 0.875rem; } }
+@keyframes landing-pop { from { scale: 0; } }
 
 @utility no-scrollbar {
   scrollbar-width: none;

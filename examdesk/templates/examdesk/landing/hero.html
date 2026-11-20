@@ -1,0 +1,157 @@
+{% with question="Is big-O enough or do you want the exact count?" answer="Big-O is enough. You don't need the exact count." %}
+{# The hero demo: an invigilator reports a new question from a phone, the examiner opens and answers it, and the invigilator delivers the answer. #}
+<div id="how-it-works" class="mx-auto mt-14 max-w-6xl scroll-mt-20 sm:mt-18" data-demo="hero">
+  <div class="landing-stage-box" role="img" aria-label="An invigilator reports a question from seat 14 on a phone. It appears in the examiner's list, the examiner opens it and answers, and the invigilator shows the answer to seat 14.">
+    <div class="landing-stage landing-hero-stage" inert aria-hidden="true" data-active="phone">
+      <c-landing.window exam="Algorithms Final" clarifications="2" class="landing-hero-window">
+        <div class="clarifications-layout h-full">
+          <section class="queue" aria-label="Clarifications">
+            <div class="queue-toolbar">
+              <nav class="tabs tabs-box tabs-sm fill"><a class="tab gap-1.5" aria-current="true">All</a><a class="tab gap-1.5">Open<span class="num" data-el="open-count">2</span></a><a class="tab gap-1.5">Answered<span class="num" data-el="answered-count">1</span></a><a class="tab gap-1.5">Closed<span class="num">0</span></a></nav>
+              <div class="flex gap-2"><input class="min-w-0 flex-1" placeholder="All questions"><select class="w-34 shrink-0"><option>Longest wait</option></select></div>
+            </div>
+            <div class="queue-list"><div class="queue-rows">
+              <a class="queue-row" aria-current="page" data-el="row-2a">
+                <div class="mb-1 flex items-center gap-2 text-meta text-subtle"><span class="label-chip">2a</span><span class="inline-flex items-center gap-1"><c-icon name="users" />2</span><span class="wait late ml-auto">6 min</span></div>
+                <p>Is there a typo in 2a? The bound says n² but the code loops n times.</p>
+              </a>
+              <a class="queue-row">
+                <div class="mb-1 flex items-center gap-2 text-meta text-subtle"><span class="label-chip">1</span><span class="wait ml-auto">2 min</span></div>
+                <p>Can we use the built-in sort?</p>
+              </a>
+              <a class="queue-row">
+                <div class="mb-1 flex items-center gap-2 text-meta text-subtle"><span class="label-chip">4a</span><c-state-badge :state="State.ANSWERED" /><span class="inline-flex items-center gap-1"><c-icon name="users" />3</span></div>
+                <p>Does the tree have to be balanced?</p>
+              </a>
+              <a class="queue-row" aria-current="false" data-el="row-3b" data-shown="0">
+                <div class="mb-1 flex items-center gap-2 text-meta text-subtle">
+                  <span class="label-chip">3b</span>
+                  <span data-el="row-answered" data-shown="0"><c-state-badge :state="State.ANSWERED" /></span>
+                  <span class="wait ml-auto" data-el="row-wait">&lt;1 min</span>
+                  <span class="ml-auto font-medium text-blue-700" data-el="row-to-deliver" data-shown="0">1 to deliver</span>
+                </div>
+                <p>{{ question }}</p>
+              </a>
+            </div></div>
+          </section>
+
+          <section class="clarification-pane" aria-label="Clarification" data-clarification data-el="pane-2a">
+            <div class="clarification-header">
+              <h2 class="flex min-w-0 items-center gap-2.5"><span class="label-chip h-6 text-sm">2a</span><c-state-badge :state="State.OPEN" /></h2>
+              <span class="meta wait late">6 min</span>
+              <div class="ml-auto flex items-center gap-1.5"><span class="btn btn-ghost btn-sm"><c-icon name="git-merge" />Merge…</span><span class="btn btn-ghost btn-sm">Next<c-icon name="chevron-right" /></span></div>
+            </div>
+            <div class="clarification-body">
+              <p class="wording-text">Is there a typo in 2a? The bound says n² but the code loops n times.</p>
+              <section>
+                <h2 class="section-title">Seats<span class="count">2</span></h2>
+                <div class="pane-list">
+                  <div class="row-item items-start"><p class="min-w-0 flex-1"><span class="font-medium">Hall A 32</span> <span class="meta">Ann · 10:32</span></p></div>
+                  <div class="row-item items-start"><p class="min-w-0 flex-1"><span class="font-medium">Hall B 21</span> <span class="meta">Ben · 10:33</span></p></div>
+                </div>
+              </section>
+            </div>
+            <div class="answer-composer">
+              <div class="mb-2 flex flex-wrap gap-1.5">{% for text in canned %}<span class="reply-chip">{{ text }}</span>{% endfor %}</div>
+              <textarea rows="2" placeholder="Answer"></textarea>
+              <div class="mt-3 flex items-center justify-end gap-2"><span class="btn btn-ghost btn-sm"><c-icon name="megaphone" />Announce…</span><span class="btn btn-primary btn-sm"><c-icon name="send" />Send</span></div>
+            </div>
+          </section>
+
+          <section class="clarification-pane" aria-label="Clarification" data-clarification data-el="pane-3b" data-shown="0">
+            <div class="clarification-header">
+              <h2 class="flex min-w-0 items-center gap-2.5"><span class="label-chip h-6 text-sm">3b</span><span data-el="state-open"><c-state-badge :state="State.OPEN" /></span><span data-el="state-answered" data-shown="0"><c-state-badge :state="State.ANSWERED" /></span></h2>
+              <span class="meta wait" data-el="wait">&lt;1 min</span>
+              <div class="ml-auto flex items-center gap-1.5"><span class="btn btn-ghost btn-sm"><c-icon name="git-merge" />Merge…</span><span class="btn btn-ghost btn-sm">Next<c-icon name="chevron-right" /></span></div>
+            </div>
+            <div class="clarification-body">
+              <p class="wording-text">{{ question }}</p>
+              <section class="rounded-box border border-green-600/20 bg-green-50/50 p-4" data-el="answer" data-shown="0">
+                <div class="mb-1 flex min-h-8 items-center gap-x-2"><h2 class="flex items-center gap-1.5 text-meta text-green-800"><c-icon name="check" />Answer</h2><span class="meta">Lee · 10:39</span><span class="btn btn-ghost btn-sm -mr-2 ml-auto"><c-icon name="pen-line" />Correct answer</span></div>
+                <p class="prose-answer">{{ answer }}</p>
+              </section>
+              <section>
+                <h2 class="section-title">Seats<span class="count">1</span></h2>
+                <div class="pane-list">
+                  <div class="row-item items-start">
+                    <p class="min-w-0 flex-1"><span class="font-medium">Hall A 14</span> <span class="meta">Ann · 10:38</span></p>
+                    <span data-el="to-deliver" data-shown="0"><c-state-badge :state="ReportState.TO_DELIVER" /></span>
+                    <span data-el="delivered" data-shown="0"><c-state-badge :state="ReportState.DELIVERED" /></span>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <div class="answer-composer" data-el="composer">
+              <div class="mb-2 flex flex-wrap gap-1.5">{% for text in canned %}<span class="reply-chip">{{ text }}</span>{% endfor %}</div>
+              <textarea rows="2" placeholder="Answer" data-el="answer-text" data-text="{{ answer }}"></textarea>
+              <div class="mt-3 flex items-center justify-end gap-2"><span class="btn btn-ghost btn-sm"><c-icon name="megaphone" />Announce…</span><span class="btn btn-primary btn-sm" data-el="send"><c-icon name="send" />Send</span></div>
+            </div>
+          </section>
+        </div>
+        <c-landing.toast name="sent">Sent.</c-landing.toast>
+      </c-landing.window>
+
+      <c-landing.phone exam="Algorithms Final" venue="Hall A" tab="report" class="landing-hero-phone">
+        <div data-el="report-page">
+          <c-page-header title="Report a question" />
+          <div class="grid grid-cols-2 gap-3">
+            <label class="mb-0">Seat<input placeholder="e.g. B14" data-el="seat" data-text="14"></label>
+            <label class="mb-0">Question<input placeholder="e.g. 3b" data-el="label" data-text="3b"></label>
+          </div>
+          <div class="mt-6" data-el="new-question" data-shown="0">
+            <span class="btn btn-outline btn-block" data-el="new-button"><c-icon name="plus" />New clarification</span>
+            <div class="flex flex-col gap-3" data-el="new-form" data-shown="0">
+              <h2 class="section-title mb-0">New clarification</h2>
+              <textarea rows="3" placeholder="What is the student asking?" data-el="question" data-text="{{ question }}"></textarea>
+              <span class="btn btn-outline btn-block"><c-icon name="camera" />Take photo (optional)</span>
+              <span class="btn btn-primary btn-block btn-lg" data-el="save"><c-icon name="check" />Save clarification</span>
+            </div>
+          </div>
+        </div>
+
+        <div data-el="reported-page" data-shown="0">
+          <div class="mb-6 flex flex-col items-center pt-4 text-center">
+            <span class="mb-3 grid size-14 place-items-center rounded-full bg-green-600 text-white"><c-icon name="check" class="size-7" /></span>
+            <h1>Reported</h1>
+            <p class="mt-1 text-muted tabular-nums">Hall A 14 · 3b</p>
+          </div>
+          <article class="card-box mb-4">
+            <span data-el="reported-open"><c-state-badge :state="ReportState.OPEN" class="mb-2" /></span>
+            <span data-el="reported-to-deliver" data-shown="0"><c-state-badge :state="ReportState.TO_DELIVER" class="mb-2" /></span>
+            <p class="font-medium">{{ question }}</p>
+          </article>
+          <div class="flex flex-col gap-2">
+            <span class="btn btn-primary btn-block btn-lg" data-el="show-answer" data-shown="0"><c-icon name="send" />Show answer</span>
+            <span class="btn btn-primary btn-block btn-lg" data-el="report-another"><c-icon name="plus" />Report another</span>
+            <span class="btn btn-outline btn-block btn-lg" data-el="report-another-after" data-shown="0"><c-icon name="plus" />Report another</span>
+          </div>
+        </div>
+
+        <div data-el="seat-page" data-shown="0">
+          <c-back href="" label="Report" />
+          <c-page-header title="14" subtitle="Hall A" />
+          <div data-el="to-show">
+            <section class="card-box mb-4 flex flex-col gap-4">
+              <p class="flex items-start gap-2 text-sm text-muted"><span class="label-chip">3b</span><span class="line-clamp-2">{{ question }}</span></p>
+              <p class="answer-to-show">{{ answer }}</p>
+            </section>
+            <span class="btn btn-primary btn-block btn-lg" data-el="delivered-button"><c-icon name="check" />Delivered to 14</span>
+          </div>
+          <div data-el="all-delivered" data-shown="0">
+            <c-empty icon="check" title="All delivered to 14" class="success" />
+            <span class="btn btn-outline btn-block btn-lg"><c-icon name="arrow-left" />Back to Deliver</span>
+          </div>
+        </div>
+        <c-landing.toast name="delivered">Delivered 3b to Hall A 14.</c-landing.toast>
+      </c-landing.phone>
+      <c-landing.tap />
+      <c-landing.pointer />
+    </div>
+  </div>
+  <c-landing.steps>
+    <c-landing.step name="Report" device="Invigilator's phone" />
+    <c-landing.step name="Answer" device="Examiner's computer" />
+    <c-landing.step name="Deliver" device="Invigilator's phone" />
+  </c-landing.steps>
+</div>
+{% endwith %}

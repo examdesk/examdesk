@@ -1,0 +1,3 @@
+<c-vars list=False />
+{# A demo's steps (c-landing.step): a bar under it, or with `list` a list beside it. #}
+<ol class="{% if list %}landing-step-list{% else %}landing-step-bar{% endif %}" aria-label="Steps">{{ slot }}</ol>

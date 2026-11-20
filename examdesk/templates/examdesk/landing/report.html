@@ -1,0 +1,85 @@
+{# The reporting demo: a seat joins a clarification already asked, then a new one is filled in from a photo. #}
+<div class="landing-split" data-demo="report">
+  <c-landing.steps list>
+    <c-landing.step name="Seat and question">Type the seat and the question number.</c-landing.step>
+    <c-landing.step name="Already asked">Clarifications about the same question show first. Tap one and the seat joins it.</c-landing.step>
+    <c-landing.step name="New question">Otherwise type it, or take a photo and AI fills in the text.</c-landing.step>
+  </c-landing.steps>
+  <div class="landing-stage-box" role="img" aria-label="An invigilator reports seat 27 and adds it to a clarification already asked about 3b, then reports seat 32 with a photo of a new question.">
+    <div class="landing-stage landing-phone-stage" inert aria-hidden="true">
+      <c-landing.phone exam="Algorithms Final" venue="Hall A" tab="report">
+        <div data-el="first-report-page">
+          <c-page-header title="Report a question" />
+          <div class="grid grid-cols-2 gap-3">
+            <label class="mb-0">Seat<input placeholder="e.g. B14" data-el="seat" data-text="27"></label>
+            <label class="mb-0">Question<input placeholder="e.g. 3b" data-el="label" data-text="3b"></label>
+          </div>
+          <div class="mt-6" data-el="matches" data-shown="0">
+            <h2 class="section-title">Already asked about 3</h2>
+            <div class="list-card mb-4">
+              <span class="match match-button" data-el="match">
+                <span class="flex flex-wrap items-center gap-1.5"><span class="label-chip">3b</span><c-state-badge :state="State.OPEN" /></span>
+                <span class="mt-1.5 block leading-snug font-medium">Is big-O enough or do you want the exact count?</span>
+                <span class="match-action">Same question<c-icon name="chevron-right" /></span>
+              </span>
+              <span class="match match-button">
+                <span class="flex flex-wrap items-center gap-1.5"><span class="label-chip">3a</span><c-state-badge :state="State.ANSWERED" /></span>
+                <span class="mt-1.5 block leading-snug font-medium">Can the array have duplicates?</span>
+                <span class="match-action">Same question<c-icon name="chevron-right" /></span>
+              </span>
+            </div>
+            <span class="btn btn-outline btn-block"><c-icon name="plus" />New clarification</span>
+          </div>
+        </div>
+
+        <div data-el="first-reported-page" data-shown="0">
+          <div class="mb-6 flex flex-col items-center pt-4 text-center">
+            <span class="mb-3 grid size-14 place-items-center rounded-full bg-green-600 text-white"><c-icon name="check" class="size-7" /></span>
+            <h1>Reported</h1>
+            <p class="mt-1 text-muted tabular-nums">Hall A 27 · 3b</p>
+          </div>
+          <article class="card-box mb-4">
+            <c-state-badge :state="ReportState.OPEN" class="mb-2" />
+            <p class="font-medium">Is big-O enough or do you want the exact count?</p>
+          </article>
+          <span class="btn btn-primary btn-block btn-lg" data-el="report-another"><c-icon name="plus" />Report another</span>
+        </div>
+
+        <div data-el="second-report-page" data-shown="0">
+          <c-page-header title="Report a question" />
+          <div class="grid grid-cols-2 gap-3">
+            <label class="mb-0">Seat<input placeholder="e.g. B14" data-el="second-seat" data-text="32"></label>
+            <label class="mb-0">Question<input placeholder="e.g. 3b" data-el="second-label" data-text="3c"></label>
+          </div>
+          <div class="mt-6" data-el="new-question" data-shown="0">
+            <span class="btn btn-outline btn-block" data-el="new-button"><c-icon name="plus" />New clarification</span>
+            <div class="flex flex-col gap-3" data-el="new-form" data-shown="0">
+              <h2 class="section-title mb-0">New clarification</h2>
+              <textarea rows="3" placeholder="What is the student asking?" data-el="second-question" data-text="In 3c, can we assume the graph is connected?"></textarea>
+              <div class="flex items-start gap-3" data-el="photo" data-shown="0">
+                {% include "examdesk/landing/photo.svg" %}
+                <span class="meta mt-1 flex items-center gap-1.5" data-el="reading"><span class="loading loading-spinner loading-xs"></span>Reading</span>
+              </div>
+              <span class="btn btn-outline btn-block" data-el="photo-button"><c-icon name="camera" />Fill in from photo</span>
+              <span class="btn btn-primary btn-block btn-lg" data-el="save"><c-icon name="check" />Save clarification</span>
+            </div>
+          </div>
+        </div>
+
+        <div data-el="second-reported-page" data-shown="0">
+          <div class="mb-6 flex flex-col items-center pt-4 text-center">
+            <span class="mb-3 grid size-14 place-items-center rounded-full bg-green-600 text-white"><c-icon name="check" class="size-7" /></span>
+            <h1>Reported</h1>
+            <p class="mt-1 text-muted tabular-nums">Hall A 32 · 3c</p>
+          </div>
+          <article class="card-box mb-4">
+            <c-state-badge :state="ReportState.OPEN" class="mb-2" />
+            <p class="font-medium">In 3c, can we assume the graph is connected?</p>
+            {% include "examdesk/landing/photo.svg" with class="mt-3" %}
+          </article>
+        </div>
+      </c-landing.phone>
+      <c-landing.tap />
+    </div>
+  </div>
+</div>

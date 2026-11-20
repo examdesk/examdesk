@@ -1,0 +1,3 @@
+<c-vars name device="" />
+{# A step of a demo, with a track that fills as it plays. In a bar: its name and the device it happens on. In a list: its name and the slot. #}
+<li><button type="button" aria-current="false" data-step="{{ name }}">{% if slot.strip %}<span class="grid gap-1"><strong>{{ name }}</strong><span>{{ slot }}</span></span>{% else %}<span>{{ name }}{% if device %}<span class="font-normal text-subtle max-lg:hidden"> · {{ device }}</span>{% endif %}</span>{% endif %}<span class="landing-step-track"><span></span></span></button></li>

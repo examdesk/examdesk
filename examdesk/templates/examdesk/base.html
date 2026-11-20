@@ -18,6 +18,7 @@
   <script src="{% static 'examdesk/app.js' %}" defer></script>
 </head>
 <body{% if invigilator_screen %} class="invigilator"{% endif %}{% if member %} data-exam-view="{{ member.exam.pk }} {% if invigilator_screen %}invigilator{% else %}examiner{% endif %}"{% endif %} data-offline-after="{{ config.offline_after }}" data-late-after="{{ config.late_after }}" data-very-late-after="{{ config.very_late_after }}" data-photo-max-side="{{ config.photo_max_side }}" data-photo-max-bytes="{{ config.photo_max_bytes }}" hx-boost:inherited="true" hx-sync:inherited="body:replace">
+  {% block body %}
   <header class="appbar">
     <div class="appbar-row page-container">
       {% if invigilator_screen %}
@@ -50,6 +51,7 @@
     <datalist id="seats">{% for value in seats %}<option value="{{ value }}">{% endfor %}</datalist>
   </main>
   {% block after_main %}{% endblock %}
+  {% endblock %}
   <div id="toasts" class="toast toast-center toast-bottom z-50">
     {# A refresh leaves the messages to the page the send redirects to. #}
     {% if not is_refresh %}{% for message in messages|unique %}

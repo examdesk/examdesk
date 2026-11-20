@@ -1,40 +1,82 @@
 {% extends "examdesk/base.html" %}
-{% block appbar %}<a href="{% url 'account_login' %}" class="btn btn-ghost btn-sm">Sign in</a>{% endblock %}
-{% block content %}
-<section class="mx-auto flex max-w-2xl flex-col items-center pt-16 pb-12 text-center sm:pt-24">
-  <h1 class="text-4xl leading-tight font-semibold tracking-tight text-balance sm:text-5xl">Quiet halls, quick answers</h1>
-  <p class="mt-4 max-w-xl text-lg text-muted">Exam Desk brings clarifications from every venue to one place, and sends the answers back to the right seats.</p>
-  <div class="mt-8 flex flex-wrap justify-center gap-3">
-    {% if config.registration %}
-      <a href="{% url 'account_signup' %}" class="btn btn-primary btn-lg">Create an account</a>
-      <a href="{% url 'account_login' %}" class="btn btn-outline btn-lg">Sign in</a>
-    {% else %}
-      <a href="{% url 'account_login' %}" class="btn btn-primary btn-lg">Sign in</a>
-    {% endif %}
+{% load static %}
+{% block title %}Exam Desk{% endblock %}
+{% block body %}
+{% with github="https://github.com/examdesk/examdesk" %}
+{# Plain links: leaving the page loads the next one in full, which stops the demos. #}
+<div hx-boost:inherited="false" data-gsap="{% static 'examdesk/gsap-3.13.0.min.js' %}">
+<header class="appbar">
+  <div class="appbar-row page-container">
+    <a href="{% url 'home' %}" class="brand"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-7">Exam Desk</a>
+    <nav class="ml-auto flex items-center gap-1 max-lg:hidden" aria-label="Sections">
+      {% for id, name in sections %}<a class="rounded-field px-2.5 py-1.5 text-muted hover:text-base-content" href="#{{ id }}">{{ name }}</a>{% endfor %}
+    </nav>
+    <div class="ml-auto flex items-center gap-2 lg:ml-2">
+      <a href="{{ github }}" class="btn btn-ghost btn-sm btn-square" aria-label="GitHub"><c-github class="size-5" /></a>
+      <a href="{% url 'account_login' %}" class="btn btn-ghost btn-sm">Sign in</a>
+      {% if config.registration %}<a href="{% url 'account_signup' %}" class="btn btn-primary btn-sm max-sm:hidden">Create an account</a>{% endif %}
+    </div>
   </div>
-  <p class="mt-10 text-sm text-subtle">Invigilating? Open the exam link or scan the code you were given.</p>
+</header>
+
+<main>
+<section class="landing-hero-section">
+  <canvas class="landing-seats" aria-hidden="true" data-seats></canvas>
+  <div class="landing-intro">
+    <svg class="landing-logo" viewBox="0 0 32 32" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="4" fill="#bccbf7"/><rect x="1.5" y="17.5" width="13" height="13" rx="4" fill="#bccbf7"/><rect x="17.5" y="17.5" width="13" height="13" rx="4" fill="#bccbf7"/><g><path d="M21.5 1.5h5a4 4 0 0 1 4 4v5a4 4 0 0 1-4 4h-5q-1 0-1.96.3l-2.24.69q-1.14.35-.79-.79l.69-2.24q.3-.96.3-1.96v-5a4 4 0 0 1 4-4z" fill="#1d4ed8"/><path d="M20.6 8.3l2.3 2.3 4.5-4.7" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
+    <a class="inline-flex items-center gap-2 rounded-full border border-base-300 bg-base-100 px-3.5 py-1.5 text-sm font-medium text-muted hover:text-base-content" href="{{ github }}"><c-github class="size-4 text-base-content" />Open source on GitHub<c-icon name="arrow-right" class="size-3.5" /></a>
+    <h1>Answer a question once. Every seat that asked gets it.</h1>
+    <p class="max-w-2xl text-lg text-muted sm:text-xl">Invigilators report students' questions from their phones. Examiners answer from one list, and the answer goes back to the right seats in every hall.</p>
+    <div class="flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+      {% if config.registration %}<a class="btn btn-primary btn-lg" href="{% url 'account_signup' %}">Create an account</a>{% else %}<a class="btn btn-primary btn-lg" href="{% url 'account_login' %}">Sign in</a>{% endif %}
+      <a class="btn btn-outline btn-lg" href="#how-it-works">See how it works</a>
+    </div>
+    <p class="text-sm text-muted">Invigilating? Open the exam link or scan the code you were given.</p>
+  </div>
+  {% include "examdesk/landing/hero.html" %}
 </section>
-<ol class="mx-auto grid max-w-4xl gap-4 pb-8 text-center sm:grid-cols-3">
-  <li class="card-box">
-    <c-icon name="smartphone" class="size-6 text-primary" />
-    <h2 class="mt-3">Report</h2>
-    <p class="mt-1 text-sm text-muted">Invigilators enter the question, or a photo of it, with the seat.</p>
-  </li>
-  <li class="card-box">
-    <c-icon name="message-square-reply" class="size-6 text-primary" />
-    <h2 class="mt-3">Answer</h2>
-    <p class="mt-1 text-sm text-muted">Examiners answer from one list. Repeat questions are grouped.</p>
-  </li>
-  <li class="card-box">
-    <c-icon name="send" class="size-6 text-primary" />
-    <h2 class="mt-3">Deliver</h2>
-    <p class="mt-1 text-sm text-muted">Invigilators see which seats are waiting and read the answer out.</p>
-  </li>
-</ol>
-{% endblock %}
-{% block after_main %}
-<footer class="mx-auto max-w-6xl border-t border-base-300 px-4 py-8 text-center text-[13px] leading-6 text-subtle sm:px-6">
-  <p>© {% now "Y" %} Exam Desk. Built by educators for educators.</p>
-  <p>Part of <a href="https://edfab.org" class="font-medium text-muted underline decoration-base-300 underline-offset-2 hover:text-base-content hover:decoration-current">EdFab — Education Fabrication Lab</a></p>
+
+<c-landing.section id="report" icon="square-pen" name="Report" title="Report from the seat." description="Invigilators enter the seat and the question number on their phones. If another seat asked the same thing, this seat joins it.">
+  {% include "examdesk/landing/report.html" %}
+</c-landing.section>
+
+<c-landing.section id="answer" icon="message-square-reply" name="Answer" title="Answer once, for every seat." description="Clarifications from every hall arrive in one list, longest wait first. Merge duplicates and answer them together.">
+  {% include "examdesk/landing/answer.html" %}
+</c-landing.section>
+
+<c-landing.section id="deliver" icon="send" name="Deliver" title="Back to the right seat." description="Invigilators see which seats have an answer waiting, and who is already on the way.">
+  {% include "examdesk/landing/deliver.html" %}
+</c-landing.section>
+
+<c-landing.section id="features" icon="layout-grid" name="Features" title="Built for the exam hall.">
+  <ul class="mx-auto grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for icon_name, title, text in features %}
+    <li class="card-box flex gap-3.5"><span class="grid size-9 shrink-0 place-items-center rounded-lg bg-base-200 text-muted ring-1 ring-base-300 ring-inset"><c-icon name="{{ icon_name }}" /></span><div class="grid content-start gap-1"><h3 class="font-semibold">{{ title }}</h3><p class="text-muted">{{ text }}</p></div></li>
+    {% endfor %}
+  </ul>
+</c-landing.section>
+
+<section class="px-4 pb-12 sm:px-6 sm:pb-16">
+  <div class="card-box mx-auto grid max-w-6xl justify-items-center gap-6 px-6 py-14 text-center sm:px-6 sm:py-14">
+    <img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-10">
+    <h2 class="landing-heading">Run your next exam with Exam Desk.</h2>
+    <div class="flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+      {% if config.registration %}<a class="btn btn-primary btn-lg" href="{% url 'account_signup' %}">Create an account</a>{% else %}<a class="btn btn-primary btn-lg" href="{% url 'account_login' %}">Sign in</a>{% endif %}
+      <a class="btn btn-outline btn-lg" href="{{ github }}"><c-github class="size-5" />View on GitHub</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 pb-10 text-sm text-muted sm:px-6">
+  <div class="grid gap-1">
+    <span class="flex items-center gap-2 font-semibold tracking-tight text-base-content"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-5">Exam Desk</span>
+    <p>Built by educators, for educators.</p>
+    <p>Part of <a class="font-medium text-base-content hover:underline" href="https://edfab.org">EdFab</a>, the Education Fabrication Lab.</p>
+  </div>
+  <nav class="flex flex-wrap gap-x-4 gap-y-2 sm:ml-auto sm:gap-x-6" aria-label="Footer">{% for id, name in sections %}<a class="hover:text-base-content" href="#{{ id }}">{{ name }}</a>{% endfor %}<a class="hover:text-base-content" href="{{ github }}">GitHub</a></nav>
 </footer>
+</div>
+<script type="module" src="{% static 'examdesk/landing.js' %}"></script>
+{% endwith %}
 {% endblock %}

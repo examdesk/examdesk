@@ -18,6 +18,41 @@ from ..forms import ExamForm, NameForm
 from ..models import Clarification, Exam, Member, Report, Role
 from .common import flash_errors, redirect_next
 
+LANDING_SECTIONS = [
+    ("report", "Report"),
+    ("answer", "Answer"),
+    ("deliver", "Deliver"),
+    ("features", "Features"),
+]
+LANDING_FEATURES = [
+    (
+        "smartphone",
+        "No app, no account",
+        "Invigilators and examiners join from a link or QR code with just their name.",
+    ),
+    (
+        "map-pin",
+        "A view for each hall",
+        "Invigilators pick their venue and see only its seats and announcements.",
+    ),
+    (
+        "armchair",
+        "Every seat at a glance",
+        "Each seat shows whether it's waiting, has an answer to deliver, or is done.",
+    ),
+    (
+        "megaphone",
+        "Announcements, read out",
+        "Announce to every hall and see which halls have read it out.",
+    ),
+    ("radio", "Live on every screen", "New questions and answers appear without a reload."),
+    (
+        "sparkles",
+        "Bring your own AI",
+        "Connect an OpenAI-compatible API to read photos and draft answers from the exam paper.",
+    ),
+]
+
 
 @require_GET
 def home(request: HttpRequest) -> HttpResponse:
@@ -27,7 +62,17 @@ def home(request: HttpRequest) -> HttpResponse:
         visible |= Exam.objects.filter(owner_id=request.user.pk)
     paginator = Paginator(visible.distinct().order_by("-created_at"), settings.EXAMDESK_PAGE_SIZE)
     if not paginator.count and not request.user.is_authenticated:
-        return render(request, "examdesk/landing.html")
+        return render(
+            request,
+            "examdesk/landing.html",
+            {
+                "sections": LANDING_SECTIONS,
+                "features": LANDING_FEATURES,
+                "canned": settings.EXAMDESK_CANNED_ANSWERS,
+                "State": Clarification.State,
+                "ReportState": Report.State,
+            },
+        )
     page_obj = paginator.get_page(request.GET.get("page"))
     exams = list(page_obj)
     open_counts = dict(
