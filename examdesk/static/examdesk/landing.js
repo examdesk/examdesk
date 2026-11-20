@@ -57,9 +57,11 @@ function registerEffects() {
       .set(targets, { attr: { "data-shown": 1 } })
       .fromTo(targets, { autoAlpha: 0, y: 6 }, { autoAlpha: 1, y: 0, duration: 0.3, immediateRender: false }),
   );
+  // A zero-duration tween rather than a timeline of one set: GSAP never renders a zero-duration timeline again once
+  // past it, and a frame landing exactly on a set at a nested timeline's start can render it as not reached.
   register("hide", (targets) => {
     shownAtStart(targets);
-    return gsap.timeline().set(targets, { attr: { "data-shown": 0 } });
+    return gsap.to(targets, { attr: { "data-shown": 0 }, duration: 0, immediateRender: false });
   });
   register("swap", ([from, to]) => {
     shownAtStart([from]);
