@@ -408,11 +408,19 @@
     & [data-shown="0"] { display: none !important; }
     & [data-focus="1"] { @apply border-primary ring-3 ring-primary/15; }
   }
-  .landing-hero-stage > .landing-hero-window { @apply hidden lg:absolute lg:top-0 lg:left-0 lg:flex lg:h-[660px] lg:w-[822px]; }
+  .landing-hero-stage > .landing-hero-window { @apply absolute inset-0 flex lg:h-[660px] lg:w-[822px]; }
   .landing-hero-phone { @apply absolute top-0 left-0 lg:top-20 lg:left-[812px]; }
-  /* From lg, the device in use (`data-active`: phone, window or both) stands out and the other one fades under
-     a white overlay. Opacity would show the page behind it through. */
+  /* Below lg, the stage shows one device at a time: the window while the examiner works (`data-active=window`), else
+     the phone. From lg, the device in use (`data-active`: phone, window or both) stands out and the other one fades
+     under a white overlay. Opacity would show the page behind it through. */
   .landing-hero-stage {
+    @variant max-lg {
+      &:not([data-active=window]) > .landing-hero-window, &[data-active=window] > .landing-hero-phone { @apply opacity-0; }
+      &:not([data-active=window]) .landing-pointer { @apply hidden; }
+      @variant motion-safe {
+        > :is(.landing-hero-window, .landing-hero-phone) { transition: opacity 0.5s !important; }
+      }
+    }
     @variant lg {
       > :is(.landing-hero-window, .landing-hero-phone)::after {
         @apply pointer-events-none absolute inset-0 z-50 rounded-[inherit] bg-base-100 opacity-0 content-[''];
@@ -428,10 +436,13 @@
   }
 
   /* The examiner's window: its app bar over a page. Below lg, only the open clarification, as
-     the app shows it on a small screen. */
+     the app shows it on a small screen, or the queue with `data-view=queue`. */
   .landing-window {
     @apply relative flex h-full flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-100;
     box-shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 16px 40px -12px rgb(16 24 40 / 0.16), 0 48px 96px -40px rgb(16 24 40 / 0.22);
+  }
+  .landing-window .clarifications-layout[data-view=queue] {
+    @variant max-lg { > .queue { @apply flex; } > .clarification-pane { @apply hidden; } }
   }
   .landing-window-page {
     @apply min-h-0 flex-1 bg-base-200 p-4;
@@ -457,7 +468,6 @@
     @apply invisible absolute bottom-6 left-1/2 z-50 -translate-x-1/2 opacity-0;
     > .alert { @apply text-sm whitespace-nowrap shadow-lg; }
   }
-  .landing-hero-stage .landing-pointer { @apply max-lg:hidden; }
   .landing-dialog {
     @apply invisible absolute inset-0 z-40 grid place-items-center bg-gray-900/40 opacity-0;
     > .modal-box { @apply w-full bg-base-100 text-sm; }

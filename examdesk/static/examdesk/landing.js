@@ -239,6 +239,7 @@ function answerTimeline(timeline, $, [longestWait, merge, draft, announce]) {
 
   timeline
     .addLabel(merge, "+=1")
+    .set($("layout"), { attr: { "data-view": "clarification" } }, merge)
     .click($("duplicate-1-checkbox"), {}, merge)
     .set($("duplicate-1-checkbox"), { checked: true })
     .show($("merge"), {}, "<")
@@ -266,8 +267,10 @@ function answerTimeline(timeline, $, [longestWait, merge, draft, announce]) {
 
   timeline
     .addLabel(announce, "+=1.2")
+    .set($("layout"), { attr: { "data-view": "queue" } }, announce)
     .click($("row-2a"), {}, announce)
-    .set($("row-3b"), { attr: { "aria-current": "false" } })
+    .set($("layout"), { attr: { "data-view": "clarification" } })
+    .set($("row-3b"), { attr: { "aria-current": "false" } }, "<")
     .set($("row-2a"), { attr: { "aria-current": "page" } }, "<")
     .swap([$("pane-3b"), $("pane-2a")], {}, "<")
     .click($("2a-text"), {}, "+=0.6")
