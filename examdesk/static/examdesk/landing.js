@@ -1,10 +1,9 @@
 // The landing page (landing.html): the seat plan behind the headline, and the demos. Each demo is a GSAP timeline over
-// a stage of the app's own markup (examdesk/landing/*.html), switching its parts on and off (`data-shown`).
+// frames of the app's own pages (demos.py), showing one at a time per device (`data-shown`).
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const REPEAT_DELAY = 1.5;
 const EASE = "power2.inOut";
-const TYPING_SPEED = 28; // characters a second
 
 // GSAP's build sets a global and can't be imported: in a module it fails to assign `self.window`.
 function loadScript(src) {
@@ -42,35 +41,7 @@ const TypeTextPlugin = {
 };
 
 function registerEffects() {
-  const register = (name, effect, defaults = {}) =>
-    gsap.registerEffect({ name, effect, defaults, extendTimeline: true });
-
-  // Parts that start shown say so: a rewind restores the value an attribute had, and a missing one comes back as 0.
-  const shownAtStart = (targets) => {
-    for (const target of targets) target.dataset.shown ??= "1";
-  };
-
-  // A part shows, fading and rising in, or hides; or one part replaces another.
-  register("show", (targets) =>
-    gsap
-      .timeline()
-      .set(targets, { attr: { "data-shown": 1 } })
-      .fromTo(targets, { autoAlpha: 0, y: 6 }, { autoAlpha: 1, y: 0, duration: 0.3, immediateRender: false }),
-  );
-  // A zero-duration tween rather than a timeline of one set: GSAP never renders a zero-duration timeline again once
-  // past it, and a frame landing exactly on a set at a nested timeline's start can render it as not reached.
-  register("hide", (targets) => {
-    shownAtStart(targets);
-    return gsap.to(targets, { attr: { "data-shown": 0 }, duration: 0, immediateRender: false });
-  });
-  register("swap", ([from, to]) => {
-    shownAtStart([from]);
-    return gsap
-      .timeline()
-      .set(from, { attr: { "data-shown": 0 } })
-      .set(to, { attr: { "data-shown": 1 } })
-      .fromTo(to, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3, immediateRender: false });
-  });
+  const register = (name, effect) => gsap.registerEffect({ name, effect, extendTimeline: true });
 
   // The pointer curves over to the target and clicks: a ripple, and the target dips. A target the stage hides at
   // this width is clicked where the pointer is.
@@ -112,10 +83,9 @@ function registerEffects() {
     ([field], { speed }) =>
       gsap
         .timeline()
-        .set(field, { attr: { "data-focus": 1 } })
+        .set(field.closest(".ts-control") ?? field, { attr: { "data-focus": 1 } })
         .to(field, { typeText: field.dataset.text, duration: field.dataset.text.length / speed, ease: "none" })
-        .set(field, { attr: { "data-focus": 0 } }, "+=0.2"),
-    { speed: TYPING_SPEED },
+        .set(field.closest(".ts-control") ?? field, { attr: { "data-focus": 0 } }, "+=0.2"),
   );
 
   register("toast", ([toast]) =>
@@ -126,225 +96,74 @@ function registerEffects() {
   );
 }
 
-// A ghost button made primary, as Next is once its clarification is answered or closed.
-const primaryButton = (button) => ({ attr: { class: button.className.replace("btn-ghost", "btn-primary") } });
-
-// The hero (landing/hero.html): seat 14 reports a new question, the examiner opens and answers it, and the
-// invigilator delivers the answer.
-function heroTimeline(timeline, $, [report, answer, deliver]) {
-  // The device not in use dims (`data-active`); both stay lit while one hands something to the other.
-  const stage = $("report-page").closest(".landing-stage");
-
-  timeline
-    .addLabel(report)
-    .tap($("seat"), {}, "+=0.6")
-    .type($("seat"))
-    .tap($("label"))
-    .type($("label"))
-    .show($("new-question"), {}, "+=0.3")
-    .tap($("new-button"), {}, "+=0.6")
-    .swap([$("new-button"), $("new-form")])
-    .tap($("question"))
-    .type($("question"))
-    .tap($("save"), {}, "+=0.4")
-    .swap([$("report-page"), $("reported-page")])
-    .show($("row-3b"), {}, "+=0.4")
-    .set([$("clarifications-count"), $("open-count")], { innerText: 3 }, "<")
-    .set(stage, { attr: { "data-active": "both" } }, "<");
-
-  timeline
-    .addLabel(answer, "+=0.8")
-    .set(stage, { attr: { "data-active": "window" } }, answer)
-    .click($("row-3b"), {}, answer)
-    .set($("row-2a"), { attr: { "aria-current": "false" } })
-    .set($("row-3b"), { attr: { "aria-current": "page" } }, "<")
-    .swap([$("pane-2a"), $("pane-3b")], {}, "<")
-    .click($("3b-text"), {}, "+=0.6")
-    .type($("3b-text"))
-    .click($("3b-send"), {}, "+=0.3")
-    // Answered, 3b leaves the Open list.
-    .hide([$("3b-composer"), $("3b-wait"), $("row-3b")])
-    .show([$("3b-answer"), $("3b-answered"), $("to-deliver")], {}, "<")
-    .set($("3b-next"), primaryButton($("3b-next")), "<")
-    .set([$("clarifications-count"), $("open-count")], { innerText: 2 }, "<")
-    .set($("answered-count"), { innerText: 2 }, "<")
-    .toast($("sent-toast"), {}, "<")
-    .set(stage, { attr: { "data-active": "both" } }, "+=0.6")
-    .swap([$("reported-open"), $("reported-to-deliver")], {}, "<")
-    .swap([$("report-another"), $("report-another-after")], {}, "<")
-    .show([$("show-answer"), $("deliver-count")], {}, "<");
-
-  timeline
-    .addLabel(deliver, "+=1")
-    .set(stage, { attr: { "data-active": "phone" } }, deliver)
-    .tap($("show-answer"), {}, deliver)
-    .swap([$("reported-page"), $("seat-page")])
-    .tap($("delivered-button"), {}, "+=1.6")
-    .swap([$("to-show"), $("all-delivered")])
-    .hide([$("deliver-count"), $("withdraw")], {}, "<")
-    .toast($("delivered-toast"), {}, "<")
-    .swap([$("to-deliver"), $("delivered")], {}, "<")
-    .set(stage, { attr: { "data-active": "both" } }, "<")
-    .set({}, {}, "+=1.6");
+// Plays a demo's actions (demos.py) over its frames, each at its GSAP position: a pointer clicks on the window and a
+// finger taps the phone, fields fill a letter at a time, and each device shows its frames in turn.
+function playActions(timeline, stage, actions) {
+  const devices = Object.fromEntries(
+    [...stage.querySelectorAll("[data-device]")].map((device) => [
+      device.dataset.device,
+      { frames: [...device.querySelectorAll(".landing-frame")], index: 0 },
+    ]),
+  );
+  const frame = (device) => devices[device].frames[devices[device].index];
+  const find = ({ device, on }) =>
+    frame(device).querySelector(on) ?? console.error(`No ${on} in the ${device}'s frame ${devices[device].index}`);
+  for (const action of actions) {
+    const { position } = action;
+    switch (action.type) {
+      case "step":
+        timeline.addLabel(action.name, position);
+        break;
+      // The device shows its next frame at once, scrolled as the one before.
+      case "next_frame": {
+        const from = frame(action.device);
+        devices[action.device].index += 1;
+        const to = frame(action.device);
+        timeline
+          .set(to, { attr: { "data-shown": 1 } }, position)
+          .set(to.querySelector("main"), { scrollTop: () => from.querySelector("main").scrollTop }, "<")
+          .set(from, { attr: { "data-shown": 0 } }, "<");
+        break;
+      }
+      case "tap":
+        timeline[action.device === "phone" ? "tap" : "click"](find(action), {}, position);
+        break;
+      case "type": {
+        const field = find(action);
+        field.dataset.text = action.text;
+        timeline.type(field, { speed: action.speed }, position);
+        break;
+      }
+      case "set":
+        timeline.set(frame(action.device).querySelectorAll(action.on), action.props, position);
+        break;
+      // Attributes set, or with null removed, before the demo plays: GSAP can't set and restore some, e.g. `src`.
+      case "set_attributes":
+        for (const element of frame(action.device).querySelectorAll(action.on)) {
+          for (const [name, value] of Object.entries(action.attributes)) {
+            if (value === null) element.removeAttribute(name);
+            else element.setAttribute(name, value);
+          }
+        }
+        break;
+      case "scroll": {
+        const main = frame(action.device).querySelector("main");
+        const end = () => main.scrollHeight - main.clientHeight;
+        timeline.to(main, { scrollTop: end, duration: 0.5, ease: EASE }, position);
+        break;
+      }
+      case "toast":
+        timeline.toast(stage.querySelector(`[data-toast="${action.index}"]`), {}, position);
+        break;
+      case "set_active":
+        timeline.set(stage, { attr: { "data-active": action.on } }, position);
+        break;
+      case "pause":
+        timeline.set({}, {}, position);
+        break;
+    }
+  }
 }
-
-// Reporting (landing/report.html): seat 27 joins a clarification about 3b, then seat 32 reports 3c from a photo.
-function reportTimeline(timeline, $, [seatAndQuestion, alreadyAsked, newQuestion]) {
-  const question = $("second-question");
-  // The second report outgrows the screen, which scrolls to its end.
-  const screen = $("second-report-page").parentElement;
-  const toEnd = { scrollTop: () => screen.scrollHeight - screen.clientHeight, duration: 0.5, ease: EASE };
-  timeline
-    .addLabel(seatAndQuestion)
-    .tap($("seat"), {}, "+=0.5")
-    .type($("seat"))
-    .tap($("label"))
-    .type($("label"));
-
-  timeline
-    .addLabel(alreadyAsked, "+=0.5")
-    .show($("matches"), {}, alreadyAsked)
-    .tap($("match"), {}, "+=1.6")
-    .swap([$("first-report-page"), $("first-reported-page")]);
-
-  timeline
-    .addLabel(newQuestion, "+=1.4")
-    .tap($("report-another"), {}, newQuestion)
-    .swap([$("first-reported-page"), $("second-report-page")])
-    .tap($("second-seat"))
-    .type($("second-seat"))
-    .tap($("second-label"))
-    .type($("second-label"))
-    .show($("new-question"), {}, "+=0.3")
-    .tap($("new-button"), {}, "+=0.6")
-    .swap([$("new-button"), $("new-form")])
-    .to(screen, toEnd)
-    .tap($("photo-button"), {}, "+=0.4")
-    .show($("photo"))
-    .to(screen, toEnd, "<0.05")
-    .set($("photo-button"), { attr: { "aria-busy": "true" } }, "<")
-    .set(question, { attr: { placeholder: "Reading the photo…" } }, "<")
-    .set($("photo-button"), { attr: { "aria-busy": "false" } }, "+=1.2")
-    .set(question, { attr: { placeholder: question.placeholder } }, "<")
-    .to(question, { typeText: question.dataset.text, duration: 0.2, ease: "none" }, "<")
-    .show($.all("similarity"), {}, "+=0.3")
-    .tap($("save"), {}, "+=0.6")
-    .swap([$("second-report-page"), $("second-reported-page")])
-    .set({}, {}, "+=1.8");
-}
-
-// Answering (landing/answer.html): a duplicate of 3b arrives, both duplicates merge into it, an AI draft answers it,
-// and 2a's answer is announced from Send's menu.
-function answerTimeline(timeline, $, [longestWait, merge, draft, announce]) {
-  const counts = (open, answered, closed) =>
-    timeline
-      .set([$("clarifications-count"), $("open-count")], { innerText: open }, "<")
-      .set($("answered-count"), { innerText: answered }, "<")
-      .set($("closed-count"), { innerText: closed }, "<");
-
-  timeline
-    .addLabel(longestWait)
-    .show([$("row-duplicate-2"), $("duplicate-2"), $("select-all")], {}, "+=0.8")
-    .set($("duplicate-count"), { innerText: 2 }, "<");
-  counts(4, 1, 0);
-  timeline.swap([$("row-2a-wait"), $("row-2a-late")], {}, "+=1.4");
-
-  timeline
-    .addLabel(merge, "+=1")
-    .set($("layout"), { attr: { "data-view": "clarification" } }, merge)
-    .click($("duplicate-1-checkbox"), {}, merge)
-    .set($("duplicate-1-checkbox"), { checked: true })
-    .show($("merge"), {}, "<")
-    .click($("duplicate-2-checkbox"))
-    .set($("duplicate-2-checkbox"), { checked: true })
-    .click($("merge"), {}, "+=0.3")
-    // Merged, the duplicates are closed and leave the Open list.
-    .hide([$("duplicates"), $("row-duplicate-1"), $("row-duplicate-2")])
-    .show([...$.all("merged-seat"), $("row-3b-seats")], {}, "<")
-    .toast($("merged-toast"), {}, "<");
-  counts(2, 1, 2);
-
-  timeline
-    .addLabel(draft, "+=1.2")
-    .click($("3b-draft"), {}, draft)
-    .type($("3b-text"), { speed: 90 }, "+=0.4")
-    .click($("3b-send"), {}, "+=0.6")
-    .hide([$("3b-composer"), $("3b-wait"), $("row-3b")])
-    .show([$("3b-answer"), $("3b-answered"), ...$.all("3b-to-deliver")], {}, "<")
-    .set($("3b-next"), primaryButton($("3b-next")), "<")
-    .toast($("sent-toast"), {}, "<");
-  counts(1, 2, 2);
-
-  timeline
-    .addLabel(announce, "+=1.2")
-    .set($("layout"), { attr: { "data-view": "queue" } }, announce)
-    .click($("row-2a"), {}, announce)
-    .set($("layout"), { attr: { "data-view": "clarification" } })
-    .set($("row-2a"), { attr: { "aria-current": "page" } }, "<")
-    .swap([$("pane-3b"), $("pane-2a")], {}, "<")
-    .click($("2a-text"), {}, "+=0.6")
-    .type($("2a-text"))
-    .click($("2a-send-menu-button"), {}, "+=0.3")
-    .show($("2a-send-menu"))
-    .click($("2a-announce"), {}, "+=0.4")
-    .hide($("2a-send-menu"))
-    .fromTo($("announce-dialog"), { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2, immediateRender: false })
-    .click($("announce-confirm"), {}, "+=0.9")
-    .to($("announce-dialog"), { autoAlpha: 0, duration: 0.2 })
-    // Closed, 2a leaves the Open list, and its seats can no longer be moved.
-    .swap([$("2a-composer"), $("2a-reopen")])
-    .hide([$("row-2a"), $("2a-wait"), $("clarifications-count")], {}, "<")
-    .hide($("pane-2a").querySelectorAll('[data-el="seat-actions"]'), {}, "<")
-    .show([$("empty"), $("2a-answer"), $("2a-announced"), $("announcements-count")], {}, "<")
-    .show($.all("2a-to-read-out"), {}, "<")
-    .set($("2a-next"), primaryButton($("2a-next")), "<")
-    .toast($("announced-toast"), {}, "<");
-  counts(0, 2, 3);
-  timeline.set({}, {}, "+=2");
-}
-
-// Delivering (landing/deliver.html): seat 8 is with Ben, so seat 14 is delivered, then comes back with a corrected
-// answer.
-function deliverTimeline(timeline, $, [seats, oneInvigilator, delivered, corrected]) {
-  const rows = $("list-page").querySelectorAll(".deliver-row");
-  timeline
-    .addLabel(seats)
-    .fromTo(rows, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, stagger: 0.15, immediateRender: false }, seats)
-    .set({}, {}, "+=1");
-
-  timeline
-    .addLabel(oneInvigilator, "+=0.4")
-    .show($("claim"), {}, oneInvigilator)
-    .set($("row-8"), { attr: { class: "deliver-row claimed" } }, "<")
-    .tap($("row-14"), {}, "+=1.4")
-    .swap([$("list-page"), $("seat-page")]);
-
-  timeline
-    .addLabel(delivered, "+=1.6")
-    .tap($("delivered-button"), {}, delivered)
-    .swap([$("to-show"), $("all-delivered")])
-    .set($("deliver-count"), { innerText: 2 }, "<")
-    .toast($("delivered-toast"), {}, "<");
-
-  timeline
-    .addLabel(corrected, "+=1.4")
-    .tap($("deliver-tab"), {}, corrected)
-    .swap([$("seat-page"), $("corrected-page")])
-    // The correction is newer than Ben's claim, so the claim ends.
-    .swap([$("old-answer"), $("new-answer")], {}, "+=0.9")
-    .hide([$("claim-corrected"), $("delivered-recently")], {}, "<")
-    .set($("row-8-corrected"), { attr: { class: "deliver-row" } }, "<")
-    .show($("row-corrected"), {}, "<")
-    .set($("deliver-count"), { innerText: 3 }, "<")
-    .set({}, {}, "+=2");
-}
-
-const TIMELINES = {
-  hero: heroTimeline,
-  report: reportTimeline,
-  answer: answerTimeline,
-  deliver: deliverTimeline,
-};
 
 // Scales the stage to its box.
 function fitStage(stage) {
@@ -375,17 +194,15 @@ function playDemo(root) {
   const stage = root.querySelector(".landing-stage");
   fitStage(stage);
   const pointer = stage.querySelector(".landing-pointer");
-  if (pointer) gsap.set(pointer, { autoAlpha: 1, x: stage.offsetWidth - 120, y: stage.offsetHeight - 40 });
+  // The pointer waits at the foot of the window.
+  const windowDevice = stage.querySelector('[data-device="window"]');
+  if (pointer) {
+    const x = windowDevice.offsetLeft + windowDevice.offsetWidth - 120;
+    gsap.set(pointer, { autoAlpha: 1, x, y: windowDevice.offsetTop + windowDevice.offsetHeight - 40 });
+  }
   const steps = [...root.querySelectorAll("[data-step]")];
   const timeline = gsap.timeline({ paused: true, defaults: { duration: 0.35, ease: "power2.out" } });
-  // The demo's parts by `data-el`: the first, or with `$.all` every one.
-  const $ = (name) => root.querySelector(`[data-el="${name}"]`);
-  $.all = (name) => [...root.querySelectorAll(`[data-el="${name}"]`)];
-  TIMELINES[root.dataset.demo](
-    timeline,
-    $,
-    steps.map((step) => step.dataset.step),
-  );
+  playActions(timeline, stage, JSON.parse(root.querySelector(".landing-stage-box > script").textContent));
   const starts = fillSteps(steps, timeline);
   steps.forEach((step, index) =>
     step.addEventListener("click", () => {

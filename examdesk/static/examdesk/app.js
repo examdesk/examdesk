@@ -271,11 +271,12 @@ const scheduleRefresh = () => {
   const delays = [...document.querySelectorAll("[data-refresh-in]")].map((part) => Number(part.dataset.refreshIn));
   if (delays.length) refreshTimer = setTimeout(refresh, Math.min(...delays) * 1000);
 };
-// Wait times count up as the `wait` and `wait_level` template filters render them.
+// Wait times count up as the `wait` and `wait_level` template filters render them, except in the
+// landing page's demos (inert).
 const lateAfter = Number(document.body.dataset.lateAfter);
 const veryLateAfter = Number(document.body.dataset.veryLateAfter);
 setInterval(() => {
-  document.querySelectorAll("[data-wait-since]").forEach((wait) => {
+  document.querySelectorAll("[data-wait-since]:not([inert] *)").forEach((wait) => {
     const seconds = Date.now() / 1000 - Number(wait.dataset.waitSince);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
@@ -590,7 +591,7 @@ document.addEventListener("keydown", (event) => {
   }
   if (!["j", "k"].includes(event.key) || event.ctrlKey || event.metaKey || event.altKey) return;
   if (event.target.closest("input, textarea, select, [contenteditable]") || document.querySelector("dialog[open]")) return;
-  const rows = [...document.querySelectorAll(".queue-row")];
+  const rows = [...document.querySelectorAll(".queue-row:not([inert] *)")];
   if (!rows.length) return;
   const current = rows.findIndex((row) => row.getAttribute("aria-current") === "page");
   const next = current === -1 ? 0 : current + (event.key === "j" ? 1 : -1);

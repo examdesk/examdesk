@@ -15,6 +15,7 @@ RUN uv sync --locked --no-dev --extra server \
     && python manage.py tailwind build \
     && python manage.py collectstatic --no-input \
     && python manage.py download_model \
+    && DATABASE_URL=sqlite://:memory: python manage.py build_demos \
     && rm -rf .django_tailwind_cli
 
 RUN useradd --system --uid 1000 examdesk && mkdir -p /data/media && chown -R examdesk /data

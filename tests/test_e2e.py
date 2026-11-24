@@ -4,6 +4,7 @@ import os
 import re
 import threading
 from collections.abc import Iterator
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -13,7 +14,8 @@ from django.core.asgi import get_asgi_application
 from playwright.sync_api import Browser, Page, Route, expect
 from pytest_django.fixtures import Settings
 
-from examdesk import services
+from examdesk import demos, services
+from examdesk.views import exams
 from tests.helpers import named, report
 
 # Playwright's sync API runs an event loop; the ORM calls here are still synchronous.
@@ -293,3 +295,21 @@ def test_a_clarification_pane_is_inert_while_another_loads(
         route.continue_()
     expect(wording).to_contain_text("Can we use a calculator?")
     expect(pane).not_to_have_attribute("inert", "")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_landing_demos_find_what_they_act_on(
+    server: str, browser: Browser, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(exams, "DEMOS", tmp_path / "demos.json")
+    demos.save(exams.DEMOS)
+    exams.landing_demos.cache_clear()
+    page = browser.new_page()
+    errors: list[str] = []
+    page.on(
+        "console", lambda message: errors.append(message.text) if message.type == "error" else None
+    )
+    page.on("pageerror", lambda error: errors.append(error.message))
+    page.goto(server)
+    expect(page.locator("[data-step][aria-current=true]").first).to_be_visible()
+    assert errors == []

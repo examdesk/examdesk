@@ -58,6 +58,7 @@ uv run manage.py createcachetable
 uv run manage.py download_model
 uv run manage.py tailwind build
 uv run manage.py collectstatic --no-input
+DATABASE_URL=sqlite://:memory: uv run manage.py build_demos
 uv run gunicorn examdesk.asgi --worker-class uvicorn_worker.UvicornWorker --bind 127.0.0.1:8000 --workers 3
 ```
 
@@ -121,6 +122,7 @@ uv sync
 uv run manage.py migrate
 uv run manage.py createcachetable
 uv run manage.py download_model
+DATABASE_URL=sqlite://:memory: uv run manage.py build_demos   # the landing page's demos
 uv run manage.py createsuperuser
 uv run manage.py tailwind watch   # in its own terminal
 DJANGO_DEBUG=1 uv run uvicorn examdesk.asgi:application --reload --timeout-graceful-shutdown 1

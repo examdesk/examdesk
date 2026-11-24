@@ -1,6 +1,10 @@
 """The list of exams, joining and leaving one, names, and what both roles share."""
 
+import json
 from collections import Counter
+from functools import cache
+from pathlib import Path
+from typing import Any
 
 from django.conf import settings
 from django.contrib import messages
@@ -17,6 +21,16 @@ from ..access import HtmxRequest, StaffRequest, exam_view, forbidden
 from ..forms import ExamForm, NameForm
 from ..models import Clarification, Exam, Member, Report, Role
 from .common import flash_errors, redirect_next
+
+DEMOS = Path(__file__).parent.parent / "demos.json"
+
+
+@cache
+def landing_demos() -> dict[str, Any]:
+    """As `manage.py build_demos` saved them (demos.py); none if it hasn't run."""
+    demos: dict[str, Any] = json.loads(DEMOS.read_text()) if DEMOS.exists() else {}
+    return demos
+
 
 LANDING_SECTIONS = [
     ("report", "Report"),
@@ -71,8 +85,7 @@ def home(request: HttpRequest) -> HttpResponse:
             {
                 "sections": LANDING_SECTIONS,
                 "features": LANDING_FEATURES,
-                "State": Clarification.State,
-                "ReportState": Report.State,
+                "demos": landing_demos(),
             },
         )
     query = request.GET.get("q", "").strip()

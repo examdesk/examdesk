@@ -1,0 +1,15 @@
+<c-vars demo />
+{# A demo (demos.py) on its window, its phone or both, each showing the pages it steps through in turn, with the actions to play as JSON. #}
+<div class="landing-stage-box" role="img" aria-label="{{ demo.description }}">
+  <div class="landing-stage landing-{{ demo.layout }}-stage" inert aria-hidden="true" hx-ignore{% if demo.layout == "hero" %} data-active="phone"{% endif %}>
+    {% for device, frames in demo.frames.items %}
+      <div class="landing-{{ device }}" data-device="{{ device }}"><div class="landing-screen">
+        {% for frame in frames %}<div class="landing-frame" data-shown="{% if forloop.first %}1{% else %}0{% endif %}">{{ frame|safe }}</div>{% endfor %}
+        {% for toast_device, text in demo.toasts %}{% if toast_device == device %}<div class="landing-toast" data-toast="{{ forloop.counter0 }}"><div class="alert success"><c-icon name="circle-check" /><span>{{ text }}</span></div></div>{% endif %}{% endfor %}
+      </div></div>
+    {% endfor %}
+    {% if "phone" in demo.frames %}<div class="landing-tap"></div>{% endif %}
+    {% if "window" in demo.frames %}<div class="landing-pointer"><svg viewBox="0 0 24 24" class="size-5.5"><path d="M5 3l14 8.5-6.2 1.4L9.6 19z" fill="#fff" stroke="#101828" stroke-width="1.4" stroke-linejoin="round"/></svg><span></span></div>{% endif %}
+  </div>
+  {{ demo.actions|json_script }}
+</div>

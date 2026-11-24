@@ -8,3 +8,4 @@ __pycache__/
 .ruff_cache/
 /assets/
 .django_tailwind_cli/
+/examdesk/demos.json

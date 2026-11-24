@@ -1,3 +1,7 @@
-<c-vars list=False />
-{# A demo's steps (c-landing.step): a bar under it, or with `list` a list beside it. #}
-<ol class="{% if list %}landing-step-list{% else %}landing-step-bar{% endif %}" aria-label="Steps">{{ slot }}</ol>
+<c-vars demo list=False />
+{# A demo's steps, each with a track that fills as it plays: a bar under the demo with who uses each step, or with `list` a list beside it with what happens. #}
+<ol class="{% if list %}landing-step-list{% else %}landing-step-bar{% endif %}" aria-label="Steps">
+  {% for step in demo.steps %}
+    <li><button type="button" aria-current="false" data-step="{{ step.name }}">{% if list %}<span class="grid gap-1"><strong>{{ step.name }}</strong><span>{{ step.text }}</span></span>{% else %}<span>{{ step.name }}{% if step.device %}<span class="font-normal text-subtle max-lg:hidden"> · {{ step.device }}</span>{% endif %}</span>{% endif %}<span class="landing-step-track"><span></span></span></button></li>
+  {% endfor %}
+</ol>

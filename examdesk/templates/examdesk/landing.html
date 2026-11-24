@@ -33,19 +33,39 @@
     </div>
     <p class="text-sm text-muted">Invigilating? Open the exam link or scan the code you were given.</p>
   </div>
-  {% include "examdesk/landing/hero.html" %}
+  {% if demos %}
+  <div id="how-it-works" class="mx-auto mt-14 max-w-6xl scroll-mt-20 sm:mt-18" data-demo="hero">
+    <c-landing.stage :demo="demos.hero" />
+    <c-landing.steps :demo="demos.hero" />
+  </div>
+  {% endif %}
 </section>
 
 <c-landing.section id="report" icon="square-pen" name="Report" title="Report from the seat." description="Invigilators enter the seat and the question number on their phones. If another seat asked the same thing, this seat joins it.">
-  {% include "examdesk/landing/report.html" %}
+  {% if demos %}
+  <div class="landing-split" data-demo="report">
+    <c-landing.steps :demo="demos.report" list />
+    <c-landing.stage :demo="demos.report" />
+  </div>
+  {% endif %}
 </c-landing.section>
 
 <c-landing.section id="answer" icon="message-square-reply" name="Answer" title="Answer once, for every seat." description="Clarifications from every hall arrive in one list, longest wait first. Merge duplicates and answer them together.">
-  {% include "examdesk/landing/answer.html" %}
+  {% if demos %}
+  <div class="mx-auto max-w-6xl" data-demo="answer">
+    <c-landing.stage :demo="demos.answer" />
+    <c-landing.steps :demo="demos.answer" />
+  </div>
+  {% endif %}
 </c-landing.section>
 
 <c-landing.section id="deliver" icon="send" name="Deliver" title="Back to the right seat." description="Invigilators see which seats have an answer waiting, and who is already on the way.">
-  {% include "examdesk/landing/deliver.html" %}
+  {% if demos %}
+  <div class="landing-split landing-split-reverse" data-demo="deliver">
+    <c-landing.stage :demo="demos.deliver" />
+    <c-landing.steps :demo="demos.deliver" list />
+  </div>
+  {% endif %}
 </c-landing.section>
 
 <c-landing.section id="features" icon="layout-grid" name="Features" title="Built for the exam hall.">

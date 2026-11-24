@@ -92,7 +92,7 @@
 
   /* Page frame: one width for the app bar and the page */
   .page-container { @apply mx-auto w-full max-w-7xl px-4 sm:px-6; }
-  body.invigilator .page-container { @apply max-w-2xl sm:px-4; }
+  :is(body.invigilator, .landing-phone) .page-container { @apply max-w-2xl sm:px-4; }
   .page-header {
     @apply mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3;
     p { @apply mt-0.5 text-meta text-subtle; }
@@ -432,55 +432,66 @@
     & [data-shown="0"] { display: none !important; }
     & [data-focus="1"] { @apply border-primary ring-3 ring-primary/15; }
   }
-  .landing-hero-stage > .landing-hero-window { @apply absolute inset-0 flex lg:h-[660px] lg:w-[822px]; }
-  .landing-hero-phone { @apply absolute top-0 left-0 lg:top-20 lg:left-[812px]; }
+  .landing-hero-stage > .landing-window { @apply absolute inset-0 lg:h-[660px] lg:w-[822px]; --zoom: calc(822 / 960); }
+  .landing-hero-stage > .landing-phone { @apply absolute top-0 left-0 lg:top-20 lg:left-[812px]; }
   /* Below lg, the stage shows one device at a time: the window while the examiner works (`data-active=window`), else
      the phone. From lg, the device in use (`data-active`: phone, window or both) stands out and the other one fades
      under a white overlay. Opacity would show the page behind it through. */
   .landing-hero-stage {
     @variant max-lg {
-      &:not([data-active=window]) > .landing-hero-window, &[data-active=window] > .landing-hero-phone { @apply opacity-0; }
+      &:not([data-active=window]) > .landing-window, &[data-active=window] > .landing-phone { @apply opacity-0; }
       &:not([data-active=window]) .landing-pointer { @apply hidden; }
       @variant motion-safe {
-        > :is(.landing-hero-window, .landing-hero-phone) { transition: opacity 0.5s !important; }
+        > :is(.landing-window, .landing-phone) { transition: opacity 0.5s !important; }
       }
     }
     @variant lg {
-      > :is(.landing-hero-window, .landing-hero-phone)::after {
+      > :is(.landing-window, .landing-phone)::after {
         @apply pointer-events-none absolute inset-0 z-50 rounded-[inherit] bg-base-100 opacity-0 content-[''];
       }
-      &[data-active=phone] > .landing-hero-window, &[data-active=window] > .landing-hero-phone {
+      &[data-active=phone] > .landing-window, &[data-active=window] > .landing-phone {
         @apply grayscale-60 after:opacity-55;
       }
       @variant motion-safe {
-        > :is(.landing-hero-window, .landing-hero-phone) { transition: filter 0.5s !important; }
-        > :is(.landing-hero-window, .landing-hero-phone)::after { transition: opacity 0.5s; }
+        > :is(.landing-window, .landing-phone) { transition: filter 0.5s !important; }
+        > :is(.landing-window, .landing-phone)::after { transition: opacity 0.5s; }
       }
     }
   }
 
-  /* The examiner's window: its app bar over a page. Below lg, only the open clarification, as
-     the app shows it on a small screen, or the queue with `data-view=queue`. */
+  /* The examiner's window and the invigilator's phone, each showing the app's pages in turn
+     (demos.py). */
   .landing-window {
-    @apply relative flex h-full flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-100;
+    @apply relative h-full overflow-hidden rounded-2xl border border-base-300 bg-base-100;
     box-shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 16px 40px -12px rgb(16 24 40 / 0.16), 0 48px 96px -40px rgb(16 24 40 / 0.22);
   }
-  .landing-window .clarifications-layout[data-view=queue] {
-    @variant max-lg { > .queue { @apply flex; } > .clarification-pane { @apply hidden; } }
+  /* Rendered at the width of a real laptop or phone (1 / `--zoom` times the device's) and
+     scaled down to fit it. The scale also makes it the containing block of the pages' fixed
+     parts, so the tab bar stays at the foot of the screen. */
+  .landing-screen {
+    @apply relative origin-top-left overflow-hidden;
+    width: calc(100% / var(--zoom, 1));
+    height: calc(100% / var(--zoom, 1));
+    scale: var(--zoom, 1);
   }
-  .landing-window-page {
-    @apply min-h-0 flex-1 bg-base-200 p-4;
-    --pane-width: 22rem;
-    @variant max-lg { @apply bg-base-100 px-5; }
+  /* A page in its device: the app bar, then the page, which scrolls. Sticky bars are static and under the tab bar:
+     Safari misplaces sticky elements on a scaled screen. */
+  .landing-frame {
+    @apply absolute inset-0 flex flex-col overflow-hidden bg-base-200;
+    > main { @apply min-h-0 flex-1 overflow-hidden; }
+    :is(.appbar, .action-bar) { @apply static z-auto; }
   }
-  /* The invigilator's phone. Its text and controls are sized as on invigilator screens (`body.invigilator`). */
+  .landing-window .landing-frame { --pane-width: 22rem; > main { @apply flex flex-col; } }
+  /* The phone's text and controls are sized as on invigilator screens (`body.invigilator`). */
   .landing-phone {
     @apply h-[680px] w-[340px] rounded-[44px] bg-gray-900 p-2.5;
     box-shadow: 0 2px 4px rgb(16 24 40 / 0.1), 0 24px 48px -16px rgb(16 24 40 / 0.35);
   }
-  .landing-phone-screen { @apply relative flex h-full flex-col overflow-hidden rounded-[36px] bg-base-200; }
-  .landing-phone-screen > .appbar { @apply pt-5; }
-  .landing-phone-page { @apply relative min-h-0 flex-1 overflow-hidden px-4 pt-5 pb-4; }
+  .landing-phone {
+    --zoom: calc(320 / 375);
+    .landing-screen { @apply rounded-[42px]; }
+    .appbar { @apply pt-5; }
+  }
 
   .landing-pointer {
     @apply pointer-events-none invisible absolute top-0 left-0 z-60 opacity-0;
@@ -492,10 +503,8 @@
     @apply invisible absolute bottom-6 left-1/2 z-50 -translate-x-1/2 opacity-0;
     > .alert { @apply text-sm whitespace-nowrap shadow-lg; }
   }
-  .landing-dialog {
-    @apply invisible absolute inset-0 z-40 grid place-items-center bg-gray-900/40 opacity-0;
-    > .modal-box { @apply w-full bg-base-100 text-sm; }
-  }
+  /* Above the tab bar, as on invigilator screens. */
+  .landing-phone .landing-toast { @apply bottom-20; }
 
   /* A demo's steps: a bar under it, each step's track filling as it plays. */
   .landing-step-bar {
@@ -624,12 +633,11 @@
   }
   .modal-action { @apply mt-6 gap-2; }
   .modal-backdrop { @apply bg-gray-900/40; }
-  /* daisyUI's dock is fixed to the window; in a landing demo it sits at the foot of the phone. */
-  .landing-phone .dock { @apply relative shrink-0; }
-  /* A dialog in a demo shows as daisyUI shows an open one. */
-  .landing-dialog > .modal-box { @apply translate-0 scale-100 opacity-100; }
-  /* A menu in a demo, open above its button, where the app's popover flips with no room below. */
-  .landing-stage .menu-panel.landing-menu { @apply absolute right-0 bottom-full z-30 mt-0 mb-2 flex; }
+  /* A dialog or menu a demo opens (`data-open`), as daisyUI shows an open dialog, and the menu
+     above its button, where the app's popover flips with no room below. */
+  .landing-stage .modal[data-open="1"] { @apply pointer-events-auto visible absolute grid opacity-100; > .modal-box { @apply translate-0 scale-100 opacity-100; } }
+  .landing-stage .answer-composer { @apply relative; }
+  .landing-stage .menu-panel[data-open="1"] { @apply absolute right-4 bottom-14 z-30 m-0 flex [position-area:none]; }
   .dock {
     @apply border-t border-base-300 bg-base-100/95 backdrop-blur;
     padding-inline: max(0.5rem, (100% - var(--container-2xl)) / 2 + 1rem);
