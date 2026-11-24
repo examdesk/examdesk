@@ -161,11 +161,14 @@
       <c-dialog id="merge-dialog" title="Merge into another clarification" action="{% url 'examiner:merge_clarifications' pk %}" submit="Merge">
         <input type="hidden" name="source" value="{{ clarification.pk }}">
         <input type="hidden" name="next" value="{% url 'examiner:clarification' pk clarification.pk %}">
-        <select name="target" aria-label="Merge into" required>
-          <option value="">Pick a clarification…</option>
-          {% for other in others %}<option value="{{ other.pk }}">{{ other|titled }}</option>{% endfor %}
-        </select>
+        {% partial clarification_choices %}
       </c-dialog>
+      {% if others or reports|length > 1 %}
+        {# Each seat's Move button fills in its action and title. #}
+        <c-dialog id="move-dialog" title="Move seat" submit="Move">
+          {% with new_clarification=True %}{% partial clarification_choices %}{% endwith %}
+        </c-dialog>
+      {% endif %}
     {% endif %}
   </c-live>
 </div>
@@ -178,21 +181,35 @@
     {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<c-photo-viewer id="photo-{{ report.pk }}" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}" class="mt-2.5 block w-fit"><img class="max-h-36 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>{% endif %}
     {% if can_answer %}
       <div class="-mx-1.5 mt-3 -mb-1.5 flex gap-1 border-t border-base-300 pt-1.5">
-        <button type="button" class="btn btn-ghost btn-xs font-normal text-muted" commandfor="move-{{ report.pk }}" command="show-modal"><c-icon name="arrow-right-left" />Move</button>
+        {% if others or reports|length > 1 %}<button type="button" class="btn btn-ghost btn-xs font-normal text-muted" commandfor="move-dialog" command="show-modal" data-dialog-action="{% url 'examiner:move_report' pk report.pk %}" data-dialog-title="Move {{ report.venue }} {{ report.seat }}"><c-icon name="arrow-right-left" />Move</button>{% endif %}
         <button type="button" class="btn btn-ghost btn-danger btn-xs font-normal" commandfor="delete-report-{{ report.pk }}" command="show-modal"><c-icon name="trash-2" />Delete</button>
       </div>
     {% endif %}
   </div>
   {% if can_answer %}
     <c-delete-report-dialog :report="report" next="{% url 'examiner:clarification' pk clarification.pk %}" />
-    <c-dialog id="move-{{ report.pk }}" title="Move {{ report.venue }} {{ report.seat }}" action="{% url 'examiner:move_report' pk report.pk %}" submit="Move">
-      <select name="target" aria-label="Move to">
-        {% if reports|length > 1 %}<option value="new">New clarification</option>{% endif %}
-        {% for other in others %}<option value="{{ other.pk }}">{{ other|titled }}</option>{% endfor %}
-      </select>
-    </c-dialog>
   {% endif %}
 {% endwith %}{% endpartialdef %}
+
+{% partialdef clarification_choices %}
+  <div class="relative">
+    <c-icon name="search" class="pointer-events-none absolute top-1/2 left-3 z-10 -translate-y-1/2 text-subtle" />
+    <input type="search" class="h-9 pl-9 text-sm" placeholder="Find a clarification" aria-label="Find a clarification" autocomplete="off" data-filter>
+  </div>
+  <div class="choice-list" role="radiogroup" aria-label="Clarifications">
+    {% if new_clarification and reports|length > 1 %}<label class="queue-row"><input type="radio" name="target" value="new" class="sr-only" required><span class="flex items-center gap-2"><c-icon name="plus" />New clarification</span></label>{% endif %}
+    {% for other in others %}
+      <label class="queue-row" data-filter-item>
+        <input type="radio" name="target" value="{{ other.pk }}" class="sr-only" required>
+        <span><span class="queue-row-meta">
+          {% if other.state != "open" %}<c-state-badge :state="other.state" />{% endif %}
+          {% with seats=other.reports.all|length %}{% if seats > 1 %}<span class="inline-flex items-center gap-1" title="Seats"><c-icon name="users" />{{ seats }}</span>{% endif %}{% endwith %}
+        </span>{% if other.label %}<span class="label-chip mr-1.5">{{ other.label }}</span>{% endif %}{{ other.summary }}</span>
+      </label>
+    {% endfor %}
+    <div data-filter-empty hidden><c-empty icon="search" title="No clarifications match" /></div>
+  </div>
+{% endpartialdef %}
 
 {% partialdef duplicates %}{% if duplicates %}{% with pk=member.exam.pk %}
   <section class="group" aria-labelledby="duplicates-title">

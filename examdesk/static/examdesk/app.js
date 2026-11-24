@@ -308,14 +308,34 @@ document.addEventListener("submit", (event) => {
   event.stopImmediatePropagation();
   showNotSent();
 }, true);
-// Validate the opener's form before showing a dialog, and fill its [data-quote] fields.
+// Before showing a dialog: validate the opener's form, fill the [data-quote] fields, set the
+// form action and title from the opener's data-dialog-action and data-dialog-title, and reset a
+// form with a [data-filter] box.
 document.addEventListener("command", (event) => {
   if (event.command !== "show-modal") return;
   if (event.source.form && !event.source.form.reportValidity()) return event.preventDefault();
-  event.target.querySelectorAll("[data-quote]").forEach((quote) => {
+  const dialog = event.target;
+  const form = dialog.querySelector("form");
+  dialog.querySelectorAll("[data-quote]").forEach((quote) => {
     quote[quote.localName === "input" ? "value" : "textContent"] = document.getElementById(quote.dataset.quote).value;
   });
+  const { dialogAction, dialogTitle } = event.source.dataset;
+  if (dialogAction) form.action = dialogAction;
+  if (dialogTitle) dialog.querySelector("h2").textContent = dialogTitle;
+  const filter = dialog.querySelector("[data-filter]");
+  if (filter) {
+    form.reset();
+    filterItems(filter);
+  }
 }, true);
+// A [data-filter] box shows the [data-filter-item]s that have each of its words.
+const filterItems = (filter) => {
+  const words = filter.value.toLowerCase().split(/\s+/).filter(Boolean);
+  const items = [...filter.form.querySelectorAll("[data-filter-item]")];
+  items.forEach((item) => (item.hidden = !words.every((word) => item.textContent.toLowerCase().includes(word))));
+  filter.form.querySelector("[data-filter-empty]").hidden = items.some((item) => !item.hidden);
+};
+document.addEventListener("input", (event) => event.target.matches("[data-filter]") && filterItems(event.target));
 // data-draft, data-retry, data-copy, data-clear (the photo) and data-show/data-hide buttons.
 const handleButtons = (event) => {
   const target = event.target;

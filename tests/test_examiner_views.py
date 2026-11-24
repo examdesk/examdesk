@@ -371,9 +371,9 @@ def test_move_to_an_unknown_clarification_is_refused(examiner: Client, exam: Exa
 
 def test_merge_asks_for_a_target_first(examiner: Client, exam: Exam) -> None:
     a = report(exam)
-    report(exam, seat="21")
+    b = report(exam, seat="21")
     assert (
-        '<option value="">Pick a clarification'
+        f'name="target" value="{b.clarification_id}" class="sr-only" required>'
         in examiner.get(url("examiner:clarification", exam, a.clarification_id)).content.decode()
     )
     back = url("examiner:clarification", exam, a.clarification_id)
@@ -403,12 +403,36 @@ def test_move_offers_new_clarification_only_with_several_seats(
     examiner: Client, exam: Exam
 ) -> None:
     single = report(exam).clarification
-    option = '<option value="new">New clarification</option>'
+    choice = 'name="target" value="new"'
     assert (
-        option not in examiner.get(url("examiner:clarification", exam, single.pk)).content.decode()
+        choice not in examiner.get(url("examiner:clarification", exam, single.pk)).content.decode()
     )
     report(exam, seat="21", clarification=single)
-    assert option in examiner.get(url("examiner:clarification", exam, single.pk)).content.decode()
+    assert choice in examiner.get(url("examiner:clarification", exam, single.pk)).content.decode()
+
+
+def test_seats_share_one_move_dialog(examiner: Client, exam: Exam) -> None:
+    first = report(exam)
+    second = report(exam, seat="21", clarification=first.clarification)
+    html = examiner.get(
+        url("examiner:clarification", exam, first.clarification_id)
+    ).content.decode()
+    assert html.count('id="move-dialog"') == 1
+    for seat in (first, second):
+        assert f'data-dialog-action="{url("examiner:move_report", exam, seat.pk)}"' in html
+        assert f'data-dialog-title="Move HALL1 {seat.seat}"' in html
+
+
+def test_merge_and_move_list_the_most_alike_first(examiner: Client, exam: Exam) -> None:
+    here = report(exam, text="Is x an integer?").clarification
+    unlike = report(exam, seat="21", label="Q5", text="Is y real?").clarification
+    alike = report(exam, seat="34", label="Q4", text="Is x an integer or a real?").clarification
+    html = examiner.get(url("examiner:clarification", exam, here.pk)).content.decode()
+    for dialog in ("merge-dialog", "move-dialog"):
+        start = html.index(f'id="{dialog}"')
+        choices = html[start : html.index("</dialog>", start)]
+        assert 'type="search"' in choices
+        assert choices.index(f'value="{alike.pk}"') < choices.index(f'value="{unlike.pk}"')
 
 
 def test_announce_from_a_clarification_uses_the_answer_box(examiner: Client, exam: Exam) -> None:

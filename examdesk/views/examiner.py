@@ -189,7 +189,7 @@ def clarification_page(
     reports = list(
         Report.objects.with_state().filter(clarification=clarification).select_related("member")
     )
-    related = list(unmerged_others(exam, clarification))
+    ranked = rank_similar(clarification.texts, unmerged_others(exam, clarification))
     current = clarification.current_answer
     context |= {
         "clarification": clarification,
@@ -201,14 +201,12 @@ def clarification_page(
         if clarification.wording
         else next((r for r in reports if r.photo), None),
         # with an AI service, replaced by `clarification_duplicates`
-        "duplicates": possible_duplicates(
-            clarification, rank_similar(clarification.texts, related)
-        ),
+        "duplicates": possible_duplicates(clarification, ranked),
         "answer_form": form,
         "reports": reports,
         "answers": clarification.answers.select_related("member"),
         "withdrawable": current and not current.deliveries.exists(),
-        "others": [other for other in related if not other.closed_reason],
+        "others": [other for other, _ in ranked if not other.closed_reason],
         "canned": settings.EXAMDESK_CANNED_ANSWERS,
         "label_form": label_form or LabelForm(initial={"label": clarification.label}),
         "correcting": correcting,

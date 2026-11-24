@@ -227,16 +227,19 @@
   .queue-rows { @apply min-h-0 flex-1 lg:overflow-y-auto; }
   .queue-row {
     @apply relative block border-b border-base-300 px-(--surface-padding) py-3 text-base-content last:border-b-0 hover:bg-base-200/60;
-    &[aria-current=page] { @apply bg-primary/6; &::before { content: ""; @apply absolute inset-y-0 left-0 w-0.5 bg-primary; } }
+    &[aria-current=page], &:has(> :checked) { @apply bg-primary/6; &::before { content: ""; @apply absolute inset-y-0 left-0 w-0.5 bg-primary; } }
+    &:has(> :focus-visible) { @apply outline-2 -outline-offset-2 outline-primary; }
     /* Two lines, the second fading out at its end when the text overflows (a scroll timeline is
        inactive without overflow). Not line-clamp: Safari counts the floated meta as a line. */
-    > p {
-      @apply max-h-10 overflow-hidden text-sm leading-5 font-medium;
+    > :last-child {
+      @apply block max-h-10 overflow-hidden text-sm leading-5 font-medium;
       animation: fade-overflowing-text both;
       animation-timeline: scroll(self);
     }
     .label-chip { @apply align-top; }
   }
+  /* Clarifications to pick from in a dialog, as queue rows. */
+  .choice-list { @apply max-h-[min(22rem,50dvh)] overflow-y-auto rounded-box border border-base-300; > .queue-row { @apply cursor-pointer; } }
   .queue-row-meta { @apply float-right ml-3 flex items-center gap-2 text-meta leading-5 font-normal text-subtle; }
   .queue-pagination { @apply flex shrink-0 items-center justify-between gap-2 border-t border-base-300 px-(--surface-padding) py-2 text-meta text-subtle; }
   /* A question label (Q3b), and a place: a venue and seat */
