@@ -226,21 +226,16 @@
   .queue-list { @apply flex min-h-0 flex-1 flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 lg:rounded-none lg:border-0; }
   .queue-rows { @apply min-h-0 flex-1 lg:overflow-y-auto; }
   .queue-row {
-    @apply relative block border-b border-base-300 px-(--surface-padding) py-3 text-base-content last:border-b-0 hover:bg-base-200/60;
+    @apply relative flex flex-col gap-1 border-b border-base-300 px-(--surface-padding) py-3 text-base-content last:border-b-0 hover:bg-base-200/60;
     &[aria-current=page], &:has(> :checked) { @apply bg-primary/6; &::before { content: ""; @apply absolute inset-y-0 left-0 w-0.5 bg-primary; } }
     &:has(> :focus-visible) { @apply outline-2 -outline-offset-2 outline-primary; }
-    /* Two lines, the second fading out at its end when the text overflows (a scroll timeline is
-       inactive without overflow). Not line-clamp: Safari counts the floated meta as a line. */
-    > :last-child {
-      @apply block max-h-10 overflow-hidden text-sm leading-5 font-medium;
-      animation: fade-overflowing-text both;
-      animation-timeline: scroll(self);
-    }
-    .label-chip { @apply align-top; }
   }
   /* Clarifications to pick from in a dialog, as queue rows. */
   .choice-list { @apply max-h-[min(22rem,50dvh)] overflow-y-auto rounded-box border border-base-300; > .queue-row { @apply cursor-pointer; } }
-  .queue-row-meta { @apply float-right ml-3 flex items-center gap-2 text-meta leading-5 font-normal text-subtle; }
+  /* The question label and signals, with the wait or state at the end; the question below. */
+  .queue-row-head { @apply flex items-center gap-2 text-meta text-subtle; }
+  .queue-row-status { @apply ml-auto flex items-center gap-2; }
+  .queue-row-text { @apply line-clamp-2 text-sm font-medium; }
   .queue-pagination { @apply flex shrink-0 items-center justify-between gap-2 border-t border-base-300 px-(--surface-padding) py-2 text-meta text-subtle; }
   /* A question label (Q3b), and a place: a venue and seat */
   .label-chip, .place-chip { @apply inline-flex items-center bg-base-200 text-xs font-semibold tabular-nums ring-1 ring-base-300 ring-inset; }
@@ -654,9 +649,6 @@
 .toast > .alert.success { animation: toast 250ms ease-out, fade-out 300ms 4s forwards; }
 body.invigilator > .toast { bottom: calc(var(--spacing) * 20 + env(safe-area-inset-bottom)); }
 @keyframes fade-out { to { opacity: 0; visibility: hidden; } }
-@keyframes fade-overflowing-text {
-  from, to { mask: linear-gradient(#000 0 0) top / 100% 1.25rem no-repeat, linear-gradient(to left, transparent, #000 3rem) bottom / 100% 1.25rem no-repeat; }
-}
 
 /* The headline's logo: the lit seat pops in, then the rest rises in. */
 @media (prefers-reduced-motion: no-preference) {

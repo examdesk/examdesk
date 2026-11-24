@@ -197,14 +197,16 @@
     <input type="search" class="h-9 pl-9 text-sm" placeholder="Find a clarification" aria-label="Find a clarification" autocomplete="off" data-filter>
   </div>
   <div class="choice-list" role="radiogroup" aria-label="Clarifications">
-    {% if new_clarification and reports|length > 1 %}<label class="queue-row"><input type="radio" name="target" value="new" class="sr-only" required><span class="flex items-center gap-2"><c-icon name="plus" />New clarification</span></label>{% endif %}
+    {% if new_clarification and reports|length > 1 %}<label class="queue-row"><input type="radio" name="target" value="new" class="sr-only" required><span class="flex items-center gap-2 text-sm font-medium"><c-icon name="plus" />New clarification</span></label>{% endif %}
     {% for other in others %}
       <label class="queue-row" data-filter-item>
         <input type="radio" name="target" value="{{ other.pk }}" class="sr-only" required>
-        <span><span class="queue-row-meta">
-          {% if other.state != "open" %}<c-state-badge :state="other.state" />{% endif %}
+        <span class="queue-row-head">
+          <span class="label-chip{% if not other.label %} font-medium text-subtle{% endif %}">{{ other.label|default:"No question" }}</span>
           {% with seats=other.reports.all|length %}{% if seats > 1 %}<span class="inline-flex items-center gap-1" title="Seats"><c-icon name="users" />{{ seats }}</span>{% endif %}{% endwith %}
-        </span>{% if other.label %}<span class="label-chip mr-1.5">{{ other.label }}</span>{% endif %}{{ other.summary }}</span>
+          {% if other.state != "open" %}<span class="queue-row-status"><c-state-badge :state="other.state" /></span>{% endif %}
+        </span>
+        <span class="queue-row-text">{{ other.summary }}</span>
       </label>
     {% endfor %}
     <div data-filter-empty hidden><c-empty icon="search" title="No clarifications match" /></div>

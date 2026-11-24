@@ -19,17 +19,20 @@
     {% for row in page_obj %}
       {% with item=row.clarification %}
       <a class="queue-row" href="{% url 'examiner:clarification' pk item.pk %}"{% if item.pk == clarification.pk %} aria-current="page"{% endif %} hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">
-        {# The meta floats beside the first line; the second takes the full width. #}
-        <p><span class="queue-row-meta">
+        <span class="queue-row-head">
+          <span class="label-chip{% if not item.label %} font-medium text-subtle{% endif %}">{{ item.label|default:"No question" }}</span>
+          {% if row.reports|length > 1 %}<span class="inline-flex items-center gap-1" title="Seats"><c-icon name="users" />{{ row.reports|length }}</span>{% endif %}
+          {% if item.photo_report_id %}<c-icon name="image" title="Photo" />{% endif %}
+          <span class="queue-row-status">
             {% if item.state != "open" and item.state != state %}<c-state-badge :state="item.state" />{% endif %}
-            {% if row.reports|length > 1 %}<span class="inline-flex items-center gap-1" title="Seats"><c-icon name="users" />{{ row.reports|length }}</span>{% endif %}
-            {% if item.photo_report_id %}<c-icon name="image" title="Photo" />{% endif %}
             {% if item.state == "open" and row.waiting_since %}
               <span class="wait {{ row.waiting_since|wait_level }}" data-wait-since="{{ row.waiting_since|date:'U' }}" data-wait-level title="Asked at {{ row.waiting_since|time:'H:i' }}">{{ row.waiting_since|wait }}</span>
             {% elif item.state == "answered" and row.unresolved %}
               <span class="font-medium text-blue-700">{{ row.unresolved }} to deliver</span>
             {% endif %}
-          </span>{% if item.label %}<span class="label-chip mr-1.5">{{ item.label }}</span>{% endif %}{{ item.summary }}</p>
+          </span>
+        </span>
+        <span class="queue-row-text">{{ item.summary }}</span>
       </a>
       {% endwith %}
     {% empty %}
