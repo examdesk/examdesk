@@ -109,6 +109,16 @@ document.addEventListener("htmx:finally:request", (event) => {
   loadingBar.dataset.state = "done";
   document.querySelectorAll("[aria-busy=true]:not(.btn)").forEach((element) => element.removeAttribute("aria-busy"));
 });
+// The first clarification beside the queue ([data-first-clarification]) loads again once the newer
+// request that aborted it (a tab, the same page) has swapped, if it is still on the page.
+let abortedFirstClarification = null;
+document.addEventListener("htmx:finally:request", ({ detail: { ctx } }) => {
+  if (ctx.request.signal.aborted && ctx.sourceElement.hasAttribute("data-first-clarification")) abortedFirstClarification = ctx.sourceElement;
+});
+document.addEventListener("htmx:after:swap", () => {
+  if (abortedFirstClarification?.isConnected) htmx.trigger(abortedFirstClarification, "retry");
+  abortedFirstClarification = null;
+});
 // A link that loads a clarification or a seat beside its list is marked current in the list at once.
 const listItemSelectors = { "clarification-pane": ".queue-row", "seat-pane": ".seat-pill" };
 document.addEventListener("htmx:before:request", (event) => {
@@ -146,8 +156,8 @@ const buzz = () => {
   try { sessionStorage.setItem("alerted", id); } catch {}
   navigator.vibrate?.(200);
 };
-// Each new exam version refreshes the live parts. With a dialog, an inline editor or a Tom Select
-// menu open, the refresh waits until it closes, since a morph would remove it. The pages of an
+// Each new exam version refreshes the live parts. With a dialog, a menu, an inline editor or a Tom
+// Select menu open, the refresh waits until it closes, since a morph would remove it. The pages of an
 // exam share its stream. A stream that hasn't opened or sent a message for `offlineAfter` has
 // dropped: the page shows the offline banner and reconnects. A request that couldn't reach the
 // server shows it too, until one does.
@@ -159,7 +169,7 @@ let lastMessageAt = Date.now();
 let connectedAt = 0;
 let requestFailed = false;
 let refreshPending = false;
-const isEditing = () => document.querySelector("dialog[open], [data-editor]:not([hidden]), .ts-wrapper.dropdown-active");
+const isEditing = () => document.querySelector("dialog[open], :popover-open, [data-editor]:not([hidden]), .ts-wrapper.dropdown-active");
 const refresh = () => {
   if (isEditing()) refreshPending = true;
   else htmx.trigger("#refresh", "exam-changed");
@@ -199,6 +209,7 @@ const syncEventSource = () => {
   connect();
 };
 document.addEventListener("close", flushRefresh, true);
+document.addEventListener("toggle", (event) => event.newState === "closed" && flushRefresh(), true);
 // A tab shown again, or a page whose timers stopped (a laptop asleep), reconnects a dropped stream
 // before showing the offline banner.
 const reconnectIfDropped = () => {
@@ -471,6 +482,8 @@ const enhance = (field) => {
     },
   };
   if (multi) settings.plugins = ["remove_button"];
+  // A single select in a filter bar (the sort) has a few options: no search box.
+  else if (autosubmit && field.localName === "select") settings.controlInput = null;
   if (field.localName === "input") {
     Object.assign(settings, {
       maxItems: 1,
@@ -510,7 +523,7 @@ htmx.onLoad((element) => {
   buzz();
   announceNewClarifications();
   if (queryAllIncludingSelf(element, "[data-refresh-in]").length) scheduleRefresh();
-  queryAllIncludingSelf(element, "select:not(.tomselected, [hidden], [data-native]), input[list]:not(.tomselected)").forEach(enhance);
+  queryAllIncludingSelf(element, "select:not(.tomselected, [hidden]), input[list]:not(.tomselected)").forEach(enhance);
 });
 document.addEventListener("click", (event) => {
   followRow(event);

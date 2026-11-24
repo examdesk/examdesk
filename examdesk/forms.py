@@ -176,7 +176,6 @@ class ExamFileForm(BaseForm):
 
 class ClarificationFilterForm(BaseForm):
     STATES = {
-        "all": "All",
         Clarification.State.OPEN: "Open",
         Clarification.State.ANSWERED: "Answered",
         "closed": "Closed",
@@ -201,7 +200,7 @@ class ClarificationFilterForm(BaseForm):
             "-wait": "Newest",
         },
         required=False,
-        widget=forms.Select(attrs={"aria-label": "Sort", "data-native": True}),
+        widget=forms.Select(attrs={"aria-label": "Sort"}),
     )
 
     def __init__(self, *args: Any, labels: Iterable[str], **kwargs: Any) -> None:

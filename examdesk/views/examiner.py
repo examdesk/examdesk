@@ -119,13 +119,12 @@ def queue(request: HtmxRequest, exam: Exam, query: QueryDict) -> dict[str, Any]:
     for clarification in found:
         tab = "closed" if clarification.closed_reason else clarification.state
         counts[tab] += 1
-        if state in ("all", tab):
+        if state == tab:
             reports = list(clarification.reports.all())
             unresolved = sum(r.state in Report.UNRESOLVED for r in reports)
             rows.append(
                 ClarificationRow(clarification, reports, unresolved, waiting_since(reports))
             )
-    counts["all"] = counts.total()
     sort = filters.get("sort") or "wait"
     rows.sort(key=SORT_KEYS["wait"])
     rows.sort(key=SORT_KEYS[sort.removeprefix("-")], reverse=sort.startswith("-"))  # ties by wait

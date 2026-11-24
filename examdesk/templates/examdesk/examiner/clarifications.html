@@ -12,12 +12,8 @@
         <a class="btn btn-primary btn-sm mt-5" href="{% url 'examiner:members' member.exam.pk %}?invite=invigilator"><c-icon name="user-plus" />Invite people</a>
       </div>
     {% elif rows %}
-      {% with first=rows.0.clarification %}
-      <c-empty icon="inbox" title="{{ rows|length }} {% if state == 'open' %}open{% else %}clarification{{ rows|length|pluralize }}{% endif %}">
-        <p><kbd>J</kbd> and <kbd>K</kbd> move through the list.</p>
-        <a class="btn btn-primary btn-sm mt-5" href="{% url 'examiner:clarification' member.exam.pk first.pk %}" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">Open {{ first.label|default:"clarification" }}<c-icon name="arrow-right" /></a>
-      </c-empty>
-      {% endwith %}
+      {# Opens the first clarification beside the queue; phones show only the queue. Queued behind the navigation that is still finishing; app.js retries it when a newer request aborts it. #}
+      <div data-first-clarification hx-get="{% url 'examiner:clarification' member.exam.pk page_obj.0.clarification.pk %}" hx-trigger="load[matchMedia('(min-width: 64rem)').matches], retry" hx-sync="body:queue last" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML" hx-replace-url="true"></div>
     {% endif %}
   </c-live>
 </div>

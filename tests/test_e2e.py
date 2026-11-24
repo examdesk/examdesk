@@ -69,6 +69,7 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
 
     # The examiner answers; the invigilator's Deliver badge and Waiting list follow.
     prof.get_by_role("link", name="Is x an integer?").click()
+    prof.get_by_role("button", name="Quick replies").click()
     prof.get_by_role("button", name="State your assumptions.").click()
     prof.get_by_role("button", name="Send", exact=True).click()
     prof.get_by_role("link", name="Seats").click()
@@ -131,23 +132,25 @@ def test_question_filter_applies_its_picks_when_closed(
     report(exam, seat="34", label="Q3b", text="Three?")
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
     prof.get_by_role("link", name="Clarifications").first.click()
+    expect(prof.locator("[data-clarification]")).to_be_visible()  # the first clarification opens
+    queue = prof.locator(".queue")
     search = prof.get_by_role("combobox", name="Questions")
     search.click()
     prof.get_by_role("option", name="Q3", exact=True).click()
     search.press_sequentially("10")
     search.press("Enter")  # picks Q10, and the menu stays open: nothing applied yet
-    expect(prof.get_by_text("Two?")).to_be_visible()
+    expect(queue.get_by_text("Two?")).to_be_visible()
     prof.keyboard.press("Escape")
-    expect(prof.get_by_text("Two?")).to_be_hidden()
-    expect(prof.get_by_text("Three?")).to_be_visible()  # Q3 covers Q3b
+    expect(queue.get_by_text("Two?")).to_be_hidden()
+    expect(queue.get_by_text("Three?")).to_be_visible()  # Q3 covers Q3b
     # Removing a pick with the menu closed applies at once.
     chips = prof.locator(".ts-wrapper.multi .item")
     chips.filter(has_text="Q10").get_by_role("button").click()
-    expect(prof.get_by_text("Ten?")).to_be_hidden()
+    expect(queue.get_by_text("Ten?")).to_be_hidden()
     expect(chips).to_have_count(1)
     # A state tab keeps the other filters.
-    prof.get_by_role("link", name="All", exact=True).click()
-    expect(prof).to_have_url(re.compile(r"state=all&label=Q3"))
+    prof.get_by_role("link", name="Answered").click()
+    expect(prof).to_have_url(re.compile(r"state=answered&label=Q3"))
     expect(chips).to_have_count(1)
 
 

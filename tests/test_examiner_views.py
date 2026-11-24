@@ -51,11 +51,11 @@ def test_clarification_filters_come_back_on_the_plain_url(examiner: Client, exam
     report(exam, label="Q3")
     page = url("examiner:clarifications", exam)
     assert examiner.get(page).status_code == 200
-    examiner.get(page + "?state=all&label=Q3&sort=seats")
+    examiner.get(page + "?state=answered&label=Q3&sort=seats")
     examiner.get(page + "?state=open", headers=REFRESH)  # a refresh does not save
     response = examiner.get(page)
     assert response.status_code == 302
-    assert response["Location"] == page + "?state=all&label=Q3&sort=seats"
+    assert response["Location"] == page + "?state=answered&label=Q3&sort=seats"
     # Going back to the plain URL shows it as it was.
     back = examiner.get(page, headers={"HX-Request": "true", "HX-History-Restore-Request": "true"})
     assert back.status_code == 200
@@ -64,13 +64,14 @@ def test_clarification_filters_come_back_on_the_plain_url(examiner: Client, exam
 def test_a_saved_filter_forgets_a_label_that_is_gone(examiner: Client, exam: Exam) -> None:
     r = report(exam, label="Q3b")
     page = url("examiner:clarifications", exam)
-    examiner.get(page + "?state=all&label=Q3b&sort=seats")
+    examiner.get(page + "?state=answered&label=Q3b&sort=seats")
     services.relabel_clarification(r.clarification, "Q4")
     html = examiner.get(page, follow=True).content.decode()
     assert "not one of the available choices" not in html
-    assert '<input type="hidden" name="state" value="all"' in html  # the other filters still apply
+    # the other filters still apply
+    assert '<input type="hidden" name="state" value="answered"' in html
     assert '<option value="seats" selected>' in html
-    assert examiner.get(page)["Location"] == page + "?state=all&sort=seats"
+    assert examiner.get(page)["Location"] == page + "?state=answered&sort=seats"
 
 
 def test_question_filter_picks_several_questions(examiner: Client, exam: Exam) -> None:
@@ -78,7 +79,7 @@ def test_question_filter_picks_several_questions(examiner: Client, exam: Exam) -
     report(exam, seat="21", label="Q5", text="Five?")
     report(exam, seat="34", label="Q31", text="Thirty-one?")
     html = examiner.get(
-        url("examiner:clarifications", exam) + "?label=Q3&label=Q5&state=all"
+        url("examiner:clarifications", exam) + "?label=Q3&label=Q5"
     ).content.decode()
     assert "Three?" in html  # Q3 covers Q3b
     assert "Five?" in html
@@ -96,8 +97,10 @@ def test_clarification_list_shows_state_chips(examiner: Client, exam: Exam) -> N
     )
     announced = report(exam, seat="21").clarification
     services.announce(text="!", member=named(exam, "Prof"), clarification=announced)
-    html = examiner.get(url("examiner:clarifications", exam) + "?state=all").content.decode()
-    assert icon_then("check", "Answered</span>") in html
+    page = url("examiner:clarifications", exam)
+    html = examiner.get(page + "?state=answered").content.decode()
+    assert "Answered</span>" not in html  # the tab says so
+    html = examiner.get(page + "?state=closed").content.decode()
     assert icon_then("megaphone", "Announced</span>") in html
 
 
@@ -277,8 +280,6 @@ def test_clarifications_sort_by_question_and_tabs_count_each_state(
         ("sort=question&amp;state=closed", "Closed", "0"),
     ]
     assert 'aria-current="true">Open<span class="num">2</span>' in html
-    html = examiner.get(page + "?state=all&sort=question").content.decode()
-    assert html.index("Two?") < html.index("Three?") < html.index("Ten?")
     html = examiner.get(page + "?state=answered").content.decode()
     assert "Three?" in html
     assert "Two?" not in html
@@ -399,7 +400,7 @@ def test_announce_from_a_clarification_uses_the_answer_box(examiner: Client, exa
     clarification = report(exam).clarification
     html = examiner.get(url("examiner:clarification", exam, clarification.pk)).content.decode()
     assert 'commandfor="announce-dialog" command="show-modal"><svg' in html
-    assert "Announce</button>" in html
+    assert "Announce…</button>" in html
     assert '<blockquote data-quote="answer-text"></blockquote>' in html
     assert '<input type="hidden" name="text" data-quote="answer-text">' in html
     response = examiner.post(
@@ -416,13 +417,13 @@ def test_queue_shows_seats_to_deliver_and_wait(examiner: Client, exam: Exam) -> 
     services.answer_clarification(
         r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
-    html = examiner.get(url("examiner:clarifications", exam) + "?state=all").content.decode()
-    assert '<span class="ml-auto font-medium text-blue-700">2 to deliver</span>' in html
+    html = examiner.get(url("examiner:clarifications", exam) + "?state=answered").content.decode()
+    assert '<span class="font-medium text-blue-700">2 to deliver</span>' in html
     assert 'title="Seats"' in html
     assert "data-wait-since" not in html  # answered: no wait
     open_one = report(exam, seat="34", label="Q5").clarification
     html = examiner.get(url("examiner:clarifications", exam) + "?state=open").content.decode()
-    assert re.search(r'<span class="wait ml-auto " data-wait-since="\d+" data-wait-level', html)
+    assert re.search(r'<span class="wait " data-wait-since="\d+" data-wait-level', html)
     assert f'href="{url("examiner:clarification", exam, open_one.pk)}"' in html
 
 
@@ -441,7 +442,7 @@ def test_clarification_page_lists_what_seats_asked_and_duplicates(
     html = examiner.get(
         url("examiner:clarification", exam, first.clarification_id)
     ).content.decode()
-    seats = html[html.index('id="seats-title"') : html.index("Possible duplicates")]
+    seats = html[html.index('aria-label="Seats"') : html.index("Possible duplicates")]
     assert seats.index("HALL1 14</a>") < seats.index("HALL1 21</a>")
     assert "Can x be negative?" in seats
     assert "Is x an integer?" not in seats  # the wording, shown above
@@ -582,6 +583,36 @@ def test_photo_shows_as_the_question_without_wording(
     html = examiner.get(
         url("examiner:clarification", exam, asked.clarification_id)
     ).content.decode()
-    question = html[html.index('aria-label="Question"') : html.index('id="seats-title"')]
+    start = html.index('aria-label="Question"')
+    question = html[start : html.index("</section>", start)]
     assert f'src="{url("photo", exam, asked.pk)}"' in question
-    assert html.count(f'src="{url("photo", exam, asked.pk)}"') == 1
+    assert html.count(f'src="{url("photo", exam, asked.pk)}"') == 2  # the photo and its viewer
+
+
+def test_seats_show_under_the_question(examiner: Client, exam: Exam) -> None:
+    clarification = report(exam).clarification
+    report(exam, seat="21", clarification=clarification)
+    html = examiner.get(url("examiner:clarification", exam, clarification.pk)).content.decode()
+    start = html.index('aria-label="Question"')
+    question = html[start : html.index("</section>", start)]
+    assert "HALL1 14</a>" in question
+    assert "HALL1 21</a>" in question
+
+
+def test_the_first_clarification_opens_beside_the_queue(examiner: Client, exam: Exam) -> None:
+    report(exam, text="Older?")
+    newer = report(exam, seat="21", label="Q5", text="Newer?").clarification
+    html = examiner.get(url("examiner:clarifications", exam) + "?sort=-wait").content.decode()
+    assert f'hx-get="{url("examiner:clarification", exam, newer.pk)}"' in html
+    assert "hx-trigger=\"load[matchMedia('(min-width: 64rem)').matches], retry\"" in html
+
+
+def test_clarification_actions_are_in_a_menu(examiner: Client, exam: Exam) -> None:
+    clarification = report(exam).clarification
+    report(exam, seat="21", label="Q5", text="Other?")
+    html = examiner.get(url("examiner:clarification", exam, clarification.pk)).content.decode()
+    start = html.index('id="clarification-menu"')
+    menu = html[start : html.index("</ul>", start)]
+    assert 'commandfor="relabel-dialog"' in menu
+    assert 'commandfor="merge-dialog"' in menu
+    assert "Open</span>" not in html[: html.index('aria-label="Question"')]

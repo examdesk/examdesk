@@ -216,7 +216,7 @@ def test_every_page_and_fragment_renders_with_data(
         (invigilator, url("invigilator:announcements", exam)),
         (
             examiner,
-            url("examiner:clarifications", exam) + "?state=all&label=Q3b&label=Q5&sort=-seats",
+            url("examiner:clarifications", exam) + "?state=answered&label=Q3b&label=Q5&sort=-seats",
         ),
         (examiner, url("examiner:clarification", exam, answered.clarification_id)),
         (examiner, url("examiner:seats", exam)),
@@ -337,7 +337,7 @@ def test_delivery_state_updates_on_refresh(
     services.mark_delivered(first, answer=answer, member=named(exam, "Bob"))  # another invigilator
     services.mark_delivered(second, answer=answer, member=named(exam, "Bob"))
     clarification_live = examiner.get(clarification_page, headers=REFRESH).content.decode()
-    seats = clarification_live[clarification_live.index('id="seats-title"') :]
+    seats = clarification_live[clarification_live.index('aria-label="Seats"') :]
     assert seats.count('class="badge state-delivered mt-0.5"') == 2
     deliver_live = invigilator.get(deliver_page, headers=REFRESH).content.decode()
     assert "Unmark</button>" in deliver_live

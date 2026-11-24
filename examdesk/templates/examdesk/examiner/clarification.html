@@ -11,16 +11,20 @@
     <div class="pane-header">
       <a href="{% url 'examiner:clarifications' pk %}" class="btn btn-ghost btn-sm btn-square -ml-2 lg:hidden" aria-label="Clarifications"><c-icon name="arrow-left" /></a>
       <h2 class="flex min-w-0 items-center gap-2.5">
-        {% if editable %}
-          <button type="button" class="label-chip h-6 cursor-pointer gap-1 text-sm hover:bg-base-300/60{% if not label %} font-medium text-subtle{% endif %}" commandfor="relabel-dialog" command="show-modal" title="Change question">{{ label|default:"No question" }}<c-icon name="chevron-down" class="size-3.5 text-subtle" /></button>
-        {% elif label %}<span class="label-chip h-6 text-sm">{{ label }}</span>{% endif %}
-        <c-state-badge :state="clarification.state" />
+        <span class="label-chip h-6 text-sm{% if not label %} font-medium text-subtle{% endif %}">{{ label|default:"No question" }}</span>
+        {% if clarification.state != 'open' %}<c-state-badge :state="clarification.state" />{% endif %}
       </h2>
-      {% if waiting_since and clarification.state == 'open' %}<span class="meta wait {{ waiting_since|wait_level }}" data-wait-since="{{ waiting_since|date:'U' }}" data-wait-level title="Asked at {{ waiting_since|time:'H:i' }}">{{ waiting_since|wait }}</span>{% endif %}
+      {% if waiting_since and clarification.state == 'open' %}<span class="meta wait lg:hidden {{ waiting_since|wait_level }}" data-wait-since="{{ waiting_since|date:'U' }}" data-wait-level title="Asked at {{ waiting_since|time:'H:i' }}">{{ waiting_since|wait }}</span>{% endif %}
       <div class="-mr-2 ml-auto flex items-center gap-1">
-        {% if can_answer and others %}<button type="button" class="btn btn-ghost btn-sm max-sm:btn-square" commandfor="merge-dialog" command="show-modal"><c-icon name="git-merge" /><span class="max-sm:sr-only">Merge</span></button>{% endif %}
+        {% if editable or can_answer and others %}
+          <button type="button" class="btn btn-ghost btn-sm btn-square" popovertarget="clarification-menu" style="anchor-name: --clarification-menu" aria-label="Actions"><c-icon name="ellipsis" /></button>
+          <ul class="menu-panel" id="clarification-menu" popover style="position-anchor: --clarification-menu">
+            {% if editable %}<li><button type="button" commandfor="relabel-dialog" command="show-modal"><c-icon name="tag" />Change question…</button></li>{% endif %}
+            {% if can_answer and others %}<li><button type="button" commandfor="merge-dialog" command="show-modal"><c-icon name="git-merge" />Merge…</button></li>{% endif %}
+          </ul>
+        {% endif %}
         {% if next_in_queue %}
-          <a href="{% url 'examiner:clarification' pk next_in_queue.pk %}" class="btn btn-sm max-sm:btn-square {% if clarification.state == 'open' %}btn-ghost{% else %}btn-primary{% endif %}" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body" title="Next (J)"><span class="max-sm:sr-only">Next</span><c-icon name="chevron-right" /></a>
+          <a href="{% url 'examiner:clarification' pk next_in_queue.pk %}" class="btn btn-sm max-sm:btn-square lg:hidden {% if clarification.state == 'open' %}btn-ghost{% else %}btn-primary{% endif %}" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body" title="Next (J)"><span class="max-sm:sr-only">Next</span><c-icon name="chevron-right" /></a>
         {% endif %}
       </div>
     </div>
@@ -51,23 +55,34 @@
         {% endif %}
         {% if question_photo %}
           {% url 'photo' pk question_photo.pk as photo %}
-          <a href="{{ photo }}" target="_blank" class="mt-3 block w-fit"><img class="max-h-80 rounded-lg border border-base-300" src="{{ photo }}" alt="Photo, {{ question_photo.venue }} {{ question_photo.seat }}"></a>
+          <c-photo-viewer id="photo-{{ question_photo.pk }}" src="{{ photo }}" alt="Photo, {{ question_photo.venue }} {{ question_photo.seat }}" class="mt-3 block w-fit"><img class="max-h-80 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>
+        {% endif %}
+        {% if reports %}
+          <div class="seat-list mt-2" role="group" aria-label="Seats">
+            {% for report in reports|slice:":5" %}{% partial seat_row %}{% endfor %}
+            {% if reports|length > 5 %}
+              <details class="group/more">
+                <summary class="cursor-pointer list-none text-meta font-medium text-primary hover:underline group-open/more:hidden">Show {{ reports|length|add:"-5" }} more</summary>
+                <div class="seat-list">{% for report in reports|slice:"5:" %}{% partial seat_row %}{% endfor %}</div>
+              </details>
+            {% endif %}
+          </div>
         {% endif %}
       </section>
 
       {% if clarification.current_answer %}
         <section class="rounded-box border border-green-600/20 bg-green-50/50 p-4" aria-labelledby="answer-title">
-          <div class="mb-1 flex min-h-8 flex-wrap items-center gap-x-2">
+          <div class="mb-1.5 flex flex-wrap items-center gap-x-2">
             <h2 id="answer-title" class="flex items-center gap-1.5 text-meta text-green-800"><c-icon name="check" />Answer</h2>
             <span class="meta">{{ clarification.current_answer.member.name }} · {{ clarification.current_answer.created_at|time:"H:i" }}</span>
             {% if can_answer %}
-              <div class="-mr-2 ml-auto flex gap-1">
-                <button type="button" class="btn btn-ghost btn-sm" data-show="correction" title="Correct answer"{% if correcting %} hidden{% endif %}><c-icon name="pen-line" /><span class="max-sm:sr-only">Correct answer</span></button>
+              <div class="-my-0.5 -mr-1.5 ml-auto flex gap-0.5">
+                <button type="button" class="btn btn-ghost btn-xs font-normal text-muted" data-show="correction" title="Correct answer"{% if correcting %} hidden{% endif %}><c-icon name="pen-line" /><span class="max-sm:sr-only">Correct answer</span></button>
                 {% if withdrawable %}
                   <form method="post" action="{% url 'examiner:withdraw_answer' pk clarification.pk %}">
                     {% csrf_token %}
                     <input type="hidden" name="expected_answer" value="{{ clarification.current_answer_id }}">
-                    <button class="btn btn-ghost btn-sm"><c-icon name="undo-2" />Withdraw</button>
+                    <button class="btn btn-ghost btn-xs font-normal text-muted"><c-icon name="undo-2" />Withdraw</button>
                   </form>
                 {% endif %}
               </div>
@@ -84,20 +99,6 @@
               </ul>
             </details>
           {% endif %}
-        </section>
-      {% endif %}
-      {% if reports %}
-        <section aria-labelledby="seats-title">
-          <h2 id="seats-title" class="section-title">Seats<span class="count">{{ reports|length }}</span></h2>
-          <div class="pane-list">
-            {% for report in reports|slice:":5" %}{% partial seat_row %}{% endfor %}
-            {% if reports|length > 5 %}
-              <details class="group/more">
-                <summary class="cursor-pointer list-none py-2.5 text-meta font-medium text-primary hover:underline group-open/more:hidden">Show {{ reports|length|add:"-5" }} more</summary>
-                <div class="pane-list">{% for report in reports|slice:"5:" %}{% partial seat_row %}{% endfor %}</div>
-              </details>
-            {% endif %}
-          </div>
         </section>
       {% endif %}
 
@@ -117,21 +118,30 @@
       <form method="post" action="{% url 'examiner:answer_clarification' pk clarification.pk %}" class="answer-composer" id="correction"{% if clarification.current_answer and not correcting %} hidden{% endif %}>
         {% csrf_token %}
         <input type="hidden" name="expected_answer" value="{{ answer_form.expected_answer.value|default_if_none:'' }}">
-        <div class="mb-2 flex flex-wrap gap-1.5">
-          {% if member.exam.has_ai_service %}<button type="button" class="reply-chip text-primary" data-draft="{% url 'examiner:draft_answer' pk clarification.pk %}"><c-icon name="sparkles" />Draft with AI</button>{% endif %}
-          {% for text in canned %}
-            <button type="button" class="reply-chip" onclick="this.form.text.value = this.textContent; this.form.text.focus()">{{ text }}</button>
-          {% endfor %}
-        </div>
         <textarea name="text" maxlength="{{ config.text_max }}" id="answer-text" rows="3" required aria-label="{% if clarification.current_answer %}Corrected answer{% else %}Answer{% endif %}" placeholder="{% if clarification.current_answer %}Corrected answer{% else %}Answer{% endif %}"{% if correcting %} autofocus{% endif %}>{{ answer_form.text.value|default:"" }}</textarea>
         {% if member.exam.has_ai_service %}<p class="meta mt-1" role="status" data-draft-failed hidden>Couldn't draft an answer.</p>{% endif %}
-        <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
-          {% if clarification.current_answer %}
-            <button type="button" class="btn btn-ghost btn-sm" data-hide="correction">Cancel</button>
-          {% else %}
-            <button type="button" class="btn btn-ghost btn-sm" title="Announce to all venues" commandfor="announce-dialog" command="show-modal"><c-icon name="megaphone" />Announce</button>
+        <div class="mt-3 flex flex-wrap items-center gap-1">
+          {% if member.exam.has_ai_service %}<button type="button" class="btn btn-ghost btn-sm max-sm:btn-square text-primary" data-draft="{% url 'examiner:draft_answer' pk clarification.pk %}" title="Draft with AI"><c-icon name="sparkles" /><span class="max-sm:sr-only">Draft</span></button>{% endif %}
+          {% if canned %}
+            <button type="button" class="btn btn-ghost btn-sm" popovertarget="quick-replies" style="anchor-name: --quick-replies">Quick replies<c-icon name="chevron-down" class="size-3.5 text-subtle" /></button>
+            <ul class="menu-panel" id="quick-replies" popover style="position-anchor: --quick-replies; position-area: top span-right">
+              {% for text in canned %}<li><button type="button" popovertarget="quick-replies" popovertargetaction="hide" onclick="this.form.text.value = this.textContent; this.form.text.focus()">{{ text }}</button></li>{% endfor %}
+            </ul>
           {% endif %}
-          <button class="btn btn-primary btn-sm" title="Ctrl+Enter or ⌘+Enter"><c-icon name="send" />{% if clarification.current_answer %}Send correction{% else %}Send{% endif %}</button>
+          <div class="ml-auto flex items-center gap-2">
+            {% if clarification.current_answer %}
+              <button type="button" class="btn btn-ghost btn-sm" data-hide="correction">Cancel</button>
+              <button class="btn btn-primary btn-sm" title="Ctrl+Enter or ⌘+Enter"><c-icon name="send" />Send correction</button>
+            {% else %}
+              <div class="join">
+                <button class="btn btn-primary btn-sm join-item" title="Ctrl+Enter or ⌘+Enter"><c-icon name="send" />Send</button>
+                <button type="button" class="btn btn-primary btn-sm btn-square join-item border-l-primary-content/25" popovertarget="send-menu" style="anchor-name: --send-menu" aria-label="More ways to send"><c-icon name="chevron-down" /></button>
+              </div>
+              <ul class="menu-panel" id="send-menu" popover style="position-anchor: --send-menu">
+                <li><button type="button" commandfor="announce-dialog" command="show-modal"><c-icon name="megaphone" />Announce…</button></li>
+              </ul>
+            {% endif %}
+          </div>
         </div>
       </form>
     {% elif editable and clarification.closed_reason %}
@@ -173,11 +183,11 @@
       <p class="flex flex-wrap items-baseline gap-x-2"><a href="{% seat_url 'examiner:seat' pk report.venue report.seat %}" class="font-medium hover:underline">{{ report.venue }} {{ report.seat }}</a><span class="meta">{{ report.member.name }} · {{ report.created_at|time:"H:i" }}</span></p>
       {% if report.text and report.text != clarification.wording %}<button type="button" class="mt-0.5 line-clamp-2 cursor-pointer text-left text-sm text-muted" onclick="this.classList.toggle('line-clamp-2')">{{ report.text }}</button>{% endif %}
     </div>
-    {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<a href="{{ photo }}" target="_blank" class="-my-1 shrink-0"><img class="size-7 rounded border border-base-300 object-cover" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}"></a>{% endif %}
+    {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<c-photo-viewer id="photo-{{ report.pk }}" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}" class="-my-1 shrink-0"><img class="size-7 rounded border border-base-300 object-cover" src="{{ photo }}" alt=""></c-photo-viewer>{% endif %}
     {% if report.state != "open" %}<c-state-badge :state="report.state" class="mt-0.5" />{% endif %}
     {% if can_answer %}
       <button type="button" class="btn btn-ghost btn-xs btn-square" popovertarget="report-menu-{{ report.pk }}" style="anchor-name: --report-{{ report.pk }}" aria-label="{{ report.venue }} {{ report.seat }}: actions"><c-icon name="ellipsis" /></button>
-      <ul class="menu-panel w-48" id="report-menu-{{ report.pk }}" popover style="position-anchor: --report-{{ report.pk }}">
+      <ul class="menu-panel" id="report-menu-{{ report.pk }}" popover style="position-anchor: --report-{{ report.pk }}">
         <li><button type="button" commandfor="move-{{ report.pk }}" command="show-modal"><c-icon name="arrow-right-left" />Move…</button></li>
         <li><button type="button" class="text-error" commandfor="delete-report-{{ report.pk }}" command="show-modal"><c-icon name="trash-2" />Delete…</button></li>
       </ul>

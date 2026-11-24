@@ -128,7 +128,6 @@
     > * + * { @apply border-t border-base-300; }
     > .row-item { @apply px-0 py-2.5; }
   }
-  details > .pane-list { @apply border-y-0; }
 
   /* Forms */
   .field { @apply mb-4 flex flex-col gap-1.5; }
@@ -229,8 +228,15 @@
   .queue-row {
     @apply relative block border-b border-base-300 px-(--surface-padding) py-3 text-base-content last:border-b-0 hover:bg-base-200/60;
     &[aria-current=page] { @apply bg-primary/6; &::before { content: ""; @apply absolute inset-y-0 left-0 w-0.5 bg-primary; } }
-    > p { @apply line-clamp-2 text-sm leading-5 font-medium; }
+    /* Two lines, the second fading out at its end. Not line-clamp: Safari counts the floated meta
+       as a line. */
+    > p {
+      @apply max-h-10 overflow-hidden text-sm leading-5 font-medium;
+      mask: linear-gradient(#000 0 0) top / 100% 1.25rem no-repeat, linear-gradient(to left, transparent, #000 3rem) bottom / 100% 1.25rem no-repeat;
+    }
+    .label-chip { @apply align-top; }
   }
+  .queue-row-meta { @apply float-right ml-3 flex items-center gap-2 text-meta leading-5 font-normal text-subtle; }
   .queue-pagination { @apply flex shrink-0 items-center justify-between gap-2 border-t border-base-300 px-(--surface-padding) py-2 text-meta text-subtle; }
   /* A question label (Q3b), and a place: a venue and seat */
   .label-chip, .place-chip { @apply inline-flex items-center bg-base-200 text-xs font-semibold tabular-nums ring-1 ring-base-300 ring-inset; }
@@ -252,6 +258,8 @@
     > .wording-edit-icon { @apply mt-1.5 ml-auto size-4 shrink-0 text-subtle opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100; }
   }
   .wording-editor { @apply -mx-2 flex items-start gap-2; }
+  /* The seats that asked, under the question. */
+  .seat-list { @apply flex flex-col gap-1.5; > .row-item { @apply p-0; } }
   .place-chip { @apply h-6 shrink-0 gap-1.5 rounded-md px-2 whitespace-nowrap; }
 
   /* Examiner seats: venues of seat pills, coloured by each seat's least advanced question, and a
@@ -352,6 +360,19 @@
   .ts-wrapper.focus .ts-control { @apply border-primary ring-3 ring-primary/15; }
   .filters .ts-control { @apply min-h-9; }
   .filters select { @apply h-9 min-h-9 text-sm; }
+  /* The sort select: borderless, with a sort icon. */
+  .filters .ts-wrapper.single {
+    @apply w-auto min-w-40; /* fits the longest option, so the filter keeps its width */
+    .ts-control {
+      @apply border-transparent bg-transparent pl-8 font-medium text-muted shadow-none hover:bg-base-200;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 16 4 4 4-4M7 20V4m14 4-4-4-4 4m4-4v16'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-position: left 0.625rem center, right 0.75rem center;
+      background-size: 1rem;
+      background-repeat: no-repeat;
+    }
+    &.focus .ts-control { @apply border-transparent bg-base-200 ring-0 outline-none; }
+    .ts-dropdown { @apply left-auto w-44; }
+  }
   .ts-dropdown {
     @apply absolute inset-x-0 top-full z-30 mt-1 rounded-box border border-base-300 bg-base-100 p-1 text-sm shadow-lg;
     .ts-dropdown-content { @apply max-h-60 overflow-y-auto; }
@@ -572,7 +593,7 @@
   }
   :is(.toast, .landing-toast) > .alert.success { @apply border-gray-900 bg-gray-900 text-white; }
   .menu-panel {
-    @apply menu w-56 rounded-box border border-base-300 bg-base-100 p-1.5 text-sm shadow-lg;
+    @apply menu w-max max-w-80 min-w-44 rounded-box border border-base-300 bg-base-100 p-1.5 text-sm shadow-lg;
     /* A popover below its button's right edge. */
     inset: auto;
     margin: 0.5rem 0 0;
@@ -588,6 +609,12 @@
   .modal-box.full-screen { @apply h-dvh max-h-none w-full max-w-none rounded-none; }
   .modal-box:has(.ts-wrapper) { @apply overflow-visible; } /* its menu may reach past the box */
   .modal-box > h2 { @apply mb-1 text-lg; }
+  /* A photo, full size (c-photo-viewer). */
+  .photo-viewer > .modal-box {
+    @apply relative w-auto max-w-[min(92vw,72rem)] overflow-hidden p-0;
+    > img { @apply max-h-[85dvh] w-auto object-contain; }
+    > .btn { @apply absolute top-3 right-3 border-0 bg-gray-900/60 text-white hover:bg-gray-900/80; }
+  }
   .modal-action { @apply mt-6 gap-2; }
   .modal-backdrop { @apply bg-gray-900/40; }
   /* daisyUI's dock is fixed to the window; in a landing demo it sits at the foot of the phone. */

@@ -4,11 +4,11 @@
   <div class="queue-toolbar">
     <c-live id="queue-tabs" as="nav" class="tabs tabs-box tabs-sm fill" aria-label="State">
       {{ form.state }}
-      {% for name, title, count in tabs %}<a class="tab gap-1.5" href="{% querystring query state=name page=None %}" hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs" hx-swap="outerHTML show:none"{% if name == state %} aria-current="true"{% endif %}>{{ title }}{% if name != "all" %}<span class="num">{{ count }}</span>{% endif %}</a>{% endfor %}
+      {% for name, title, count in tabs %}<a class="tab gap-1.5" href="{% querystring query state=name page=None %}" hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs" hx-swap="outerHTML show:none"{% if name == state %} aria-current="true"{% endif %}>{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
     </c-live>
     <form method="get" action="{{ request.path }}" id="queue-filters" class="filters flex gap-2" data-autosubmit hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs" hx-swap="outerHTML show:none">
       <c-live id="queue-label-filter" class="min-w-0 flex-1">{{ form.label }}</c-live>
-      <div class="w-34 shrink-0">{{ form.sort }}</div>
+      <div class="shrink-0">{{ form.sort }}</div>
       <noscript><button class="btn btn-outline btn-sm">Apply</button></noscript>
     </form>
     <c-error>{{ form|form_errors }}</c-error>
@@ -19,23 +19,21 @@
     {% for row in page_obj %}
       {% with item=row.clarification %}
       <a class="queue-row" href="{% url 'examiner:clarification' pk item.pk %}"{% if item.pk == clarification.pk %} aria-current="page"{% endif %} hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">
-        <div class="mb-1 flex items-center gap-2 text-meta text-subtle">
-          {% if item.label %}<span class="label-chip">{{ item.label }}</span>{% endif %}
-          {% if item.state != "open" and item.state != state %}<c-state-badge :state="item.state" />{% endif %}
-          {% if row.reports|length > 1 %}<span class="inline-flex items-center gap-1" title="Seats"><c-icon name="users" />{{ row.reports|length }}</span>{% endif %}
-          {% if item.photo_report_id %}<c-icon name="image" title="Photo" />{% endif %}
-          {% if item.state == "open" and row.waiting_since %}
-            <span class="wait ml-auto {{ row.waiting_since|wait_level }}" data-wait-since="{{ row.waiting_since|date:'U' }}" data-wait-level title="Asked at {{ row.waiting_since|time:'H:i' }}">{{ row.waiting_since|wait }}</span>
-          {% elif item.state == "answered" and row.unresolved %}
-            <span class="ml-auto font-medium text-blue-700">{{ row.unresolved }} to deliver</span>
-          {% endif %}
-        </div>
-        <p>{{ item.summary }}</p>
+        {# The meta floats beside the first line; the second takes the full width. #}
+        <p><span class="queue-row-meta">
+            {% if item.state != "open" and item.state != state %}<c-state-badge :state="item.state" />{% endif %}
+            {% if row.reports|length > 1 %}<span class="inline-flex items-center gap-1" title="Seats"><c-icon name="users" />{{ row.reports|length }}</span>{% endif %}
+            {% if item.photo_report_id %}<c-icon name="image" title="Photo" />{% endif %}
+            {% if item.state == "open" and row.waiting_since %}
+              <span class="wait {{ row.waiting_since|wait_level }}" data-wait-since="{{ row.waiting_since|date:'U' }}" data-wait-level title="Asked at {{ row.waiting_since|time:'H:i' }}">{{ row.waiting_since|wait }}</span>
+            {% elif item.state == "answered" and row.unresolved %}
+              <span class="font-medium text-blue-700">{{ row.unresolved }} to deliver</span>
+            {% endif %}
+          </span>{% if item.label %}<span class="label-chip mr-1.5">{{ item.label }}</span>{% endif %}{{ item.summary }}</p>
       </a>
       {% endwith %}
     {% empty %}
       {% if filtered %}<c-empty icon="search" title="No clarifications match" />
-      {% elif state == "all" %}<c-empty icon="inbox" title="No clarifications" />
       {% else %}<c-empty icon="inbox" title="No {{ state }} clarifications" />{% endif %}
     {% endfor %}
     </div>
