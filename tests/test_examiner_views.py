@@ -12,7 +12,7 @@ from django.utils import timezone
 from pytest_django.fixtures import Settings
 
 from examdesk import services
-from examdesk.models import Exam, Readout, Report
+from examdesk.models import Clarification, Exam, Readout, Report
 from examdesk.similarity import similarity
 from tests.helpers import (
     REFRESH,
@@ -382,6 +382,21 @@ def test_merge_asks_for_a_target_first(examiner: Client, exam: Exam) -> None:
     )
     assert response["Location"] == back
     assert fresh(a.clarification).closed_reason == ""
+
+
+def test_an_answered_clarification_can_be_announced(examiner: Client, exam: Exam) -> None:
+    clarification = report(exam).clarification
+    services.answer_clarification(
+        clarification, text="Use 9.", member=named(exam, "Prof"), expected_answer=None
+    )
+    html = examiner.get(url("examiner:clarification", exam, clarification.pk)).content.decode()
+    assert 'commandfor="announce-dialog" command="show-modal"' in html
+    assert '<input type="hidden" name="text" data-quote="answer-text">' in html
+    assert ">Use 9.</textarea>" in html
+    examiner.post(
+        url("examiner:announce_clarification", exam, clarification.pk), {"text": "Use 9."}
+    )
+    assert fresh(clarification).closed_reason == Clarification.ClosedReason.ANNOUNCED
 
 
 def test_move_offers_new_clarification_only_with_several_seats(

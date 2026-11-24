@@ -274,8 +274,6 @@ def announce(
     label = ""
     if clarification is not None:
         clarification = _unclosed(clarification)
-        if clarification.current_answer_id:
-            raise ServiceError("Only an open clarification can be announced.")
         _close(clarification, Clarification.ClosedReason.ANNOUNCED)
         label = clarification.label
     return Announcement.objects.create(

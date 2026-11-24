@@ -164,6 +164,20 @@ def test_announced_seats_wait_until_read_out_in_their_venue(exam: Exam) -> None:
     assert (state(here), state(there)) == (S.READ_OUT, S.TO_READ_OUT)
 
 
+def test_announcing_an_answered_clarification_reads_it_out_instead(exam: Exam) -> None:
+    delivered, waiting = report(exam), report(exam, seat="21")
+    services.merge_clarifications(sources=[waiting.clarification], target=delivered.clarification)
+    prof = named(exam, "Prof")
+    answer = services.answer_clarification(
+        delivered.clarification, text="Use 9.", member=prof, expected_answer=None
+    )
+    services.mark_delivered(delivered, answer=answer, member=named(exam, "Ann"))
+    services.announce(text="Use 9.", member=prof, clarification=delivered.clarification)
+    assert fresh(delivered.clarification).current_answer == answer
+    assert (state(delivered), state(waiting)) == (S.TO_READ_OUT, S.TO_READ_OUT)
+    assert not Report.objects.to_deliver().exists()
+
+
 def test_merge_moves_seats_and_closes_source(exam: Exam) -> None:
     a, b = report(exam), report(exam, seat="21")
     services.merge_clarifications(sources=[a.clarification], target=b.clarification)

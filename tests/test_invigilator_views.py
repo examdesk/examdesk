@@ -471,6 +471,16 @@ def test_typing_refreshes_only_the_matches(invigilator: Client, exam: Exam) -> N
     assert "Save clarification" not in html
 
 
+def test_text_naming_another_question_warns(invigilator: Client, exam: Exam) -> None:
+    report_url = url("invigilator:report", exam) + "?venue=HALL1&seat=34&label={}&text={}"
+    html = invigilator.get(
+        report_url.format("", "5(b) mentions Figure 2"), headers=HTMX
+    ).content.decode()
+    assert "The question mentions Q5b." in html
+    html = invigilator.get(report_url.format("5", "5(b) mentions Figure 2")).content.decode()
+    assert "The question mentions" not in html
+
+
 def test_deliver_badge_and_home_count_seats_not_questions(
     client: Client, invigilator: Client, exam: Exam, staff: User
 ) -> None:

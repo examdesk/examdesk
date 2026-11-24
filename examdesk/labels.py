@@ -18,6 +18,19 @@ def normalize_label(raw: str) -> str:
     raise ValueError(f"Not a question: {raw}. Use e.g. 3b, Q3(b)(ii) or General.")
 
 
+_PART = r"(?:\s?\([a-h]\)|[a-h])"
+# `Q3`, `Q3a`, `question 3` or `3a`, `3(a)` in free text
+_MENTION = re.compile(rf"\b(?:q(?:uestion)?\s?\d+{_PART}?|\d+{_PART})(?!\w)", re.IGNORECASE)
+
+
+def mismatched_label(label: str, text: str) -> str | None:
+    """A question `text` mentions, unless one it mentions covers or is covered by `label`."""
+    mentions = [normalize_label(mention) for mention in _MENTION.findall(text)]
+    if any(covers(label, mention) or covers(mention, label) for mention in mentions):
+        return None
+    return mentions[0] if mentions else None
+
+
 def normalize_place(raw: str) -> str:
     """`hall 1` -> `HALL1`."""
     return "".join(raw.split()).upper()

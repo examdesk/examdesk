@@ -2,6 +2,7 @@ import pytest
 
 from examdesk.labels import (
     covers,
+    mismatched_label,
     natural,
     normalize_label,
     normalize_name,
@@ -65,3 +66,22 @@ def test_place_order_sorts_by_venue_then_seat() -> None:
 
 def test_normalize_name_collapses_spaces() -> None:
     assert normalize_name("  ann   lee ") == "ann lee"
+
+
+@pytest.mark.parametrize(
+    ("label", "text", "mentioned"),
+    [
+        ("General", "There is no Figure 2. Which graph is 5b about?", "Q5b"),
+        ("General", "5(b) mentions Figure 2", "Q5b"),
+        ("Q4", "Question 6: can we use recursion?", "Q6"),
+        ("Q2", "Q3 (a) says 8 integers", "Q3a"),
+        ("Q5", "5b refers to Figure 2", None),  # covers it
+        ("Q5b", "Is Q5 about Figure 1?", None),
+        ("Q3a", "Q3 asks for 8 integers but the array has 9", None),
+        ("General", "Do we have to answer all 8 questions in 2 hours?", None),
+        ("General", "Is it 2(n-1) or O(n log n)?", None),
+        ("Q1", "Can I leave at 10am?", None),
+    ],
+)
+def test_mismatched_label(label: str, text: str, mentioned: str | None) -> None:
+    assert mismatched_label(label, text) == mentioned

@@ -72,6 +72,7 @@
             {% if can_answer %}
               <div class="-my-0.5 -mr-1.5 ml-auto flex gap-0.5">
                 <button type="button" class="btn btn-ghost btn-xs font-normal text-muted" data-show="correction" title="Correct answer"{% if correcting %} hidden{% endif %}><c-icon name="pen-line" /><span class="max-sm:sr-only">Correct answer</span></button>
+                <button type="button" class="btn btn-ghost btn-xs font-normal text-muted" commandfor="announce-dialog" command="show-modal" title="Announce to all venues"><c-icon name="megaphone" /><span class="max-sm:sr-only">Announce</span></button>
                 {% if withdrawable %}
                   <form method="post" action="{% url 'examiner:withdraw_answer' pk clarification.pk %}">
                     {% csrf_token %}
@@ -98,10 +99,8 @@
 
       {% if can_answer %}
         {% if member.exam.has_ai_service %}
-          {# Keeps what it found through morphs; finds again, in place, when the exam changes. #}
-          <div id="duplicates" class="empty:hidden" hx-morph-skip-children hx-get="{% url 'examiner:clarification_duplicates' pk clarification.pk %}?version={{ member.exam.version }}" hx-trigger="load" hx-swap="innerMorph" hx-sync="this:queue last">
-            <p class="meta flex items-center gap-2" role="status"><span class="loading loading-spinner loading-xs"></span>Finding duplicates</p>
-          </div>
+          {# The most alike until the AI service replies. Keeps what it found through morphs; finds again, in place, when the exam changes. #}
+          <div id="duplicates" class="empty:hidden" hx-morph-skip-children hx-get="{% url 'examiner:clarification_duplicates' pk clarification.pk %}?version={{ member.exam.version }}" hx-trigger="load" hx-swap="innerMorph" hx-sync="this:queue last">{% partial duplicates %}</div>
         {% else %}
           {% partial duplicates %}
         {% endif %}

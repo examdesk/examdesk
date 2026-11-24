@@ -5,6 +5,7 @@ import math
 import time
 import uuid
 from collections import defaultdict
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -25,7 +26,7 @@ from django.views.decorators.http import require_GET, require_POST
 from .. import ai, services, session
 from ..access import HtmxRequest, admit, exam_view
 from ..forms import PhotoForm, ReportForm, ReportStartForm, VenueForm, form_errors
-from ..labels import natural, place_order, top_level
+from ..labels import mismatched_label, natural, normalize_label, place_order, top_level
 from ..matching import rank_similar, same_question, similar_enough
 from ..models import (
     Announcement,
@@ -158,6 +159,8 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
         start_form = ReportStartForm(query if submitted else None, initial={"venue": member.venue})
         context = {"client_key": uuid.uuid4()}
     text = query.get("text", "")
+    with suppress(ValueError):
+        context["mentioned"] = mismatched_label(normalize_label(query.get("label", "")), text)
     if start_form.is_bound and query.get("label") and start_form.is_valid():
         seat = start_form.cleaned_data
         here, elsewhere = find_matches(exam, seat["venue"], seat["seat"], seat["label"], text)

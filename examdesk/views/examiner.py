@@ -200,10 +200,10 @@ def clarification_page(
         "question_photo": None
         if clarification.wording
         else next((r for r in reports if r.photo), None),
-        # with an AI service, loaded by `clarification_duplicates`
-        "duplicates": []
-        if exam.has_ai_service
-        else possible_duplicates(clarification, rank_similar(clarification.texts, related)),
+        # with an AI service, replaced by `clarification_duplicates`
+        "duplicates": possible_duplicates(
+            clarification, rank_similar(clarification.texts, related)
+        ),
         "answer_form": form,
         "reports": reports,
         "answers": clarification.answers.select_related("member"),

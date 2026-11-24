@@ -22,6 +22,7 @@
   {% partialdef matches inline %}
   {% with pk=member.exam.pk %}
   <div id="matches" class="mt-6"{% if groups %} data-searched{% endif %}>
+  {% if mentioned %}<div class="flash warning" role="status"><c-icon name="triangle-alert" /><span>The question mentions {{ mentioned }}.</span></div>{% endif %}
   {% for heading, matches in groups %}
     {% if matches %}
     <h2 class="section-title">{{ heading }}</h2>

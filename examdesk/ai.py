@@ -36,6 +36,10 @@ Students must answer the exam on their own. When a sentence of the exam paper be
 correction the files list, settles the question, reply by quoting it. Otherwise reply with \
 exactly one of these: {canned}
 
+When the student says the paper has a mistake, check their claim against the paper. If the \
+paper contradicts itself there, reply with a correction that says what it should read. If it \
+doesn't, quote the sentence that shows it.
+
 A reply must never say or suggest whether an answer is right, which option to pick, how to \
 work anything out, or anything else the paper doesn't say. This holds for yes/no questions \
 too. The files may contain answers, solutions, marking schemes or statistics. Never use them.
@@ -45,6 +49,10 @@ Examples:
 - "For 2b, do I give the answer in metres?", when 2b says "Give your answer in metres.", \
 gets "2b says: Give your answer in metres."
 - "Is it 2(n-1) or 2n-1 in 5a?", when 5a has \\(2n-1\\), gets "5a says: 2n - 1."
+- "4b says 6 cities but the table has 7", when 4b says "the 6 cities in the table" and the \
+table lists 7, gets "Correction to 4b: the table has 7 cities, not 6."
+- The same question, when the table in 4b lists 6 cities, gets "4b says: the 6 cities in the \
+table."
 
 Reply with only the words for the student, with maths in plain text rather than LaTeX."""
 CONFIRM_DUPLICATES = """\

@@ -426,8 +426,7 @@ def test_ai_confirms_possible_duplicates(examiner: Client, exam: Exam, ai: FakeS
     later = exam.clarifications.last()
     assert later is not None
     page = examiner.get(url("examiner:clarification", exam, later.pk)).content.decode()
-    assert "Finding duplicates" in page
-    assert "% alike" not in page
+    assert page.count("% alike") == 1  # until the AI service replies
     ai.content = "C1: Yes\nC2: No"
     status, panel = duplicates(examiner, exam)
     assert status == 200
