@@ -7,7 +7,7 @@
       {% for name, title, count in tabs %}<a class="tab gap-1.5" href="{% querystring query state=name page=None %}" hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs" hx-swap="outerHTML show:none"{% if name == state %} aria-current="true"{% endif %}>{{ title }}{% if name != "all" %}<span class="num">{{ count }}</span>{% endif %}</a>{% endfor %}
     </c-live>
     <form method="get" action="{{ request.path }}" id="queue-filters" class="filters flex gap-2" data-autosubmit hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs" hx-swap="outerHTML show:none">
-      <div class="min-w-0 flex-1">{{ form.label }}</div>
+      <c-live id="queue-label-filter" class="min-w-0 flex-1">{{ form.label }}</c-live>
       <div class="w-34 shrink-0">{{ form.sort }}</div>
       <noscript><button class="btn btn-outline btn-sm">Apply</button></noscript>
     </form>

@@ -146,11 +146,11 @@ const buzz = () => {
   try { sessionStorage.setItem("alerted", id); } catch {}
   navigator.vibrate?.(200);
 };
-// Each new exam version refreshes the live parts. With a dialog or an inline editor open, the
-// refresh waits until it closes, since a morph would remove it. The pages of an exam share its
-// stream. A stream that hasn't opened or sent a message for `offlineAfter` has dropped: the page
-// shows the offline banner and reconnects. A request that couldn't reach the server shows it too,
-// until one does.
+// Each new exam version refreshes the live parts. With a dialog, an inline editor or a Tom Select
+// menu open, the refresh waits until it closes, since a morph would remove it. The pages of an
+// exam share its stream. A stream that hasn't opened or sent a message for `offlineAfter` has
+// dropped: the page shows the offline banner and reconnects. A request that couldn't reach the
+// server shows it too, until one does.
 const offlineAfter = Number(document.body.dataset.offlineAfter) * 1000;
 let eventSource;
 let streamUrl;
@@ -159,7 +159,7 @@ let lastMessageAt = Date.now();
 let connectedAt = 0;
 let requestFailed = false;
 let refreshPending = false;
-const isEditing = () => document.querySelector("dialog[open], [data-editor]:not([hidden])");
+const isEditing = () => document.querySelector("dialog[open], [data-editor]:not([hidden]), .ts-wrapper.dropdown-active");
 const refresh = () => {
   if (isEditing()) refreshPending = true;
   else htmx.trigger("#refresh", "exam-changed");
@@ -467,6 +467,7 @@ const enhance = (field) => {
     },
     onDropdownClose() {
       if (changed) apply();
+      flushRefresh();
     },
   };
   if (multi) settings.plugins = ["remove_button"];

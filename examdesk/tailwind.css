@@ -334,8 +334,8 @@
   :is(body.invigilator, .landing-phone) .ts-control { @apply min-h-12 text-base; }
   .ts-wrapper.multi .ts-control {
     @apply px-2;
-    .item { @apply flex items-center rounded-md bg-base-200 py-0.5 pl-2 text-xs font-medium ring-1 ring-base-300 ring-inset; }
-    .remove { @apply cursor-pointer px-1.5 text-muted no-underline hover:text-base-content; }
+    .item { @apply flex items-center rounded-md bg-primary/10 py-0.5 pl-2 text-sm leading-6 font-semibold text-primary ring-1 ring-primary/20 ring-inset; }
+    .remove { @apply cursor-pointer px-1.5 text-primary/60 no-underline hover:text-primary; }
   }
   /* A select shows a chevron; a text box with suggestions doesn't. */
   .ts-wrapper.single .ts-control { @apply cursor-pointer flex-nowrap; .item { @apply truncate; } }

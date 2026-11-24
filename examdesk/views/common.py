@@ -41,7 +41,7 @@ def get_clarification(exam: Exam, clarification_id: int) -> Clarification:
 def suggestions(exam: Exam) -> dict[str, Any]:
     """The datalists' options. `labels` is lazy, as refreshes don't render the datalists."""
     reports = Report.objects.of_exam(exam)
-    labels = exam.clarifications.values_list("label", flat=True)
+    labels = exam.clarifications.exclude(label="").values_list("label", flat=True)
     return {
         "labels": lambda: sorted(set(labels), key=natural),
         "venues": reports.values_list("venue", flat=True).distinct().order_by("venue"),
