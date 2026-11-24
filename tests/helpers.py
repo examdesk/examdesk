@@ -20,12 +20,12 @@ def named(exam: Exam, name: str) -> Member:
 
 
 def report(exam: Exam, **kwargs: Any) -> Report:
-    """Ann reports LT19 B14 as a new Q3b clarification, or joining `clarification`."""
+    """Ann reports HALL1 14 as a new Q3b clarification, or joining `clarification`."""
     fields: dict[str, Any] = {
         "client_key": uuid.uuid4(),
         "member": named(exam, "Ann"),
-        "venue": "LT19",
-        "seat": "B14",
+        "venue": "HALL1",
+        "seat": "14",
         "label": "Q3b",
         "text": "Is x an integer?",
     }

@@ -99,12 +99,12 @@ def test_sign_up_with_an_allowed_address(client: Client, settings: Settings) -> 
     assert response["Location"] == reverse("home")
     user = User.objects.get(email="tan@example.edu")
     assert (user.first_name, user.is_staff, user.has_usable_password()) == ("Tan Wei", False, False)
-    client.post(reverse("create_exam"), {"name": "CS1231S Final"})
+    client.post(reverse("create_exam"), {"name": "Physics Final"})
     exam = Exam.objects.get()
     assert (exam.owner, exam.members.get().name) == (user, "Tan Wei")
 
 
 def test_creating_an_exam_needs_an_account(client: Client) -> None:
-    response = client.post(reverse("create_exam"), {"name": "CS1231S Final"})
+    response = client.post(reverse("create_exam"), {"name": "Physics Final"})
     assert response["Location"].startswith(reverse("account_login"))
     assert not Exam.objects.exists()

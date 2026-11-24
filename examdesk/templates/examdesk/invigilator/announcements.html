@@ -27,7 +27,7 @@
         {% else %}
           <button type="button" class="btn btn-read-out btn-block" commandfor="read-out-{{ announcement.pk }}" command="show-modal"><c-icon name="check" />Mark as read out…</button>
           <c-dialog id="read-out-{{ announcement.pk }}" title="Read out in which venue?" action="{% url 'invigilator:mark_read_out' member.exam.pk announcement.pk %}" submit="Mark as read out">
-            <input name="venue" list="venues" aria-label="Venue" placeholder="e.g. LT19" required autocapitalize="characters" autocomplete="off">
+            <input name="venue" list="venues" aria-label="Venue" placeholder="e.g. HALL1" required autocapitalize="characters" autocomplete="off">
             <small>It also becomes your venue.</small>
           </c-dialog>
         {% endif %}

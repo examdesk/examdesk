@@ -31,8 +31,8 @@ def test_every_state_has_an_icon(state: str) -> None:
 
 
 def test_seat_url_leaves_out_empty_params() -> None:
-    assert seat_url("invigilator:deliver_seat", 1, "LT 19", "B14", report=7, back="") == (
-        "/exams/1/invigilator/deliver/seat/?venue=LT+19&seat=B14&report=7"
+    assert seat_url("invigilator:deliver_seat", 1, "HALL 1", "14", report=7, back="") == (
+        "/exams/1/invigilator/deliver/seat/?venue=HALL+1&seat=14&report=7"
     )
 
 

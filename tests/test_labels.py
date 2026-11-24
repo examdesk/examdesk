@@ -34,7 +34,7 @@ def test_normalize_label_rejects_unknown_forms(raw: str) -> None:
         normalize_label(raw)
 
 
-@pytest.mark.parametrize(("raw", "place"), [("b 14", "B14"), ("lt 19", "LT19"), (" a1 ", "A1")])
+@pytest.mark.parametrize(("raw", "place"), [(" 14 ", "14"), ("hall 1", "HALL1")])
 def test_normalize_place(raw: str, place: str) -> None:
     assert normalize_place(raw) == place
 
@@ -55,12 +55,12 @@ def test_covers() -> None:
 
 
 def test_natural_puts_b2_before_b14() -> None:
-    assert sorted(["B14", "B2", "A10", "A9"], key=natural) == ["A9", "A10", "B2", "B14"]
+    assert sorted(["14", "2", "10", "9"], key=natural) == ["2", "9", "10", "14"]
 
 
 def test_place_order_sorts_by_venue_then_seat() -> None:
-    places = [("LT20", "A1"), ("LT19", "B14"), ("LT19", "B2")]
-    assert sorted(places, key=place_order) == [("LT19", "B2"), ("LT19", "B14"), ("LT20", "A1")]
+    places = [("HALL2", "1"), ("HALL1", "14"), ("HALL1", "2")]
+    assert sorted(places, key=place_order) == [("HALL1", "2"), ("HALL1", "14"), ("HALL2", "1")]
 
 
 def test_normalize_name_collapses_spaces() -> None:

@@ -19,7 +19,7 @@ def normalize_label(raw: str) -> str:
 
 
 def normalize_place(raw: str) -> str:
-    """`lt 19` -> `LT19`."""
+    """`hall 1` -> `HALL1`."""
     return "".join(raw.split()).upper()
 
 
@@ -41,10 +41,10 @@ def covers(query: str, label: str) -> bool:
 
 
 def natural(text: str) -> list[Any]:
-    """Sort key putting B2 before B14."""
+    """Sort key putting 2 before 14."""
     return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", text)]
 
 
 def place_order(place: tuple[str, str]) -> tuple[list[Any], list[Any]]:
-    """Sort key putting LT19 B2 before LT19 B14 and LT20 A1."""
+    """Sort key putting HALL1 2 before HALL1 14 and HALL2 1."""
     return natural(place[0]), natural(place[1])

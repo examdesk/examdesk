@@ -101,7 +101,7 @@ def transcribe(client: Client, exam: Exam, jpeg: bytes) -> tuple[int, bytes]:
 
 
 def step_two(client: Client, exam: Exam) -> str:
-    query = {"venue": "LT19", "seat": "B14", "label": "Q3b"}
+    query = {"venue": "HALL1", "seat": "14", "label": "Q3b"}
     return client.get(url("invigilator:report", exam), query).content.decode()
 
 
@@ -391,9 +391,9 @@ def test_text_files_show_their_text_without_images(examiner: Client, exam: Exam)
 
 def three_clarifications(exam: Exam) -> None:
     for seat, label, text in [
-        ("B14", "Q3b", "Is the answer big-O or an exact count?"),
-        ("B15", "Q1", "Is the list sorted?"),
-        ("B16", "Q3b", "Do we give the exact count?"),
+        ("14", "Q3b", "Is the answer big-O or an exact count?"),
+        ("15", "Q1", "Is the list sorted?"),
+        ("16", "Q3b", "Do we give the exact count?"),
     ]:
         report(exam, seat=seat, label=label, text=text)
 
@@ -475,7 +475,7 @@ def test_replies_are_cached(examiner: Client, exam: Exam, ai: FakeService) -> No
     duplicates(examiner, exam)
     assert duplicates(examiner, exam)[1].count("% match") == 2
     assert len(ai.requests) == 1
-    report(exam, seat="B17", label="Q1", text="Is the input list sorted?")
+    report(exam, seat="17", label="Q1", text="Is the input list sorted?")
     ai.content = "C1: Yes\nC2: Yes\nC3: Yes"
     duplicates(examiner, exam)
     assert len(ai.requests) == 2  # a new candidate

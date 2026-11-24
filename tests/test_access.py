@@ -74,11 +74,11 @@ def test_owner_picks_a_name_through_the_examiner_link(
 
 
 def test_creating_an_exam_requires_staff(client: Client, staff: User) -> None:
-    response = client.post(reverse("create_exam"), {"name": "CS1231S Final"})
+    response = client.post(reverse("create_exam"), {"name": "Physics Final"})
     assert response.status_code == 302
     assert not Exam.objects.exists()
     client.force_login(staff)
-    response = client.post(reverse("create_exam"), {"name": "CS1231S Final"})
+    response = client.post(reverse("create_exam"), {"name": "Physics Final"})
     exam = Exam.objects.get()
     assert response["Location"] == url("examiner:clarifications", exam)
     assert exam.owner == staff
@@ -139,7 +139,7 @@ def test_a_refresh_gets_the_page_with_its_live_parts_marked(examiner: Client, ex
     assert '<div id="refresh" hidden hx-get="" ' in examiner.get(page).content.decode()
     report(exam, label="Q7")
     html = examiner.get(page, headers=REFRESH).content.decode()
-    assert "<title>(2) CS2109S Final · Exam Desk</title>" in html
+    assert "<title>(2) Biology Final · Exam Desk</title>" in html
     assert '<div id="queue-list" data-live class="queue-list">' in html
     assert "Q7" in html
     badge = '<span id="clarifications-badge" data-live><span class="count action"'
@@ -198,20 +198,20 @@ def test_photo_is_served_to_members_only(
 def test_every_page_and_fragment_renders_with_data(
     invigilator: Client, examiner: Client, exam: Exam, media: Path, jpeg: bytes
 ) -> None:
-    with_venue(invigilator, exam, "LT19")
+    with_venue(invigilator, exam, "HALL1")
     answered = report(exam, photo=SimpleUploadedFile("p.jpg", jpeg, "image/jpeg"))
     answer = services.answer_clarification(
         answered.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
     services.mark_delivered(answered, answer=answer, member=named(exam, "Ann"))
-    report(exam, seat="C1", clarification=answered.clarification)
+    report(exam, seat="21", clarification=answered.clarification)
     report(exam, label="Q3a")
     services.announce(text="Typo in Q2", member=named(exam, "Prof"))
     pages = [
-        (invigilator, url("invigilator:report", exam) + "?venue=LT19&seat=d4&label=3"),
+        (invigilator, url("invigilator:report", exam) + "?venue=HALL1&seat=34&label=3"),
         (invigilator, url("invigilator:open_clarifications", exam)),
         (invigilator, url("invigilator:to_deliver", exam)),
-        (invigilator, url("invigilator:deliver_seat", exam) + "?venue=LT19&seat=C1"),
+        (invigilator, url("invigilator:deliver_seat", exam) + "?venue=HALL1&seat=21"),
         (invigilator, url("invigilator:announcements", exam)),
         (
             examiner,
@@ -220,7 +220,7 @@ def test_every_page_and_fragment_renders_with_data(
         (examiner, url("examiner:clarification", exam, answered.clarification_id)),
         (examiner, url("examiner:seats", exam)),
         (examiner, url("examiner:members", exam)),
-        (examiner, url("examiner:seat", exam) + "?venue=LT19&seat=B14"),
+        (examiner, url("examiner:seat", exam) + "?venue=HALL1&seat=14"),
         (examiner, url("examiner:settings", exam)),
         (examiner, url("examiner:announcements", exam)),
     ]
@@ -230,7 +230,7 @@ def test_every_page_and_fragment_renders_with_data(
     matched = invigilator.get(pages[0][1]).content.decode()
     assert '<button class="match match-button" name="clarification" value="' in matched
     assert '<span class="match-action">Same question<svg' in matched
-    assert "C1" in invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
+    assert "21" in invigilator.get(url("invigilator:to_deliver", exam)).content.decode()
     assert "<svg" in examiner.get(url("examiner:members", exam)).content.decode()
 
 
@@ -246,7 +246,7 @@ def test_name_is_prefilled_for_staff(
 
 
 def test_leave_takes_the_exam_off_this_device(invigilator: Client, exam: Exam) -> None:
-    with_venue(invigilator, exam, "LT19")
+    with_venue(invigilator, exam, "HALL1")
     page = invigilator.get(url("invigilator:report", exam)).content.decode()
     assert 'aria-label="Account: ' in page
     assert f'action="{url("leave_exam", exam)}"' in page
@@ -262,7 +262,7 @@ def test_home_shows_exam_cards_with_counts(client: Client, exam: Exam, staff: Us
     services.answer_clarification(
         answered.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
-    report(exam, seat="C1", label="Q5")
+    report(exam, seat="21", label="Q5")
     client.force_login(staff)
     html = client.get(reverse("home")).content.decode()
     assert 'commandfor="create-dialog" command="show-modal"><svg' in html
@@ -308,13 +308,13 @@ def test_delivery_state_updates_on_refresh(
     invigilator: Client, examiner: Client, exam: Exam
 ) -> None:
     first = report(exam)
-    second = report(exam, seat="C1", clarification=first.clarification)
+    second = report(exam, seat="21", clarification=first.clarification)
     answer = services.answer_clarification(
         first.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
     clarification_page = url("examiner:clarification", exam, first.clarification_id)
-    deliver_page = f"{url('invigilator:deliver_seat', exam)}?venue=LT19&seat=B14"
-    seat_page = url("examiner:seat", exam) + "?venue=LT19&seat=B14"
+    deliver_page = f"{url('invigilator:deliver_seat', exam)}?venue=HALL1&seat=14"
+    seat_page = url("examiner:seat", exam) + "?venue=HALL1&seat=14"
     services.mark_delivered(first, answer=answer, member=named(exam, "Bob"))  # another invigilator
     services.mark_delivered(second, answer=answer, member=named(exam, "Bob"))
     clarification_live = examiner.get(clarification_page, headers=REFRESH).content.decode()
@@ -332,12 +332,12 @@ def test_delivery_state_updates_on_refresh(
 def test_a_name_another_device_uses_is_confirmed_or_changed(
     invigilator: Client, examiner: Client, exam: Exam
 ) -> None:
-    invigilator.post(url("invigilator:choose_venue", exam), {"venue": "lt 19"}, follow=True)
+    invigilator.post(url("invigilator:choose_venue", exam), {"venue": "hall 1"}, follow=True)
     join = reverse("join", args=[exam.invigilator_token])
     phone = Client()
     html = phone.post(join, {"name": " ann "}).content.decode()  # case and spacing aside, Ann
     assert "Ann is already on this exam" in html
-    assert "In LT19, online now." in html
+    assert "In HALL1, online now." in html
     assert phone.get(url("invigilator:report", exam)).status_code == 404
     # That's me: one Ann, on two devices.
     assert phone.post(join, {"name": "Ann", "same": "1"})["Location"] == url("exam", exam)

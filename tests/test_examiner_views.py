@@ -39,7 +39,7 @@ def test_delete_requires_typed_name(examiner: Client, exam: Exam) -> None:
 
 def test_send_stays_on_the_clarification(examiner: Client, exam: Exam) -> None:
     first = report(exam).clarification
-    report(exam, seat="C1")
+    report(exam, seat="21")
     response = examiner.post(
         url("examiner:answer_clarification", exam, first.pk), {"text": "Yes"}, follow=True
     )
@@ -75,8 +75,8 @@ def test_a_saved_filter_forgets_a_label_that_is_gone(examiner: Client, exam: Exa
 
 def test_question_filter_picks_several_questions(examiner: Client, exam: Exam) -> None:
     report(exam, label="Q3b", text="Three?")
-    report(exam, seat="C1", label="Q5", text="Five?")
-    report(exam, seat="D4", label="Q31", text="Thirty-one?")
+    report(exam, seat="21", label="Q5", text="Five?")
+    report(exam, seat="34", label="Q31", text="Thirty-one?")
     html = examiner.get(
         url("examiner:clarifications", exam) + "?label=Q3&label=Q5&state=all"
     ).content.decode()
@@ -94,7 +94,7 @@ def test_clarification_list_shows_state_chips(examiner: Client, exam: Exam) -> N
     services.answer_clarification(
         answered, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
-    announced = report(exam, seat="C1").clarification
+    announced = report(exam, seat="21").clarification
     services.announce(text="!", member=named(exam, "Prof"), clarification=announced)
     html = examiner.get(url("examiner:clarifications", exam) + "?state=all").content.decode()
     assert icon_then("check", "Answered</span>") in html
@@ -115,11 +115,11 @@ def test_invalid_relabel_reopens_its_dialog_with_the_error(examiner: Client, exa
 
 def test_wrong_delete_name_reopens_its_dialog(examiner: Client, exam: Exam) -> None:
     services.close_exam(exam)
-    response = examiner.post(url("examiner:delete_exam", exam), {"name": "CS2109S"})
+    response = examiner.post(url("examiner:delete_exam", exam), {"name": "Biology"})
     html = response.content.decode()
     assert response.status_code == 400
     assert '<dialog id="delete-dialog" class="modal" data-autoopen aria-labelledby' in html
-    assert 'value="CS2109S"' in html
+    assert 'value="Biology"' in html
     assert Exam.objects.exists()
 
 
@@ -149,14 +149,14 @@ def test_members_page_shows_the_invigilator_link_then_the_examiner_link_with_a_w
 
 
 def test_examiner_announcements_page(invigilator: Client, examiner: Client, exam: Exam) -> None:
-    report(exam, venue="LT20", seat="A1")
+    report(exam, venue="HALL2", seat="1")
     assert invigilator.get(url("examiner:announcements", exam)).status_code == 403
     response = examiner.post(url("examiner:announce", exam), {"text": "Typo in Q2"})
     assert response["Location"] == url("examiner:announcements", exam)
     html = examiner.get(url("examiner:announcements", exam)).content.decode()
     assert "Typo in Q2" in html
     assert '<span class="badge state-to-read-out" title="Not read out yet">' in html
-    assert icon_then("clock", "LT20</span>") in html
+    assert icon_then("clock", "HALL2</span>") in html
     assert '<span class="count" title="Not read out in every venue yet">1</span>' in html
     queue = examiner.get(url("examiner:clarifications", exam)).content.decode()
     assert "Typo in Q2" not in queue
@@ -167,20 +167,20 @@ def test_seats_list_every_venue_and_find_a_seat(
     examiner: Client, exam: Exam, settings: Settings
 ) -> None:
     settings.EXAMDESK_PAGE_SIZE = 2
-    report(exam, venue="LT20", seat="A1")
-    report(exam, seat="B14")
-    report(exam, seat="B2")
+    report(exam, venue="HALL2", seat="1")
+    report(exam, seat="14")
+    report(exam, seat="2")
     seats = url("examiner:seats", exam)
     every = examiner.get(seats).content.decode()
-    assert every.index('aria-label="LT19 B2:') < every.index('aria-label="LT19 B14:')
-    assert 'aria-label="LT20 A1:' in every
-    assert 'href="#venue-lt20">LT20</a>' in every
-    found = examiner.get(seats + "?q=b+1").content.decode()
-    assert 'value="B1"' in found
-    assert 'aria-label="LT19 B14:' in found
-    assert 'aria-label="LT19 B2:' not in found
-    assert 'aria-label="LT20 A1:' not in found
-    assert "No seats match" in examiner.get(seats + "?q=Z9").content.decode()
+    assert every.index('aria-label="HALL1 2:') < every.index('aria-label="HALL1 14:')
+    assert 'aria-label="HALL2 1:' in every
+    assert 'href="#venue-hall2">HALL2</a>' in every
+    found = examiner.get(seats + "?q=1+4").content.decode()
+    assert 'value="14"' in found
+    assert 'aria-label="HALL1 14:' in found
+    assert 'aria-label="HALL1 2:' not in found
+    assert 'aria-label="HALL2 1:' not in found
+    assert "No seats match" in examiner.get(seats + "?q=99").content.decode()
 
 
 def test_seats_show_each_seat_by_its_least_advanced_question(examiner: Client, exam: Exam) -> None:
@@ -189,25 +189,25 @@ def test_seats_show_each_seat_by_its_least_advanced_question(examiner: Client, e
         done.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
     services.mark_delivered(done, answer=answer, member=named(exam, "Ann"))
-    report(exam, label="Q5", text="Five?")  # B14 asks again: open
-    report(exam, venue="LT20", seat="A1", clarification=done.clarification)  # answered, to deliver
+    report(exam, label="Q5", text="Five?")  # 14 asks again: open
+    report(exam, venue="HALL2", seat="1", clarification=done.clarification)  # answered, to deliver
     html = examiner.get(url("examiner:seats", exam)).content.decode()
     assert re.findall(r'<section class="card-box scroll-mt-4" id="venue-(\w+)"', html) == [
-        "lt19",
-        "lt20",
+        "hall1",
+        "hall2",
     ]
     assert (
-        'aria-label="LT19 B14: waiting, 2 questions">B14<span class="seat-pill-count">2</span>'
+        'aria-label="HALL1 14: waiting, 2 questions">14<span class="seat-pill-count">2</span>'
         in html
     )
     assert 'class="seat-pill state-to-deliver"' in html
-    assert 'aria-label="LT20 A1: to deliver">A1</a>' in html
+    assert 'aria-label="HALL2 1: to deliver">1</a>' in html
     assert 'aria-current="true">All<span class="num">2</span>' in html
     to_deliver = examiner.get(url("examiner:seats", exam) + "?state=to-deliver").content.decode()
-    assert 'aria-label="LT20 A1:' in to_deliver
-    assert 'aria-label="LT19 B14:' not in to_deliver
+    assert 'aria-label="HALL2 1:' in to_deliver
+    assert 'aria-label="HALL1 14:' not in to_deliver
     assert "No seats to deliver" in to_deliver
-    page = examiner.get(url("examiner:seat", exam) + "?venue=LT20&seat=A1").content.decode()
+    page = examiner.get(url("examiner:seat", exam) + "?venue=HALL2&seat=1").content.decode()
     assert ">Yes</p>" in page
     corrected = fresh(done.clarification).current_answer
     services.answer_clarification(
@@ -216,7 +216,7 @@ def test_seats_show_each_seat_by_its_least_advanced_question(examiner: Client, e
         member=named(exam, "Prof"),
         expected_answer=corrected.pk if corrected else None,
     )
-    page = examiner.get(url("examiner:seat", exam) + "?venue=LT19&seat=B14").content.decode()
+    page = examiner.get(url("examiner:seat", exam) + "?venue=HALL1&seat=14").content.decode()
     assert "<s>Yes</s></p>" in page
     assert "Delivered by Ann at" in page
     assert "since corrected" in page
@@ -227,7 +227,7 @@ def test_deleting_an_announcement_asks_first(
 ) -> None:
     posted = services.announce(text="Typo in Q2", member=named(exam, "Prof"))
     services.mark_read_out(
-        posted, venue="LT19", member=named(exam, "Ann")
+        posted, venue="HALL1", member=named(exam, "Ann")
     )  # read out: still deletable
     page = examiner.get(url("examiner:announcements", exam)).content.decode()
     assert f'commandfor="delete-{posted.pk}" command="show-modal"' in page
@@ -260,8 +260,8 @@ def test_clarifications_sort_by_question_and_tabs_count_each_state(
     examiner: Client, exam: Exam
 ) -> None:
     report(exam, label="Q10", text="Ten?")
-    report(exam, seat="C1", label="Q2", text="Two?")
-    answered = report(exam, seat="D4", label="Q3", text="Three?")
+    report(exam, seat="21", label="Q2", text="Two?")
+    answered = report(exam, seat="34", label="Q3", text="Three?")
     services.answer_clarification(
         answered.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
@@ -345,7 +345,7 @@ def test_move_stays_on_the_split_clarification_while_it_has_seats(
     examiner: Client, exam: Exam
 ) -> None:
     first = report(exam)
-    second = report(exam, seat="C1", clarification=first.clarification)
+    second = report(exam, seat="21", clarification=first.clarification)
     response = examiner.post(url("examiner:move_report", exam, second.pk), {"target": "new"})
     assert response["Location"] == url("examiner:clarification", exam, first.clarification_id)
     moved = Report.objects.get(pk=second.pk).clarification
@@ -357,7 +357,7 @@ def test_move_stays_on_the_split_clarification_while_it_has_seats(
 
 def test_move_to_an_unknown_clarification_is_refused(examiner: Client, exam: Exam) -> None:
     first = report(exam)
-    report(exam, seat="C1", clarification=first.clarification)
+    report(exam, seat="21", clarification=first.clarification)
     other_exam = services.create_exam(name="Other", owner=exam.owner)
     for target in ("", "999", str(report(other_exam).clarification_id)):
         html = examiner.post(
@@ -370,7 +370,7 @@ def test_move_to_an_unknown_clarification_is_refused(examiner: Client, exam: Exa
 
 def test_merge_asks_for_a_target_first(examiner: Client, exam: Exam) -> None:
     a = report(exam)
-    report(exam, seat="C1")
+    report(exam, seat="21")
     assert (
         '<option value="">Pick a clarification'
         in examiner.get(url("examiner:clarification", exam, a.clarification_id)).content.decode()
@@ -391,7 +391,7 @@ def test_move_offers_new_clarification_only_with_several_seats(
     assert (
         option not in examiner.get(url("examiner:clarification", exam, single.pk)).content.decode()
     )
-    report(exam, seat="C1", clarification=single)
+    report(exam, seat="21", clarification=single)
     assert option in examiner.get(url("examiner:clarification", exam, single.pk)).content.decode()
 
 
@@ -412,7 +412,7 @@ def test_announce_from_a_clarification_uses_the_answer_box(examiner: Client, exa
 
 def test_queue_shows_seats_to_deliver_and_wait(examiner: Client, exam: Exam) -> None:
     r = report(exam)
-    report(exam, seat="C1", clarification=r.clarification)
+    report(exam, seat="21", clarification=r.clarification)
     services.answer_clarification(
         r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
@@ -420,7 +420,7 @@ def test_queue_shows_seats_to_deliver_and_wait(examiner: Client, exam: Exam) -> 
     assert '<span class="ml-auto font-medium text-blue-700">2 to deliver</span>' in html
     assert 'title="Seats"' in html
     assert "data-wait-since" not in html  # answered: no wait
-    open_one = report(exam, seat="D4", label="Q5").clarification
+    open_one = report(exam, seat="34", label="Q5").clarification
     html = examiner.get(url("examiner:clarifications", exam) + "?state=open").content.decode()
     assert re.search(r'<span class="wait ml-auto " data-wait-since="\d+" data-wait-level', html)
     assert f'href="{url("examiner:clarification", exam, open_one.pk)}"' in html
@@ -430,19 +430,19 @@ def test_clarification_page_lists_what_seats_asked_and_duplicates(
     examiner: Client, exam: Exam
 ) -> None:
     first = report(exam, text="Is x an integer?")
-    report(exam, seat="C1", clarification=first.clarification, text="Can x be negative?")
-    other = report(exam, seat="D4", label="Q3a", text="Is y real?")
-    report(exam, seat="E5", label="Q4", text="Elsewhere?")
-    mislabeled = report(exam, seat="E6", label="Q4", text="Is x an integer or a real?")
-    announced = report(exam, seat="F6", label="Q3c", text="Already announced?").clarification
+    report(exam, seat="21", clarification=first.clarification, text="Can x be negative?")
+    other = report(exam, seat="34", label="Q3a", text="Is y real?")
+    report(exam, seat="45", label="Q4", text="Elsewhere?")
+    mislabeled = report(exam, seat="46", label="Q4", text="Is x an integer or a real?")
+    announced = report(exam, seat="56", label="Q3c", text="Already announced?").clarification
     services.announce(text="!", member=named(exam, "Prof"), clarification=announced)
-    merged = report(exam, seat="G7", label="Q3c", text="Merged away?").clarification
+    merged = report(exam, seat="67", label="Q3c", text="Merged away?").clarification
     services.merge_clarifications(sources=[merged], target=other.clarification)
     html = examiner.get(
         url("examiner:clarification", exam, first.clarification_id)
     ).content.decode()
     seats = html[html.index('id="seats-title"') : html.index("Possible duplicates")]
-    assert seats.index("LT19 B14</a>") < seats.index("LT19 C1</a>")
+    assert seats.index("HALL1 14</a>") < seats.index("HALL1 21</a>")
     assert "Can x be negative?" in seats
     assert "Is x an integer?" not in seats  # the wording, shown above
     duplicates = html[html.index("Possible duplicates") : html.index('id="correction"')]
@@ -463,7 +463,7 @@ def test_clarification_page_lists_what_seats_asked_and_duplicates(
 
 
 def test_merge_several_and_show_the_target(examiner: Client, exam: Exam) -> None:
-    here, a, b = report(exam), report(exam, seat="C1"), report(exam, seat="D4")
+    here, a, b = report(exam), report(exam, seat="21"), report(exam, seat="34")
     response = examiner.post(
         url("examiner:merge_clarifications", exam),
         {"source": [a.clarification_id, b.clarification_id], "target": here.clarification_id},
@@ -491,12 +491,12 @@ def test_announced_seats_wait_on_the_seats_pages_until_read_out(
         text="Typo", member=named(exam, "Prof"), clarification=r.clarification
     )
     seats = examiner.get(url("examiner:seats", exam)).content.decode()
-    assert 'aria-label="LT19 B14: waiting"' in seats
-    seat = examiner.get(url("examiner:seat", exam) + "?venue=LT19&seat=B14").content.decode()
+    assert 'aria-label="HALL1 14: waiting"' in seats
+    seat = examiner.get(url("examiner:seat", exam) + "?venue=HALL1&seat=14").content.decode()
     assert icon_then("megaphone", "To read out</span>") in seat
-    services.mark_read_out(announcement, venue="LT19", member=named(exam, "Ann"))
+    services.mark_read_out(announcement, venue="HALL1", member=named(exam, "Ann"))
     seats = examiner.get(url("examiner:seats", exam)).content.decode()
-    assert 'aria-label="LT19 B14: delivered"' in seats
+    assert 'aria-label="HALL1 14: delivered"' in seats
     page = examiner.get(url("examiner:clarification", exam, r.clarification_id)).content.decode()
     assert 'class="badge state-read-out mt-0.5"' in page
 
@@ -505,14 +505,14 @@ def test_members_page_lists_everyone_online_first(
     invigilator: Client, examiner: Client, exam: Exam
 ) -> None:
     assert invigilator.get(url("examiner:members", exam)).status_code == 403
-    invigilator.post(url("invigilator:choose_venue", exam), {"venue": "lt 19"}, follow=True)
+    invigilator.post(url("invigilator:choose_venue", exam), {"venue": "hall 1"}, follow=True)
     ben = Client()
     open_link(ben, exam.invigilator_token, "Ben")
     ben.get(url("invigilator:report", exam))
     html = examiner.get(url("examiner:members", exam)).content.decode()
     html = html[html.index('<h1 class="truncate">People</h1>') :]
     assert html.count(">Online<") == 3  # Ann, Ben and Prof
-    assert html.index("Ann") < html.index('<span class="badge">LT19</span>') < html.index("Ben")
+    assert html.index("Ann") < html.index('<span class="badge">HALL1</span>') < html.index("Ben")
     assert 'Invigilators<span class="num">2</span>' in html
     invigilators = examiner.get(url("examiner:members", exam) + "?role=invigilator")
     assert "Prof" not in invigilators.content.decode().split("<tbody>")[1]
@@ -563,16 +563,16 @@ def test_a_removed_member_keeps_their_history_and_can_rejoin(
 def test_clarification_shows_five_seats_and_the_rest_under_show_more(
     examiner: Client, exam: Exam
 ) -> None:
-    first = report(exam, seat="A1")
+    first = report(exam, seat="1")
     for n in range(2, 8):
-        report(exam, seat=f"A{n}", clarification=first.clarification)
+        report(exam, seat=f"{n}", clarification=first.clarification)
     html = examiner.get(
         url("examiner:clarification", exam, first.clarification_id)
     ).content.decode()
     more = html[html.index('<details class="group/more">') :]
     assert "Show 2 more</summary>" in more
-    assert "LT19 A5</a>" not in more
-    assert "LT19 A6</a>" in more
+    assert "HALL1 5</a>" not in more
+    assert "HALL1 6</a>" in more
 
 
 def test_photo_shows_as_the_question_without_wording(

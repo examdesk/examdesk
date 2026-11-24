@@ -70,7 +70,7 @@
       {% for venue in venues %}<button class="btn btn-outline" form="venue-pick" name="pick" value="{{ venue }}"{% if venue == member.venue %} aria-pressed="true"{% endif %}>{{ venue }}</button>{% endfor %}
     </div>
   {% endif %}
-  <input name="venue" value="{{ member.venue|default:"" }}" list="venues" aria-label="My venue" placeholder="{% if venues %}Another venue, e.g. LT19{% else %}e.g. LT19{% endif %}"
+  <input name="venue" value="{{ member.venue|default:"" }}" list="venues" aria-label="My venue" placeholder="{% if venues %}Another venue, e.g. HALL1{% else %}e.g. HALL1{% endif %}"
          autocapitalize="characters" autocomplete="off">
   <div><button class="link-button text-sm" form="venue-pick" name="all" value="1">I move between venues</button></div>
 </c-dialog>

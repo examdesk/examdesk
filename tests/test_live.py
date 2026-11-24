@@ -61,7 +61,7 @@ def test_a_stream_sends_versions_newer_than_its_page(examiner: Client, exam: Exa
     stream = events(examiner, f"{url('events', exam)}?version={page_version}")
 
     async def next_version() -> bytes:
-        await sync_to_async(report)(exam, seat="C1")
+        await sync_to_async(report)(exam, seat="21")
         return await anext(stream)
 
     current = version(exam)

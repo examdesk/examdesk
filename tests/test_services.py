@@ -57,7 +57,7 @@ def test_client_key_of_another_exam_is_refused(exam: Exam) -> None:
 
 def test_same_question_joins_open_clarification(exam: Exam) -> None:
     first = report(exam)
-    second = report(exam, seat="C1", clarification=first.clarification, text="")
+    second = report(exam, seat="21", clarification=first.clarification, text="")
     assert second.clarification == first.clarification
     assert state(second) == S.OPEN
 
@@ -154,18 +154,18 @@ def test_deliver_rejects_stale_or_missing_answer(exam: Exam) -> None:
 
 def test_announced_seats_wait_until_read_out_in_their_venue(exam: Exam) -> None:
     here = report(exam)
-    there = report(exam, venue="LT20", seat="A1", clarification=here.clarification)
+    there = report(exam, venue="HALL2", seat="1", clarification=here.clarification)
     announcement = services.announce(
         text="!", member=named(exam, "Prof"), clarification=here.clarification
     )
     assert announcement.clarification == here.clarification
     assert (state(here), state(there)) == (S.TO_READ_OUT, S.TO_READ_OUT)
-    services.mark_read_out(announcement, venue="LT19", member=named(exam, "Ann"))
+    services.mark_read_out(announcement, venue="HALL1", member=named(exam, "Ann"))
     assert (state(here), state(there)) == (S.READ_OUT, S.TO_READ_OUT)
 
 
 def test_merge_moves_seats_and_closes_source(exam: Exam) -> None:
-    a, b = report(exam), report(exam, seat="C1")
+    a, b = report(exam), report(exam, seat="21")
     services.merge_clarifications(sources=[a.clarification], target=b.clarification)
     source = fresh(a.clarification)
     assert source.closed_reason == Clarification.ClosedReason.MERGED
@@ -174,7 +174,7 @@ def test_merge_moves_seats_and_closes_source(exam: Exam) -> None:
 
 
 def test_merge_adopts_the_answer_of_an_answered_source(exam: Exam) -> None:
-    open_, answered = report(exam), report(exam, seat="C1")
+    open_, answered = report(exam), report(exam, seat="21")
     answer = services.answer_clarification(
         answered.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
@@ -186,7 +186,7 @@ def test_merge_adopts_the_answer_of_an_answered_source(exam: Exam) -> None:
 
 
 def test_merge_several_into_one(exam: Exam) -> None:
-    a, b, c = report(exam), report(exam, seat="C1"), report(exam, seat="D4")
+    a, b, c = report(exam), report(exam, seat="21"), report(exam, seat="34")
     services.merge_clarifications(
         sources=[b.clarification, c.clarification], target=a.clarification
     )
@@ -195,7 +195,7 @@ def test_merge_several_into_one(exam: Exam) -> None:
 
 
 def test_merge_rejects_two_answers_for_an_unanswered_target(exam: Exam) -> None:
-    open_, *answered = report(exam), report(exam, seat="C1"), report(exam, seat="D4")
+    open_, *answered = report(exam), report(exam, seat="21"), report(exam, seat="34")
     for r in answered:
         services.answer_clarification(
             r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
@@ -208,7 +208,7 @@ def test_merge_rejects_two_answers_for_an_unanswered_target(exam: Exam) -> None:
 
 
 def test_merge_requeues_seats_that_got_a_different_answer(exam: Exam) -> None:
-    a, b = report(exam), report(exam, seat="C1")
+    a, b = report(exam), report(exam, seat="21")
     ans_a = services.answer_clarification(
         a.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
     )
@@ -222,14 +222,14 @@ def test_merge_requeues_seats_that_got_a_different_answer(exam: Exam) -> None:
 
 
 def test_merge_into_a_photo_keeps_the_sources_wording(exam: Exam) -> None:
-    photo, text = report(exam), report(exam, seat="C1", text="Is S finite?")
+    photo, text = report(exam), report(exam, seat="21", text="Is S finite?")
     services.reword_clarification(photo.clarification, "")  # as a photo-only clarification has none
     services.merge_clarifications(sources=[text.clarification], target=photo.clarification)
     assert fresh(photo.clarification).wording == "Is S finite?"
 
 
 def test_merge_rejects_a_merged_or_the_same_clarification(exam: Exam) -> None:
-    a, b, c = report(exam), report(exam, seat="C1"), report(exam, seat="D4")
+    a, b, c = report(exam), report(exam, seat="21"), report(exam, seat="34")
     services.merge_clarifications(sources=[b.clarification], target=c.clarification)
     for target in (b.clarification, a.clarification):
         with pytest.raises(ServiceError):
@@ -237,7 +237,7 @@ def test_merge_rejects_a_merged_or_the_same_clarification(exam: Exam) -> None:
 
 
 def test_merge_into_an_announced_clarification(exam: Exam) -> None:
-    announced, waiting, answered = report(exam), report(exam, seat="C1"), report(exam, seat="D4")
+    announced, waiting, answered = report(exam), report(exam, seat="21"), report(exam, seat="34")
     services.announce(text="!", member=named(exam, "Prof"), clarification=announced.clarification)
     services.answer_clarification(
         answered.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
@@ -252,7 +252,7 @@ def test_merge_into_an_announced_clarification(exam: Exam) -> None:
 
 def test_move_report_to_new_or_existing_clarification(exam: Exam) -> None:
     a = report(exam)
-    b = report(exam, seat="C1", clarification=a.clarification, text="Is x positive?")
+    b = report(exam, seat="21", clarification=a.clarification, text="Is x positive?")
     new = services.move_report(b, target=None)
     assert new != a.clarification
     assert (new.label, new.wording) == (a.clarification.label, "Is x positive?")
@@ -274,12 +274,12 @@ def test_announce_with_clarification_closes_it(exam: Exam) -> None:
 def test_announce_without_clarification_and_ack_per_venue_is_idempotent(exam: Exam) -> None:
     a = services.announce(text="30 minutes left", member=named(exam, "Prof"))
     assert a.label == ""
-    services.mark_read_out(a, venue="LT19", member=named(exam, "Ann"))
-    services.mark_read_out(a, venue="LT19", member=named(exam, "Bob"))
-    services.mark_read_out(a, venue="LT20", member=named(exam, "Cy"))
+    services.mark_read_out(a, venue="HALL1", member=named(exam, "Ann"))
+    services.mark_read_out(a, venue="HALL1", member=named(exam, "Bob"))
+    services.mark_read_out(a, venue="HALL2", member=named(exam, "Cy"))
     assert [(k.venue, k.member.name) for k in Readout.objects.all()] == [
-        ("LT19", "Ann"),
-        ("LT20", "Cy"),
+        ("HALL1", "Ann"),
+        ("HALL2", "Cy"),
     ]
 
 
@@ -331,7 +331,7 @@ def test_withdrawing_the_only_answer_reopens(exam: Exam) -> None:
 
 @pytest.mark.parametrize("reason", ["announced", "merged"])
 def test_reopen_clarification(exam: Exam, reason: str) -> None:
-    a, b = report(exam), report(exam, seat="B15", text="Other?")
+    a, b = report(exam), report(exam, seat="15", text="Other?")
     if reason == "announced":
         services.announce(text="!", member=named(exam, "Prof"), clarification=a.clarification)
     else:
@@ -344,7 +344,7 @@ def test_reopen_clarification(exam: Exam, reason: str) -> None:
 
 
 def test_merge_is_reversed_by_reopening_and_moving_back(exam: Exam) -> None:
-    a, b = report(exam), report(exam, seat="B15", text="Other?")
+    a, b = report(exam), report(exam, seat="15", text="Other?")
     services.merge_clarifications(sources=[a.clarification], target=b.clarification)
     services.reopen_clarification(a.clarification)
     services.move_report(Report.objects.get(pk=a.pk), target=a.clarification)
@@ -354,7 +354,7 @@ def test_merge_is_reversed_by_reopening_and_moving_back(exam: Exam) -> None:
 
 def test_delete_report_drops_an_unused_clarification(exam: Exam) -> None:
     alone, first = report(exam, label="Q1"), report(exam, label="Q2")
-    joined = report(exam, seat="B15", clarification=first.clarification)
+    joined = report(exam, seat="15", clarification=first.clarification)
     services.delete_report(joined)
     assert list(first.clarification.reports.all()) == [first]
     services.delete_report(alone)
@@ -381,7 +381,7 @@ def test_closed_exam_is_read_only_and_can_reopen(exam: Exam) -> None:
     r = report(exam)
     services.close_exam(exam)
     actions: list[Any] = [
-        lambda: report(exam, seat="C1"),
+        lambda: report(exam, seat="21"),
         lambda: services.answer_clarification(
             r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
         ),
@@ -392,7 +392,7 @@ def test_closed_exam_is_read_only_and_can_reopen(exam: Exam) -> None:
         with pytest.raises(ServiceError, match="closed"):
             action()
     services.reopen_exam(exam)
-    report(exam, seat="C1")
+    report(exam, seat="21")
 
 
 def test_delete_exam_needs_closed_and_removes_photo_folder(
@@ -422,7 +422,7 @@ def test_a_seat_joining_a_clarification_twice_gets_its_existing_report(exam: Exa
 
 
 def test_moving_the_last_seat_closes_the_source_as_merged(exam: Exam) -> None:
-    a, b = report(exam), report(exam, seat="C1")
+    a, b = report(exam), report(exam, seat="21")
     source = a.clarification
     assert services.move_report(a, target=b.clarification) == b.clarification
     source = fresh(source)
@@ -434,6 +434,6 @@ def test_moving_the_last_seat_closes_the_source_as_merged(exam: Exam) -> None:
 
 def test_moving_one_of_several_seats_keeps_the_source_open(exam: Exam) -> None:
     a = report(exam)
-    report(exam, seat="C1", clarification=a.clarification)
+    report(exam, seat="21", clarification=a.clarification)
     services.move_report(a, target=None)
     assert fresh(a.clarification).closed_reason == ""

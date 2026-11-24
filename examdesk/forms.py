@@ -86,13 +86,13 @@ class ReportStartForm(BaseForm):
     venue = PlaceField(
         max_length=30,
         widget=datalist_input(
-            "venues", {"autocapitalize": "characters", "placeholder": "e.g. LT19"}
+            "venues", {"autocapitalize": "characters", "placeholder": "e.g. HALL1"}
         ),
     )
     seat = PlaceField(
         max_length=30,
         widget=datalist_input(
-            "seats", {"autocapitalize": "characters", "autofocus": True, "placeholder": "e.g. B14"}
+            "seats", {"autocapitalize": "characters", "autofocus": True, "placeholder": "e.g. 14"}
         ),
     )
     label = LabelField(

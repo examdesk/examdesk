@@ -75,6 +75,7 @@ The proxy in front should allow 12 MB request bodies and not serve the media fol
 | `DJANGO_EMAIL_PORT` | `587` | `587` uses STARTTLS, `465` TLS |
 | `DJANGO_EMAIL_USER`, `DJANGO_EMAIL_PASSWORD` | empty | SMTP credentials |
 | `DJANGO_DEFAULT_FROM_EMAIL` | `Exam Desk <examdesk@localhost>` | Sender of sign-in codes |
+| `DJANGO_TIME_ZONE` | `UTC` | Time zone of shown times, such as `Europe/London` |
 | `EXAMDESK_REGISTRATION` | on | `0` allows only accounts added in the admin |
 | `EXAMDESK_REGISTRATION_DOMAINS` | empty | Comma-separated email domains that may sign up; empty allows any |
 | `EXAMDESK_PROXY_COUNT` | `1`, or `0` with `DJANGO_DEBUG` | Proxies in front, for sign-in rate limits |

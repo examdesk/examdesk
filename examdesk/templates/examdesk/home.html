@@ -7,7 +7,7 @@
 {% if user.is_authenticated %}
   <c-dialog id="create-dialog" title="New exam" action="{% url 'create_exam' %}" submit="Create exam">
     <label>Name
-      <input name="name" placeholder="e.g. CS2109S Final" maxlength="200" required autocomplete="off" autofocus>
+      <input name="name" placeholder="e.g. Biology Final" maxlength="200" required autocomplete="off" autofocus>
     </label>
   </c-dialog>
 {% endif %}

@@ -18,12 +18,12 @@ def test_every_examdesk_page_renders(client: Client, exam: Exam, staff: User) ->
         answered.clarification, text="Yes.", member=prof, expected_answer=None
     )
     services.mark_delivered(answered, answer=answer, member=ann)
-    services.claim_seat(ann, venue="LT19", seat="C1")
-    announced = report(exam, seat="B15", label="Q4")
+    services.claim_seat(ann, venue="HALL1", seat="21")
+    announced = report(exam, seat="15", label="Q4")
     announcement = services.announce(
         prof, text="Q4 is cancelled.", clarification=announced.clarification
     )
-    services.mark_read_out(announcement, venue="LT19", member=ann)
+    services.mark_read_out(announcement, venue="HALL1", member=ann)
     staff.is_superuser = True
     staff.save()
     client.force_login(staff)

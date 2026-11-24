@@ -29,7 +29,7 @@ def staff() -> User:
 
 @pytest.fixture
 def exam(staff: User) -> Exam:
-    return services.create_exam(name="CS2109S Final", owner=staff)
+    return services.create_exam(name="Biology Final", owner=staff)
 
 
 @pytest.fixture

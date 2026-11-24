@@ -63,8 +63,8 @@ DATABASES = {
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-LANGUAGE_CODE = "en-sg"
-TIME_ZONE = "Asia/Singapore"
+LANGUAGE_CODE = "en"
+TIME_ZONE = os.environ.get("DJANGO_TIME_ZONE", "UTC")
 USE_TZ = True
 
 STATIC_URL = "static/"
