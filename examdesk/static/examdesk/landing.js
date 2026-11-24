@@ -126,6 +126,9 @@ function registerEffects() {
   );
 }
 
+// A ghost button made primary, as Next is once its clarification is answered or closed.
+const primaryButton = (button) => ({ attr: { class: button.className.replace("btn-ghost", "btn-primary") } });
+
 // The hero (landing/hero.html): seat 14 reports a new question, the examiner opens and answers it, and the
 // invigilator delivers the answer.
 function heroTimeline(timeline, $, [report, answer, deliver]) {
@@ -156,14 +159,13 @@ function heroTimeline(timeline, $, [report, answer, deliver]) {
     .set($("row-2a"), { attr: { "aria-current": "false" } })
     .set($("row-3b"), { attr: { "aria-current": "page" } }, "<")
     .swap([$("pane-2a"), $("pane-3b")], {}, "<")
-    .click($("answer-text"), {}, "+=0.6")
-    .type($("answer-text"))
-    .click($("send"), {}, "+=0.3")
-    .hide($("composer"))
-    .show($("answer"), {}, "<")
-    .swap([$("state-open"), $("state-answered")], {}, "<")
-    .hide([$("wait"), $("row-wait")], {}, "<")
-    .show([$("row-answered"), $("row-to-deliver"), $("to-deliver")], {}, "<")
+    .click($("3b-text"), {}, "+=0.6")
+    .type($("3b-text"))
+    .click($("3b-send"), {}, "+=0.3")
+    // Answered, 3b leaves the Open list.
+    .hide([$("3b-composer"), $("3b-wait"), $("row-3b")])
+    .show([$("3b-answer"), $("3b-answered"), $("to-deliver")], {}, "<")
+    .set($("3b-next"), primaryButton($("3b-next")), "<")
     .set([$("clarifications-count"), $("open-count")], { innerText: 2 }, "<")
     .set($("answered-count"), { innerText: 2 }, "<")
     .toast($("sent-toast"), {}, "<")
@@ -179,7 +181,7 @@ function heroTimeline(timeline, $, [report, answer, deliver]) {
     .swap([$("reported-page"), $("seat-page")])
     .tap($("delivered-button"), {}, "+=1.6")
     .swap([$("to-show"), $("all-delivered")])
-    .hide([$("deliver-count"), $("row-to-deliver")], {}, "<")
+    .hide([$("deliver-count"), $("withdraw")], {}, "<")
     .toast($("delivered-toast"), {}, "<")
     .swap([$("to-deliver"), $("delivered")], {}, "<")
     .set(stage, { attr: { "data-active": "both" } }, "<")
@@ -188,6 +190,10 @@ function heroTimeline(timeline, $, [report, answer, deliver]) {
 
 // Reporting (landing/report.html): seat 27 joins a clarification about 3b, then seat 32 reports 3c from a photo.
 function reportTimeline(timeline, $, [seatAndQuestion, alreadyAsked, newQuestion]) {
+  const question = $("second-question");
+  // The second report outgrows the screen, which scrolls to its end.
+  const screen = $("second-report-page").parentElement;
+  const toEnd = { scrollTop: () => screen.scrollHeight - screen.clientHeight, duration: 0.5, ease: EASE };
   timeline
     .addLabel(seatAndQuestion)
     .tap($("seat"), {}, "+=0.5")
@@ -212,17 +218,23 @@ function reportTimeline(timeline, $, [seatAndQuestion, alreadyAsked, newQuestion
     .show($("new-question"), {}, "+=0.3")
     .tap($("new-button"), {}, "+=0.6")
     .swap([$("new-button"), $("new-form")])
+    .to(screen, toEnd)
     .tap($("photo-button"), {}, "+=0.4")
     .show($("photo"))
-    .hide($("reading"), {}, "+=1.2")
-    .type($("second-question"), { speed: 90 })
+    .to(screen, toEnd, "<0.05")
+    .set($("photo-button"), { attr: { "aria-busy": "true" } }, "<")
+    .set(question, { attr: { placeholder: "Reading the photo…" } }, "<")
+    .set($("photo-button"), { attr: { "aria-busy": "false" } }, "+=1.2")
+    .set(question, { attr: { placeholder: question.placeholder } }, "<")
+    .to(question, { typeText: question.dataset.text, duration: 0.2, ease: "none" }, "<")
+    .show($.all("similarity"), {}, "+=0.3")
     .tap($("save"), {}, "+=0.6")
     .swap([$("second-report-page"), $("second-reported-page")])
     .set({}, {}, "+=1.8");
 }
 
 // Answering (landing/answer.html): a duplicate of 3b arrives, both duplicates merge into it, an AI draft answers it,
-// and 2a's answer is announced.
+// and 2a's answer is announced from Send's menu.
 function answerTimeline(timeline, $, [longestWait, merge, draft, announce]) {
   const counts = (open, answered, closed) =>
     timeline
@@ -232,9 +244,9 @@ function answerTimeline(timeline, $, [longestWait, merge, draft, announce]) {
 
   timeline
     .addLabel(longestWait)
-    .show([$("row-duplicate-2"), $("duplicate-2")], {}, "+=0.8")
+    .show([$("row-duplicate-2"), $("duplicate-2"), $("select-all")], {}, "+=0.8")
     .set($("duplicate-count"), { innerText: 2 }, "<");
-  counts(5, 2, 1);
+  counts(4, 1, 0);
   timeline.swap([$("row-2a-wait"), $("row-2a-late")], {}, "+=1.4");
 
   timeline
@@ -246,53 +258,55 @@ function answerTimeline(timeline, $, [longestWait, merge, draft, announce]) {
     .click($("duplicate-2-checkbox"))
     .set($("duplicate-2-checkbox"), { checked: true })
     .click($("merge"), {}, "+=0.3")
+    // Merged, the duplicates are closed and leave the Open list.
     .hide([$("duplicates"), $("row-duplicate-1"), $("row-duplicate-2")])
     .show([...$.all("merged-seat"), $("row-3b-seats")], {}, "<")
-    .set($("3b-seat-count"), { innerText: 3 }, "<")
     .toast($("merged-toast"), {}, "<");
-  counts(3, 2, 1);
+  counts(2, 1, 2);
 
   timeline
     .addLabel(draft, "+=1.2")
-    .click($("draft"), {}, draft)
+    .click($("3b-draft"), {}, draft)
     .type($("3b-text"), { speed: 90 }, "+=0.4")
     .click($("3b-send"), {}, "+=0.6")
-    .hide($("3b-composer"))
-    .show($("3b-answer"), {}, "<")
-    .swap([$("3b-open"), $("3b-answered")], {}, "<")
-    .hide([$("3b-wait"), $("row-3b-wait")], {}, "<")
-    .show([$("row-3b-answered"), $("row-3b-to-deliver"), ...$.all("3b-to-deliver")], {}, "<")
+    .hide([$("3b-composer"), $("3b-wait"), $("row-3b")])
+    .show([$("3b-answer"), $("3b-answered"), ...$.all("3b-to-deliver")], {}, "<")
+    .set($("3b-next"), primaryButton($("3b-next")), "<")
     .toast($("sent-toast"), {}, "<");
-  counts(2, 3, 1);
+  counts(1, 2, 2);
 
   timeline
     .addLabel(announce, "+=1.2")
     .set($("layout"), { attr: { "data-view": "queue" } }, announce)
     .click($("row-2a"), {}, announce)
     .set($("layout"), { attr: { "data-view": "clarification" } })
-    .set($("row-3b"), { attr: { "aria-current": "false" } }, "<")
     .set($("row-2a"), { attr: { "aria-current": "page" } }, "<")
     .swap([$("pane-3b"), $("pane-2a")], {}, "<")
     .click($("2a-text"), {}, "+=0.6")
     .type($("2a-text"))
-    .click($("announce"), {}, "+=0.3")
+    .click($("2a-send-menu-button"), {}, "+=0.3")
+    .show($("2a-send-menu"))
+    .click($("2a-announce"), {}, "+=0.4")
+    .hide($("2a-send-menu"))
     .fromTo($("announce-dialog"), { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2, immediateRender: false })
     .click($("announce-confirm"), {}, "+=0.9")
     .to($("announce-dialog"), { autoAlpha: 0, duration: 0.2 })
-    .hide($("2a-composer"))
-    .show([$("2a-answer"), $("row-2a-announced"), ...$.all("2a-to-read-out")], {}, "<")
-    .swap([$("2a-open"), $("2a-announced")], {}, "<")
-    .hide([$("2a-wait"), $("row-2a-late")], {}, "<")
+    // Closed, 2a leaves the Open list, and its seats can no longer be moved.
+    .swap([$("2a-composer"), $("2a-reopen")])
+    .hide([$("row-2a"), $("2a-wait"), $("clarifications-count")], {}, "<")
+    .hide($("pane-2a").querySelectorAll('[data-el="seat-actions"]'), {}, "<")
+    .show([$("empty"), $("2a-answer"), $("2a-announced"), $("announcements-count")], {}, "<")
+    .show($.all("2a-to-read-out"), {}, "<")
+    .set($("2a-next"), primaryButton($("2a-next")), "<")
     .toast($("announced-toast"), {}, "<");
-  counts(1, 3, 2);
+  counts(0, 2, 3);
   timeline.set({}, {}, "+=2");
 }
 
-// Delivering (landing/deliver.html): seat 27 is with Ben, so seat 14 is delivered, then comes back with a corrected
+// Delivering (landing/deliver.html): seat 8 is with Ben, so seat 14 is delivered, then comes back with a corrected
 // answer.
 function deliverTimeline(timeline, $, [seats, oneInvigilator, delivered, corrected]) {
   const rows = $("list-page").querySelectorAll(".deliver-row");
-  const subtitle = $("corrected-page").querySelector(".page-header p");
   timeline
     .addLabel(seats)
     .fromTo(rows, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, stagger: 0.15, immediateRender: false }, seats)
@@ -301,7 +315,7 @@ function deliverTimeline(timeline, $, [seats, oneInvigilator, delivered, correct
   timeline
     .addLabel(oneInvigilator, "+=0.4")
     .show($("claim"), {}, oneInvigilator)
-    .set($("row-27"), { attr: { class: "deliver-row claimed" } }, "<")
+    .set($("row-8"), { attr: { class: "deliver-row claimed" } }, "<")
     .tap($("row-14"), {}, "+=1.4")
     .swap([$("list-page"), $("seat-page")]);
 
@@ -316,8 +330,11 @@ function deliverTimeline(timeline, $, [seats, oneInvigilator, delivered, correct
     .addLabel(corrected, "+=1.4")
     .tap($("deliver-tab"), {}, corrected)
     .swap([$("seat-page"), $("corrected-page")])
-    .show($("row-corrected"), {}, "+=0.9")
-    .set(subtitle, { innerText: "3 seats to deliver" }, "<")
+    // The correction is newer than Ben's claim, so the claim ends.
+    .swap([$("old-answer"), $("new-answer")], {}, "+=0.9")
+    .hide([$("claim-corrected"), $("delivered-recently")], {}, "<")
+    .set($("row-8-corrected"), { attr: { class: "deliver-row" } }, "<")
+    .show($("row-corrected"), {}, "<")
     .set($("deliver-count"), { innerText: 3 }, "<")
     .set({}, {}, "+=2");
 }

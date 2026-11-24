@@ -9,22 +9,21 @@
     <div class="landing-stage landing-phone-stage" inert aria-hidden="true">
       <c-landing.phone exam="Algorithms Final" venue="Hall A" tab="report">
         <div data-el="first-report-page">
-          <c-page-header title="Report a question" />
           <div class="grid grid-cols-2 gap-3">
             <label class="mb-0">Seat<input placeholder="e.g. 14" data-el="seat" data-text="27"></label>
             <label class="mb-0">Question<input placeholder="e.g. 3b" data-el="label" data-text="3b"></label>
           </div>
           <div class="mt-6" data-el="matches" data-shown="0">
             <h2 class="section-title">Already asked about 3</h2>
-            <div class="list-card mb-4">
-              <span class="match match-button" data-el="match">
-                <span class="flex flex-wrap items-center gap-1.5"><span class="label-chip">3b</span><c-state-badge :state="State.OPEN" /></span>
-                <span class="mt-1.5 block leading-snug font-medium">Is big-O enough or do you want the exact count?</span>
-                <span class="match-action">Same question<c-icon name="chevron-right" /></span>
-              </span>
+            <div class="list-card mb-6">
               <span class="match match-button">
                 <span class="flex flex-wrap items-center gap-1.5"><span class="label-chip">3a</span><c-state-badge :state="State.ANSWERED" /></span>
                 <span class="mt-1.5 block leading-snug font-medium">Can the array have duplicates?</span>
+                <span class="match-action">Same question<c-icon name="chevron-right" /></span>
+              </span>
+              <span class="match match-button" data-el="match">
+                <span class="flex flex-wrap items-center gap-1.5"><span class="label-chip">3b</span><c-state-badge :state="State.OPEN" /></span>
+                <span class="mt-1.5 block leading-snug font-medium">Is big-O enough or do you want the exact count?</span>
                 <span class="match-action">Same question<c-icon name="chevron-right" /></span>
               </span>
             </div>
@@ -46,21 +45,35 @@
         </div>
 
         <div data-el="second-report-page" data-shown="0">
-          <c-page-header title="Report a question" />
           <div class="grid grid-cols-2 gap-3">
             <label class="mb-0">Seat<input placeholder="e.g. 14" data-el="second-seat" data-text="32"></label>
             <label class="mb-0">Question<input placeholder="e.g. 3b" data-el="second-label" data-text="3c"></label>
           </div>
           <div class="mt-6" data-el="new-question" data-shown="0">
+            <h2 class="section-title">Already asked about 3</h2>
+            <div class="list-card mb-6">
+              <span class="match match-button">
+                <span class="flex flex-wrap items-center gap-1.5"><span class="label-chip">3a</span><c-state-badge :state="State.ANSWERED" /><span class="meta ml-auto" data-el="similarity" data-shown="0">21% alike</span></span>
+                <span class="mt-1.5 block leading-snug font-medium">Can the array have duplicates?</span>
+                <span class="match-action">Same question<c-icon name="chevron-right" /></span>
+              </span>
+              <span class="match match-button">
+                <span class="flex flex-wrap items-center gap-1.5"><span class="label-chip">3b</span><c-state-badge :state="State.OPEN" /><span class="meta ml-auto" data-el="similarity" data-shown="0">9% alike</span></span>
+                <span class="mt-1.5 block leading-snug font-medium">Is big-O enough or do you want the exact count?</span>
+                <span class="match-action">Same question<c-icon name="chevron-right" /></span>
+              </span>
+            </div>
             <span class="btn btn-outline btn-block" data-el="new-button"><c-icon name="plus" />New clarification</span>
             <div class="flex flex-col gap-3" data-el="new-form" data-shown="0">
               <h2 class="section-title mb-0">New clarification</h2>
               <textarea rows="3" placeholder="What is the student asking?" data-el="second-question" data-text="In 3c, can we assume the graph is connected?"></textarea>
-              <div class="flex items-start gap-3" data-el="photo" data-shown="0">
-                {% include "examdesk/landing/photo.svg" %}
-                <span class="meta mt-1 flex items-center gap-1.5" data-el="reading"><span class="loading loading-spinner loading-xs"></span>Reading</span>
+              <div>
+                <div class="mb-2.5 flex items-start gap-3" data-el="photo" data-shown="0">
+                  {% include "examdesk/landing/photo.svg" %}
+                  <span class="btn btn-ghost btn-danger btn-sm"><c-icon name="x" />Remove</span>
+                </div>
+                <span class="btn btn-outline btn-block" data-el="photo-button"><c-icon name="camera" />Fill in from photo</span>
               </div>
-              <span class="btn btn-outline btn-block" data-el="photo-button"><c-icon name="camera" />Fill in from photo</span>
               <span class="btn btn-primary btn-block btn-lg" data-el="save"><c-icon name="check" />Save clarification</span>
             </div>
           </div>

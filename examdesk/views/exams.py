@@ -71,7 +71,6 @@ def home(request: HttpRequest) -> HttpResponse:
             {
                 "sections": LANDING_SECTIONS,
                 "features": LANDING_FEATURES,
-                "canned": settings.EXAMDESK_CANNED_ANSWERS,
                 "State": Clarification.State,
                 "ReportState": Report.State,
             },

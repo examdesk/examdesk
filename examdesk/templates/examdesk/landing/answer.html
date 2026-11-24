@@ -3,79 +3,50 @@
 <div class="mx-auto max-w-6xl" data-demo="answer">
   <div class="landing-stage-box" role="img" aria-label="The examiner's list of clarifications. Two duplicates of 3b merge into it, an AI draft answers it, and the answer to 2a is announced to every venue.">
     <div class="landing-stage landing-window-stage" inert aria-hidden="true">
-      <c-landing.window exam="Algorithms Final" clarifications="4">
+      <c-landing.window exam="Algorithms Final" clarifications="3">
         <div class="clarifications-layout h-full" data-el="layout" data-view="queue">
           <section class="queue" aria-label="Clarifications">
-            <div class="queue-toolbar">
-              <nav class="tabs tabs-box tabs-sm fill"><a class="tab gap-1.5" aria-current="true">All</a><a class="tab gap-1.5">Open<span class="num" data-el="open-count">4</span></a><a class="tab gap-1.5">Answered<span class="num" data-el="answered-count">2</span></a><a class="tab gap-1.5">Closed<span class="num" data-el="closed-count">1</span></a></nav>
-              <div class="flex gap-2"><input class="min-w-0 flex-1" placeholder="All questions"><select class="w-34 shrink-0"><option>Longest wait</option></select></div>
-            </div>
+            <c-landing.queue-toolbar open="3" answered="1" closed="0" />
             <div class="queue-list"><div class="queue-rows">
               <a class="queue-row" aria-current="false" data-el="row-2a">
-                <div class="mb-1 flex items-center gap-2 text-meta text-subtle">
-                  <span class="label-chip">2a</span><span class="inline-flex items-center gap-1"><c-icon name="users" />2</span>
-                  <span data-el="row-2a-announced" data-shown="0"><c-state-badge :state="State.ANNOUNCED" /></span>
-                  <span class="wait ml-auto" data-el="row-2a-wait">4 min</span><span class="wait late ml-auto" data-el="row-2a-late" data-shown="0">5 min</span>
-                </div>
-                <p>Is there a typo in 2a? The bound says n² but the code loops n times.</p>
+                <p><span class="queue-row-meta"><span class="inline-flex items-center gap-1"><c-icon name="users" />2</span><span class="wait" data-el="row-2a-wait">4 min</span><span class="wait late" data-el="row-2a-late" data-shown="0">5 min</span></span><span class="label-chip mr-1.5">2a</span>Is there a typo in 2a? The bound says n² but the code loops n times.</p>
               </a>
               <a class="queue-row" aria-current="page" data-el="row-3b">
-                <div class="mb-1 flex items-center gap-2 text-meta text-subtle">
-                  <span class="label-chip">3b</span>
-                  <span data-el="row-3b-answered" data-shown="0"><c-state-badge :state="State.ANSWERED" /></span>
-                  <span class="inline-flex items-center gap-1" data-el="row-3b-seats" data-shown="0"><c-icon name="users" />3</span>
-                  <span class="wait ml-auto" data-el="row-3b-wait">3 min</span>
-                  <span class="ml-auto font-medium text-blue-700" data-el="row-3b-to-deliver" data-shown="0">3 to deliver</span>
-                </div>
-                <p>For 3b, is big-O enough or do you want the exact number?</p>
+                <p><span class="queue-row-meta"><span class="inline-flex items-center gap-1" data-el="row-3b-seats" data-shown="0"><c-icon name="users" />3</span><span class="wait">3 min</span></span><span class="label-chip mr-1.5">3b</span>For 3b, is big-O enough or do you want the exact number?</p>
               </a>
               <a class="queue-row" data-el="row-duplicate-1">
-                <div class="mb-1 flex items-center gap-2 text-meta text-subtle"><span class="label-chip">3b</span><span class="wait ml-auto">2 min</span></div>
-                <p>Exact count of comparisons in 3b?</p>
-              </a>
-              <a class="queue-row">
-                <div class="mb-1 flex items-center gap-2 text-meta text-subtle"><span class="label-chip">1</span><c-state-badge :state="State.ANSWERED" /><span class="ml-auto font-medium text-blue-700">1 to deliver</span></div>
-                <p>Can we use the built-in sort?</p>
+                <p><span class="queue-row-meta"><span class="wait">2 min</span></span><span class="label-chip mr-1.5">3b</span>Exact count of comparisons in 3b?</p>
               </a>
               <a class="queue-row" data-el="row-duplicate-2" data-shown="0">
-                <div class="mb-1 flex items-center gap-2 text-meta text-subtle"><span class="label-chip">3b</span><span class="wait ml-auto">&lt;1 min</span></div>
-                <p>In 3b, do we count comparisons or swaps?</p>
+                <p><span class="queue-row-meta"><span class="wait">&lt;1 min</span></span><span class="label-chip mr-1.5">3b</span>In 3b, do we count comparisons or swaps?</p>
               </a>
+              <div data-el="empty" data-shown="0"><c-empty icon="inbox" title="No open clarifications" /></div>
             </div></div>
           </section>
 
           <section class="clarification-pane" aria-label="Clarification" data-clarification data-el="pane-3b">
-            <div class="pane-header">
-              <h2 class="flex min-w-0 items-center gap-2.5"><span class="label-chip h-6 text-sm">3b</span><span data-el="3b-open"><c-state-badge :state="State.OPEN" /></span><span data-el="3b-answered" data-shown="0"><c-state-badge :state="State.ANSWERED" /></span></h2>
-              <span class="meta wait" data-el="3b-wait">3 min</span>
-              <div class="ml-auto flex items-center gap-1.5"><span class="btn btn-ghost btn-sm"><c-icon name="git-merge" />Merge</span><span class="btn btn-ghost btn-sm">Next<c-icon name="chevron-right" /></span></div>
-            </div>
+            <c-landing.pane-header label="3b" wait="3 min">
+              <span data-el="3b-answered" data-shown="0"><c-state-badge :state="State.ANSWERED" /></span>
+            </c-landing.pane-header>
             <div class="clarification-body">
-              <p class="wording-text">For 3b, is big-O enough or do you want the exact number?</p>
-              <section class="rounded-box border border-green-600/20 bg-green-50/50 p-4" data-el="3b-answer" data-shown="0">
-                <div class="mb-1 flex min-h-8 items-center gap-x-2"><h2 class="flex items-center gap-1.5 text-meta text-green-800"><c-icon name="check" />Answer</h2><span class="meta">Lee · 10:39</span><span class="btn btn-ghost btn-sm -mr-2 ml-auto"><c-icon name="pen-line" />Correct answer</span></div>
-                <p class="prose-answer">{{ answer_3b }}</p>
-              </section>
-              <section>
-                <h2 class="section-title">Seats<span class="count" data-el="3b-seat-count">1</span></h2>
-                <div class="pane-list">
-                  <div class="row-item items-start">
-                    <p class="min-w-0 flex-1"><span class="font-medium">Hall A 14</span> <span class="meta">Ann · 10:36</span></p>
-                    <span data-el="3b-to-deliver" data-shown="0"><c-state-badge :state="ReportState.TO_DELIVER" /></span>
-                  </div>
-                  <div class="row-item items-start" data-el="merged-seat" data-shown="0">
-                    <p class="min-w-0 flex-1"><span class="font-medium">Hall A 27</span> <span class="meta">Ann · 10:37</span></p>
-                    <span data-el="3b-to-deliver" data-shown="0"><c-state-badge :state="ReportState.TO_DELIVER" /></span>
-                  </div>
-                  <div class="row-item items-start" data-el="merged-seat" data-shown="0">
-                    <p class="min-w-0 flex-1"><span class="font-medium">Hall B 12</span> <span class="meta">Ben · 10:38</span></p>
-                    <span data-el="3b-to-deliver" data-shown="0"><c-state-badge :state="ReportState.TO_DELIVER" /></span>
-                  </div>
+              <section aria-label="Question">
+                <div class="wording-view"><span class="wording-text">For 3b, is big-O enough or do you want the exact number?</span></div>
+                <div class="seat-list mt-2">
+                  <c-landing.seat place="Hall A 14" asked="Ann · 10:36">
+                    <span data-el="3b-to-deliver" data-shown="0"><c-state-badge :state="ReportState.TO_DELIVER" class="mt-0.5" /></span>
+                  </c-landing.seat>
+                  <c-landing.seat place="Hall A 27" asked="Ann · 10:37" data-el="merged-seat" data-shown="0">
+                    <span data-el="3b-to-deliver" data-shown="0"><c-state-badge :state="ReportState.TO_DELIVER" class="mt-0.5" /></span>
+                  </c-landing.seat>
+                  <c-landing.seat place="Hall B 12" asked="Ben · 10:38" data-el="merged-seat" data-shown="0">
+                    <span data-el="3b-to-deliver" data-shown="0"><c-state-badge :state="ReportState.TO_DELIVER" class="mt-0.5" /></span>
+                  </c-landing.seat>
                 </div>
               </section>
+              <c-landing.answer data-el="3b-answer" data-shown="0" text="{{ answer_3b }}" time="Lee · 10:39" withdraw />
               <section class="group" data-el="duplicates">
                 <div class="mb-2 flex min-h-6 items-center gap-2">
-                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary mr-1 rounded-sm">
+                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary mr-1 rounded-sm" data-el="select-all" data-shown="0">
                   <h2 class="section-title mb-0"><c-icon name="sparkles" class="text-primary" />Possible duplicates<span class="count" data-el="duplicate-count">1</span></h2>
                   <span class="btn btn-primary btn-xs ml-auto" data-el="merge" data-shown="0"><c-icon name="git-merge" />Merge into this</span>
                 </div>
@@ -95,37 +66,31 @@
                 </div>
               </section>
             </div>
-            <div class="answer-composer" data-el="3b-composer">
-              <div class="mb-2 flex flex-wrap gap-1.5"><span class="reply-chip text-primary" data-el="draft"><c-icon name="sparkles" />Draft with AI</span>{% for text in canned %}<span class="reply-chip">{{ text }}</span>{% endfor %}</div>
-              <textarea rows="2" placeholder="Answer" data-el="3b-text" data-text="{{ answer_3b }}"></textarea>
-              <div class="mt-3 flex items-center justify-end gap-2"><span class="btn btn-ghost btn-sm"><c-icon name="megaphone" />Announce</span><span class="btn btn-primary btn-sm" data-el="3b-send"><c-icon name="send" />Send</span></div>
-            </div>
+            <c-landing.composer name="3b" ai text="{{ answer_3b }}" data-el="3b-composer" />
           </section>
 
           <section class="clarification-pane" aria-label="Clarification" data-clarification data-el="pane-2a" data-shown="0">
-            <div class="pane-header">
-              <h2 class="flex min-w-0 items-center gap-2.5"><span class="label-chip h-6 text-sm">2a</span><span data-el="2a-open"><c-state-badge :state="State.OPEN" /></span><span data-el="2a-announced" data-shown="0"><c-state-badge :state="State.ANNOUNCED" /></span></h2>
-              <span class="meta wait late" data-el="2a-wait">5 min</span>
-              <div class="ml-auto flex items-center gap-1.5"><span class="btn btn-ghost btn-sm"><c-icon name="git-merge" />Merge</span><span class="btn btn-ghost btn-sm">Next<c-icon name="chevron-right" /></span></div>
-            </div>
+            <c-landing.pane-header label="2a" wait="5 min" late>
+              <span data-el="2a-announced" data-shown="0"><c-state-badge :state="State.ANNOUNCED" /></span>
+            </c-landing.pane-header>
             <div class="clarification-body">
-              <p class="wording-text">Is there a typo in 2a? The bound says n² but the code loops n times.</p>
-              <section class="rounded-box border border-green-600/20 bg-green-50/50 p-4" data-el="2a-answer" data-shown="0">
-                <div class="mb-1 flex min-h-8 items-center gap-x-2"><h2 class="flex items-center gap-1.5 text-meta text-green-800"><c-icon name="check" />Answer</h2><span class="meta">Lee · 10:41</span></div>
-                <p class="prose-answer">{{ answer_2a }}</p>
-              </section>
-              <section>
-                <h2 class="section-title">Seats<span class="count">2</span></h2>
-                <div class="pane-list">
-                  <div class="row-item items-start"><p class="min-w-0 flex-1"><span class="font-medium">Hall A 32</span> <span class="meta">Ann · 10:36</span></p><span data-el="2a-to-read-out" data-shown="0"><c-state-badge :state="ReportState.TO_READ_OUT" /></span></div>
-                  <div class="row-item items-start"><p class="min-w-0 flex-1"><span class="font-medium">Hall B 21</span> <span class="meta">Ben · 10:37</span></p><span data-el="2a-to-read-out" data-shown="0"><c-state-badge :state="ReportState.TO_READ_OUT" /></span></div>
+              <section aria-label="Question">
+                <div class="wording-view"><span class="wording-text">Is there a typo in 2a? The bound says n² but the code loops n times.</span></div>
+                <div class="seat-list mt-2">
+                  <c-landing.seat place="Hall A 32" asked="Ann · 10:36">
+                    <span data-el="2a-to-read-out" data-shown="0"><c-state-badge :state="ReportState.TO_READ_OUT" class="mt-0.5" /></span>
+                  </c-landing.seat>
+                  <c-landing.seat place="Hall B 21" asked="Ben · 10:37">
+                    <span data-el="2a-to-read-out" data-shown="0"><c-state-badge :state="ReportState.TO_READ_OUT" class="mt-0.5" /></span>
+                  </c-landing.seat>
                 </div>
               </section>
+              <c-landing.answer data-el="2a-answer" data-shown="0" text="{{ answer_2a }}" time="Lee · 10:41" />
             </div>
-            <div class="answer-composer" data-el="2a-composer">
-              <div class="mb-2 flex flex-wrap gap-1.5"><span class="reply-chip text-primary"><c-icon name="sparkles" />Draft with AI</span>{% for text in canned %}<span class="reply-chip">{{ text }}</span>{% endfor %}</div>
-              <textarea rows="2" placeholder="Answer" data-el="2a-text" data-text="{{ answer_2a }}"></textarea>
-              <div class="mt-3 flex items-center justify-end gap-2"><span class="btn btn-ghost btn-sm" data-el="announce"><c-icon name="megaphone" />Announce</span><span class="btn btn-primary btn-sm"><c-icon name="send" />Send</span></div>
+            <c-landing.composer name="2a" ai text="{{ answer_2a }}" data-el="2a-composer" />
+            <div class="answer-composer flex flex-wrap items-center justify-between gap-3" data-el="2a-reopen" data-shown="0">
+              <p class="text-sm text-muted">Announced. Reopen it to answer.</p>
+              <span class="btn btn-outline btn-sm"><c-icon name="rotate-ccw" />Reopen</span>
             </div>
           </section>
         </div>

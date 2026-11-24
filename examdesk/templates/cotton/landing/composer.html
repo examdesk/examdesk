@@ -1,0 +1,16 @@
+<c-vars name text="" ai=False />
+{# The answer box (examiner/clarification.html): the text, Draft with an AI service, Quick replies, and Send with Announce in its menu. Parts are named after `name`. #}
+<div class="answer-composer" {{ attrs }}>
+  <textarea rows="3" placeholder="Answer" data-el="{{ name }}-text" data-text="{{ text }}"></textarea>
+  <div class="mt-3 flex flex-wrap items-center gap-1">
+    {% if ai %}<span class="btn btn-ghost btn-sm max-sm:btn-square text-primary" data-el="{{ name }}-draft"><c-icon name="sparkles" /><span class="max-sm:sr-only">Draft</span></span>{% endif %}
+    <span class="btn btn-ghost btn-sm">Quick replies<c-icon name="chevron-down" class="size-3.5 text-subtle" /></span>
+    <div class="relative ml-auto flex items-center gap-2">
+      <div class="join">
+        <span class="btn btn-primary btn-sm join-item" data-el="{{ name }}-send"><c-icon name="send" />Send</span>
+        <span class="btn btn-primary btn-sm btn-square join-item border-l-primary-content/25" data-el="{{ name }}-send-menu-button"><c-icon name="chevron-down" /></span>
+      </div>
+      <ul class="menu-panel landing-menu" data-el="{{ name }}-send-menu" data-shown="0"><li><button type="button" data-el="{{ name }}-announce"><c-icon name="megaphone" />Announce…</button></li></ul>
+    </div>
+  </div>
+</div>

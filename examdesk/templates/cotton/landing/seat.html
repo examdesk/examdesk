@@ -1,0 +1,7 @@
+<c-vars place asked />
+{# A seat that asked, under the question: its state badge in the slot, then its actions menu. #}
+<div class="row-item items-start" {{ attrs }}>
+  <div class="min-w-0 flex-1"><p class="flex flex-wrap items-baseline gap-x-2"><span class="font-medium">{{ place }}</span><span class="meta">{{ asked }}</span></p></div>
+  {{ slot }}
+  <span class="btn btn-ghost btn-xs btn-square -mr-1" data-el="seat-actions"><c-icon name="ellipsis" /></span>
+</div>

@@ -1,0 +1,15 @@
+<c-vars text time withdraw=False />
+{# A clarification's answer. With `withdraw`, Correct answer and Withdraw too, as while it can still be answered and nothing is delivered. #}
+<section class="rounded-box border border-green-600/20 bg-green-50/50 p-4" {{ attrs }}>
+  <div class="mb-1.5 flex flex-wrap items-center gap-x-2">
+    <h2 class="flex items-center gap-1.5 text-meta text-green-800"><c-icon name="check" />Answer</h2>
+    <span class="meta">{{ time }}</span>
+    {% if withdraw %}
+      <div class="-my-0.5 -mr-1.5 ml-auto flex gap-0.5">
+        <span class="btn btn-ghost btn-xs font-normal text-muted"><c-icon name="pen-line" /><span class="max-sm:sr-only">Correct answer</span></span>
+        <span class="btn btn-ghost btn-xs font-normal text-muted" data-el="withdraw"><c-icon name="undo-2" />Withdraw</span>
+      </div>
+    {% endif %}
+  </div>
+  <p class="prose-answer">{{ text }}</p>
+</section>

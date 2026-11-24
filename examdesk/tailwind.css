@@ -249,7 +249,6 @@
   /* Sections keep their height, so the pane scrolls instead of squashing them. */
   .clarification-body > *, .pane-header, .answer-composer { @apply shrink-0; }
   .answer-composer { @apply border-t border-base-300 p-(--surface-padding); }
-  .reply-chip { @apply btn btn-ghost btn-xs bg-base-200 font-normal hover:bg-base-300; }
   /* The wording, edited in place in a text box of the same size. Not `text-pretty`: it would
      break lines where the text box doesn't. */
   .wording-text { @apply text-lg leading-7 font-medium text-wrap whitespace-pre-wrap; }
@@ -483,7 +482,7 @@
   }
   .landing-phone-screen { @apply relative flex h-full flex-col overflow-hidden rounded-[36px] bg-base-200; }
   .landing-phone-screen > .appbar { @apply pt-5; }
-  .landing-phone-page { @apply relative min-h-0 flex-1 overflow-hidden px-4 pt-5; }
+  .landing-phone-page { @apply relative min-h-0 flex-1 overflow-hidden px-4 pt-5 pb-4; }
 
   .landing-pointer {
     @apply pointer-events-none invisible absolute top-0 left-0 z-60 opacity-0;
@@ -622,6 +621,8 @@
   .landing-phone .dock { @apply relative shrink-0; }
   /* A dialog in a demo shows as daisyUI shows an open one. */
   .landing-dialog > .modal-box { @apply translate-0 scale-100 opacity-100; }
+  /* A menu in a demo, open above its button, where the app's popover flips with no room below. */
+  .landing-stage .menu-panel.landing-menu { @apply absolute right-0 bottom-full z-30 mt-0 mb-2 flex; }
   .dock {
     @apply border-t border-base-300 bg-base-100/95 backdrop-blur;
     padding-inline: max(0.5rem, (100% - var(--container-2xl)) / 2 + 1rem);

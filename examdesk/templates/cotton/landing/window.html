@@ -1,16 +1,15 @@
 {% load static %}
-<c-vars exam clarifications class="" />
-{# The examiner's app bar, as base.html draws it for an exam, around a page. #}
+<c-vars exam clarifications class="" narrow=False />
+{# The examiner's app bar, as base.html draws it for an exam, around a page. A `narrow` window has no room for the Invigilator view label. #}
 <div class="landing-window {{ class }}">
   <header class="appbar static">
     <div class="appbar-row px-5">
-      <span class="brand"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-7"></span>
-      <span class="flex min-w-0 items-center gap-2"><span class="truncate font-semibold">{{ exam }}</span><span class="badge green shrink-0"><span class="live-dot"></span>Live</span></span>
+      <span class="flex min-w-0 flex-1 items-center gap-2 lg:flex-none"><span class="brand"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-7"></span><span class="truncate font-semibold">{{ exam }}</span><span class="badge green shrink-0"><span class="live-dot"></span>Live</span></span>
       <nav class="tabs-nav">
         <a aria-current="page">Clarifications<span class="count action" data-el="clarifications-count">{{ clarifications }}</span></a>
-        <a>Announcements</a><a>Seats</a><a>People</a><a>Settings</a>
+        <a>Announcements<span class="count" data-el="announcements-count" data-shown="0">1</span></a><a>Seats</a><a>People</a><a>Settings</a>
       </nav>
-      <div class="ml-auto flex shrink-0 items-center gap-2"><span class="btn btn-ghost btn-sm btn-square"><c-icon name="smartphone" /></span><span class="initials">LT</span></div>
+      <div class="ml-auto flex shrink-0 items-center gap-2"><span class="btn btn-ghost btn-sm {% if narrow %}btn-square{% else %}max-sm:btn-square{% endif %}"><c-icon name="smartphone" /><span class="{% if narrow %}sr-only{% else %}max-sm:sr-only{% endif %}">Invigilator view</span></span><span class="initials">LT</span></div>
     </div>
   </header>
   <div class="landing-window-page">{{ slot }}</div>

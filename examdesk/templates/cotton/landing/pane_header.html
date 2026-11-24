@@ -1,0 +1,11 @@
+<c-vars label wait late=False />
+{# A clarification's header (examiner/clarification.html): its question, a state badge in the slot, and the actions menu; below lg, also Back, its wait and Next. #}
+<div class="pane-header">
+  <span class="btn btn-ghost btn-sm btn-square -ml-2 lg:hidden"><c-icon name="arrow-left" /></span>
+  <h2 class="flex min-w-0 items-center gap-2.5"><span class="label-chip h-6 text-sm">{{ label }}</span>{{ slot }}</h2>
+  <span class="meta wait lg:hidden{% if late %} late{% endif %}" data-el="{{ label }}-wait">{{ wait }}</span>
+  <div class="-mr-2 ml-auto flex items-center gap-1">
+    <span class="btn btn-ghost btn-sm btn-square"><c-icon name="ellipsis" /></span>
+    <span class="btn btn-ghost btn-sm max-sm:btn-square lg:hidden" data-el="{{ label }}-next"><span class="max-sm:sr-only">Next</span><c-icon name="chevron-right" /></span>
+  </div>
+</div>
