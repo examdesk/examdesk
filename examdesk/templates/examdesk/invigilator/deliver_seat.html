@@ -53,10 +53,10 @@
           <p class="prose-answer mb-3 font-medium">{{ report.clarification.current_answer.text }}</p>
           <div class="flex items-center gap-2">
             <span class="meta">{{ report.current_delivery.member.name }} · {{ report.current_delivery.created_at|time:"H:i" }}</span>
-            <form method="post" action="{% url 'invigilator:unmark_delivered' pk report.current_delivery.pk %}" class="ml-auto">
+            <form method="post" action="{% url 'invigilator:undo_delivery' pk report.current_delivery.pk %}" class="ml-auto">
               {% csrf_token %}
               {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
-              <button class="btn btn-ghost btn-sm"><c-icon name="undo-2" />Unmark</button>
+              <button class="btn btn-ghost btn-sm"><c-icon name="undo-2" />Undo</button>
             </form>
           </div>
         </div>

@@ -340,7 +340,7 @@ def test_delivery_state_updates_on_refresh(
     seats = clarification_live[clarification_live.index('aria-label="Seats"') :]
     assert seats.count('class="badge state-delivered mt-0.5"') == 2
     deliver_live = invigilator.get(deliver_page, headers=REFRESH).content.decode()
-    assert "Unmark</button>" in deliver_live
+    assert "Undo</button>" in deliver_live
     assert '<span class="meta">Bob · ' in deliver_live
     seat_live = examiner.get(seat_page, headers=REFRESH).content.decode()
     assert "Delivered by Bob at" in seat_live

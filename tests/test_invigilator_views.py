@@ -107,7 +107,7 @@ def test_deliver_list_shows_seats_with_counts(invigilator: Client, exam: Exam) -
     assert 'aria-label="HALL1 21: all delivered"' in delivered
 
 
-def test_seat_page_marks_and_unmarks(invigilator: Client, exam: Exam) -> None:
+def test_seat_page_marks_and_undoes(invigilator: Client, exam: Exam) -> None:
     q3 = report(exam)
     q5 = report(exam, label="Q5", text="Is y real?")
     answers = [
@@ -131,17 +131,17 @@ def test_seat_page_marks_and_unmarks(invigilator: Client, exam: Exam) -> None:
     delivered = html[html.index("Delivered</h2>") :]
     assert "<strong>Q3b</strong> Is x an integer?" in delivered
     assert '<span class="meta">Ann · ' in delivered
-    assert "Unmark</button>" in delivered
+    assert "Undo</button>" in delivered
     response = invigilator.post(
         url("invigilator:mark_delivered", exam, q5.pk), {"answer": answers[1].pk}, follow=True
     )
     assert response.redirect_chain[-1][0] == seat_page(exam, "HALL1", "14")
     assert "All delivered to 14" in response.content.decode()
     delivery = q5.deliveries.get()
-    response = invigilator.post(url("invigilator:unmark_delivered", exam, delivery.pk), follow=True)
+    response = invigilator.post(url("invigilator:undo_delivery", exam, delivery.pk), follow=True)
     assert response.redirect_chain[-1][0] == seat_page(exam, "HALL1", "14")
     html = response.content.decode()
-    assert "Unmarked HALL1 14." in html
+    assert "HALL1 14 back to not delivered." in html
     assert not q5.deliveries.exists()
     invigilator.post(url("invigilator:mark_delivered", exam, q5.pk), {"answer": answers[1].pk})
     assert q5.deliveries.get().member.name == "Ann"
@@ -361,16 +361,16 @@ def test_announcements_unread_then_marked_as_announced(invigilator: Client, exam
     assert announcement.readouts.get().venue == "HALL1"
     assert member(invigilator, exam).venue == "HALL1"
     html = invigilator.post(
-        url("invigilator:unmark_read_out", exam, announcement.pk), follow=True
+        url("invigilator:undo_read_out", exam, announcement.pk), follow=True
     ).content.decode()
-    assert "Unmarked in HALL1." in html
+    assert "HALL1 back to not read out." in html
     assert not announcement.readouts.exists()
     unread = invigilator.get(url("invigilator:announcements", exam)).content.decode()
     assert "</svg>Read out in HALL1</button>" in unread
     response = invigilator.post(url("invigilator:mark_read_out", exam, announcement.pk))
     assert response["Location"] == url("invigilator:announcements", exam)
     read = invigilator.get(url("invigilator:announcements", exam)).content.decode()
-    assert 'aria-label="Read out in HALL1: unmark"' in read
+    assert 'aria-label="Undo read out in HALL1"' in read
     assert re.search(r'</svg>HALL1 · Ann · <span class="num">\d\d:\d\d</span>', read)
 
 

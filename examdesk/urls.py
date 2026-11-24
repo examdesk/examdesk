@@ -14,9 +14,9 @@ invigilator_patterns = [
     path("deliver/seat/", invigilator.deliver_seat, name="deliver_seat"),
     path("reports/<int:report_id>/delivered/", invigilator.mark_delivered, name="mark_delivered"),
     path(
-        "deliveries/<int:delivery_id>/unmark/",
-        invigilator.unmark_delivered,
-        name="unmark_delivered",
+        "deliveries/<int:delivery_id>/undo/",
+        invigilator.undo_delivery,
+        name="undo_delivery",
     ),
     path("announcements/", invigilator.announcements, name="announcements"),
     path(
@@ -30,9 +30,9 @@ invigilator_patterns = [
         name="snooze_announcement",
     ),
     path(
-        "announcements/<int:announcement_id>/unmark-read-out/",
-        invigilator.unmark_read_out,
-        name="unmark_read_out",
+        "announcements/<int:announcement_id>/undo-read-out/",
+        invigilator.undo_read_out,
+        name="undo_read_out",
     ),
 ]
 

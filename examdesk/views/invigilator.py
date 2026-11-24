@@ -326,14 +326,14 @@ def mark_delivered(request: HtmxRequest, member: Member, report_id: int) -> Http
 
 @require_POST
 @exam_view(live_only=True)
-def unmark_delivered(request: HtmxRequest, member: Member, delivery_id: int) -> HttpResponse:
+def undo_delivery(request: HtmxRequest, member: Member, delivery_id: int) -> HttpResponse:
     deliveries = Delivery.objects.filter(report__clarification__exam=member.exam)
     delivery = get_object_or_404(deliveries.select_related("report__clarification"), pk=delivery_id)
     report = delivery.report
     back = back_to_report(request)
     with flash_errors(request):
-        services.unmark_delivered(delivery)
-        messages.success(request, f"Unmarked {report.venue} {report.seat}.")
+        services.undo_delivery(delivery)
+        messages.success(request, f"{report.venue} {report.seat} back to not delivered.")
     return redirect(deliver_seat_url(member, report, back))
 
 
@@ -404,7 +404,7 @@ def snooze_announcement(request: HtmxRequest, member: Member, announcement_id: i
 
 @require_POST
 @exam_view(live_only=True)
-def unmark_read_out(request: HtmxRequest, member: Member, announcement_id: int) -> HttpResponse:
+def undo_read_out(request: HtmxRequest, member: Member, announcement_id: int) -> HttpResponse:
     readout = get_object_or_404(
         Readout.objects.select_related("announcement"),
         announcement_id=announcement_id,
@@ -412,6 +412,6 @@ def unmark_read_out(request: HtmxRequest, member: Member, announcement_id: int) 
         venue=member.venue,
     )
     with flash_errors(request):
-        services.unmark_read_out(readout)
-        messages.success(request, f"Unmarked in {readout.venue}.")
+        services.undo_read_out(readout)
+        messages.success(request, f"{readout.venue} back to not read out.")
     return redirect("invigilator:announcements", member.exam.pk)

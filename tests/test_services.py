@@ -125,7 +125,7 @@ def test_empty_answer_is_rejected(exam: Exam) -> None:
         )
 
 
-def test_mark_delivered_is_idempotent_and_unmark_deletes(exam: Exam) -> None:
+def test_mark_delivered_is_idempotent_and_undo_deletes(exam: Exam) -> None:
     r = report(exam)
     answer = services.answer_clarification(
         r.clarification, text="Yes", member=named(exam, "Prof"), expected_answer=None
@@ -134,7 +134,7 @@ def test_mark_delivered_is_idempotent_and_unmark_deletes(exam: Exam) -> None:
     services.mark_delivered(r, answer=answer, member=named(exam, "Bob"))
     delivery = Delivery.objects.get()
     assert delivery.member.name == "Ann"
-    services.unmark_delivered(delivery)
+    services.undo_delivery(delivery)
     assert state(r) == S.TO_DELIVER
 
 

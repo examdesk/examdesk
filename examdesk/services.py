@@ -257,7 +257,7 @@ def release_seat(member: Member) -> None:
 
 
 @transaction.atomic
-def unmark_delivered(delivery: Delivery) -> None:
+def undo_delivery(delivery: Delivery) -> None:
     _begin_write(delivery.report.clarification.exam_id)
     delivery.delete()
 
@@ -303,7 +303,7 @@ def mark_read_out(announcement: Announcement, *, venue: str, member: Member) -> 
 
 
 @transaction.atomic
-def unmark_read_out(readout: Readout) -> None:
+def undo_read_out(readout: Readout) -> None:
     _begin_write(readout.announcement.exam_id)
     readout.delete()
 

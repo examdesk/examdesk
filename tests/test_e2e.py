@@ -86,13 +86,13 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
     expect(invigilator.locator(".dock .count")).to_have_count(0)
     expect(prof.locator("a.seat-pill.state-delivered", has_text="14")).to_be_visible()
 
-    # A delivered seat, under Delivered recently, opens to its delivery and Unmark.
+    # A delivered seat, under Delivered recently, opens to its delivery and Undo.
     invigilator.get_by_text("Delivered recently").click()
     invigilator.get_by_role("link", name="HALL1 14: all delivered").click()
     invigilator.locator("details[name=delivered] summary").click()
     expect(invigilator.locator("details[name=delivered] .meta", has_text="Ann")).to_be_visible()
-    invigilator.get_by_role("button", name="Unmark").click()
-    expect(invigilator.get_by_text("Unmarked HALL1 14.")).to_be_visible()
+    invigilator.get_by_role("button", name="Undo").click()
+    expect(invigilator.get_by_text("HALL1 14 back to not delivered.")).to_be_visible()
     invigilator.get_by_role("button", name="Delivered to 14").click()
     expect(prof.locator("a.seat-pill.state-delivered", has_text="14")).to_be_visible()
 
@@ -109,7 +109,7 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
     expect(invigilator.get_by_text("Marked as read out in HALL1.")).to_be_visible()
     expect(alert).to_be_hidden()
     invigilator.locator(".dock").get_by_role("link", name="Read out").click()
-    expect(invigilator.get_by_role("button", name="Read out in HALL1: unmark")).to_be_visible()
+    expect(invigilator.get_by_role("button", name="Undo read out in HALL1")).to_be_visible()
     expect(invigilator.locator(".dock .count")).to_have_count(0)
     expect(prof.locator(".badge.state-read-out", has_text="HALL1")).to_be_visible()
     expect(prof.locator('nav a[href$="/examiner/announcements/"] .count')).to_have_count(0)

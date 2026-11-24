@@ -9,9 +9,9 @@
         <p class="prose-answer line-clamp-3 text-sm text-muted">{{ announcement.text }}</p>
         <div class="mt-2 flex items-center gap-2">
           <span class="meta inline-flex items-center gap-1"><c-icon name="check" class="text-green-600" />{{ readout.venue }} · {{ readout.member.name }} · <span class="num">{{ readout.created_at|time:"H:i" }}</span></span>
-          <form method="post" action="{% url 'invigilator:unmark_read_out' member.exam.pk announcement.pk %}" class="ml-auto">
+          <form method="post" action="{% url 'invigilator:undo_read_out' member.exam.pk announcement.pk %}" class="ml-auto">
             {% csrf_token %}
-            <button class="btn btn-ghost btn-sm" aria-label="Read out in {{ readout.venue }}: unmark"><c-icon name="undo-2" />Unmark</button>
+            <button class="btn btn-ghost btn-sm" aria-label="Undo read out in {{ readout.venue }}"><c-icon name="undo-2" />Undo</button>
           </form>
         </div>
       </article>
