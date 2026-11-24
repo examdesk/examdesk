@@ -238,7 +238,7 @@ def test_changes_by_others_show_live_around_unsent_text(
     correction = prof.get_by_role("textbox", name="Corrected answer")
     correction.fill("Yes, a whole number.")
     report(exam, seat="21", clarification=first.clarification)
-    expect(prof.get_by_role("link", name="HALL1 21")).to_be_visible()
+    expect(prof.get_by_role("button", name="HALL1 21: to deliver")).to_be_visible()
     expect(correction).to_have_value("Yes, a whole number.")
     expect(correction).to_be_visible()
 
