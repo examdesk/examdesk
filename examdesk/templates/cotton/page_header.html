@@ -1,6 +1,6 @@
 {# A page's title, an optional subtitle and its actions (the slot). #}
-<c-vars title subtitle class />
-<div class="page-header{% if class %} {{ class }}{% endif %}">
+<c-vars title subtitle />
+<div class="page-header">
   <div class="min-w-0">
     <h1 class="truncate">{{ title }}</h1>
     {% if subtitle %}<p>{{ subtitle }}</p>{% endif %}

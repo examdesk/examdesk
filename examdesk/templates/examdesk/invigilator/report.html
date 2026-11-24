@@ -2,7 +2,7 @@
 {% load examdesk_tags %}
 {% block content %}
 {% with pk=member.exam.pk %}
-<c-page-header title="Report a question" />
+<h1 class="sr-only">Report a question</h1>
 <form method="post" enctype="multipart/form-data" id="report-form" class="report-form">
   {# Enter in a field must not submit: the first match's button would be the default. #}
   <button type="submit" disabled hidden aria-hidden="true"></button>
@@ -32,7 +32,7 @@
             {% partial match_body %}
             <div class="mt-3 flex items-center gap-3">
               {% if clarification.current_answer %}<a class="btn btn-primary" href="{% seat_url 'invigilator:deliver_seat' pk asked_here.venue asked_here.seat back='report' %}"><c-icon name="send" />Show answer</a>{% endif %}
-              <button type="button" class="btn btn-ghost btn-danger btn-sm ml-auto" commandfor="delete-report-{{ asked_here.pk }}" command="show-modal">Delete this report…</button>
+              <button type="button" class="btn btn-ghost btn-danger btn-sm ml-auto" commandfor="delete-report-{{ asked_here.pk }}" command="show-modal">Delete report</button>
             </div>
           </div>
           <c-delete-report-dialog :report="asked_here" next="{{ request.get_full_path }}" />
@@ -62,7 +62,7 @@
           <button type="button" class="btn btn-ghost btn-danger btn-sm" data-clear aria-label="Remove photo"><c-icon name="x" />Remove</button>
         </div>
         <label class="btn btn-outline btn-block mb-0 flex-row">
-          <c-icon name="camera" /><span>{% if member.exam.has_ai_service %}Fill in from photo{% else %}Take photo (optional){% endif %}</span>
+          <c-icon name="camera" /><span>{% if member.exam.has_ai_service %}Fill in from photo{% else %}Take photo{% endif %}</span>
           <input type="file" name="photo" accept="image/*" capture="environment" data-photo hidden>
         </label>
         <p class="meta mt-1" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>

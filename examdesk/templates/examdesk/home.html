@@ -1,9 +1,7 @@
 {% extends "examdesk/base.html" %}
 {% block appbar %}{% if not user.is_authenticated %}<a href="{% url 'account_login' %}" class="btn btn-ghost btn-sm">Sign in</a>{% endif %}{% endblock %}
 {% block content %}
-<c-page-header title="Exams">
-  {% if user.is_authenticated %}<button type="button" class="btn btn-primary" commandfor="create-dialog" command="show-modal"><c-icon name="plus" />Create exam…</button>{% endif %}
-</c-page-header>
+<h1 class="sr-only">Exams</h1>
 {% if user.is_authenticated %}
   <c-dialog id="create-dialog" title="New exam" action="{% url 'create_exam' %}" submit="Create exam">
     <label>Name
@@ -11,28 +9,48 @@
     </label>
   </c-dialog>
 {% endif %}
-{% if exam_rows %}
-<div class="table-card">
-  <table>
-    <thead><tr><th>Exam</th><th class="w-28 text-right">Open</th><th class="w-28 text-right max-sm:hidden">To deliver</th><th class="w-32 max-md:hidden">Role</th><th class="w-36 max-md:hidden">Created</th><th class="w-10"></th></tr></thead>
-    <tbody>
-      {% for exam, open_count, to_deliver, role in exam_rows %}
-        <tr class="row-link">
-          <td><div class="flex items-center gap-2"><a href="{% url 'exam' exam.pk %}" class="row-target truncate font-semibold">{{ exam.name }}</a><c-exam-status :exam="exam" /></div></td>
-          <td class="text-right font-semibold tabular-nums {% if open_count %}text-amber-700{% else %}text-subtle{% endif %}">{{ open_count }}</td>
-          <td class="text-right font-semibold tabular-nums max-sm:hidden {% if to_deliver %}text-blue-700{% else %}text-subtle{% endif %}">{{ to_deliver }}</td>
-          <td class="text-muted max-md:hidden">{{ role.label }}</td>
-          <td class="text-muted max-md:hidden">{{ exam.created_at|date:"j M Y" }}</td>
-          <td class="text-right"><c-icon name="chevron-right" class="text-subtle" /></td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+{% if has_exams %}
+<div class="mb-4 flex flex-wrap items-center gap-3">
+  <div id="exam-tabs" class="contents">
+    {% if status %}<input type="hidden" name="status" value="{{ status }}" form="exam-search">{% endif %}
+    <nav class="tabs tabs-box tabs-sm" aria-label="Status">
+      {% for value, title, count in tabs %}<a class="tab gap-1.5" href="{% querystring status=value|default:None page=None %}" hx-target="#exam-list" hx-select="#exam-list" hx-select-oob="#exam-tabs" hx-swap="outerHTML show:none"{% if value == status %} aria-current="true"{% endif %}>{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
+    </nav>
+  </div>
+  <form method="get" action="{% url 'home' %}" role="search" id="exam-search" class="relative order-last w-full sm:order-none sm:ml-auto sm:w-56"
+        hx-get="{% url 'home' %}" hx-trigger="input delay:300ms, submit" hx-target="#exam-list" hx-select="#exam-list" hx-select-oob="#exam-tabs" hx-swap="outerHTML show:none" hx-push-url="true">
+    <c-icon name="search" class="pointer-events-none absolute top-1/2 left-3 z-10 -translate-y-1/2 text-subtle" />
+    <input type="search" name="q" value="{{ query }}" class="h-9 pl-9 text-sm" placeholder="Find an exam" aria-label="Find an exam" autocomplete="off">
+  </form>
+  {% if user.is_authenticated %}<button type="button" class="btn btn-primary btn-sm max-sm:ml-auto" commandfor="create-dialog" command="show-modal"><c-icon name="plus" />Create exam</button>{% endif %}
 </div>
-<c-pagination :page_obj="page_obj" />
+<div id="exam-list">
+  {% if exam_rows %}
+  <div class="table-card">
+    <table>
+      <thead><tr><th>Exam</th><th class="w-28 text-right">Open</th><th class="w-28 text-right max-sm:hidden">To deliver</th><th class="w-32 max-md:hidden">Role</th><th class="w-36 max-md:hidden">Created</th><th class="w-10"></th></tr></thead>
+      <tbody>
+        {% for exam, open_count, to_deliver, role in exam_rows %}
+          <tr class="row-link">
+            <td><div class="flex items-center gap-2"><a href="{% url 'exam' exam.pk %}" class="row-target truncate font-semibold">{{ exam.name }}</a><c-exam-status :exam="exam" /></div></td>
+            <td class="text-right font-semibold tabular-nums {% if open_count %}text-amber-700{% else %}text-subtle{% endif %}">{{ open_count }}</td>
+            <td class="text-right font-semibold tabular-nums max-sm:hidden {% if to_deliver %}text-blue-700{% else %}text-subtle{% endif %}">{{ to_deliver }}</td>
+            <td class="text-muted max-md:hidden">{{ role.label }}</td>
+            <td class="text-muted max-md:hidden">{{ exam.created_at|date:"j M Y" }}</td>
+            <td class="text-right"><c-icon name="chevron-right" class="text-subtle" /></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <c-pagination :page_obj="page_obj" />
+  {% else %}
+    <c-empty icon="search" title="No exams match" class="boxed" />
+  {% endif %}
+</div>
 {% else %}
   <c-empty icon="inbox" title="No exams yet" class="boxed">
-    {% if user.is_authenticated %}<button type="button" class="btn btn-primary mt-4" commandfor="create-dialog" command="show-modal"><c-icon name="plus" />Create exam…</button>{% endif %}
+    {% if user.is_authenticated %}<button type="button" class="btn btn-primary mt-4" commandfor="create-dialog" command="show-modal"><c-icon name="plus" />Create exam</button>{% endif %}
   </c-empty>
 {% endif %}
 {% endblock %}

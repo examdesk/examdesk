@@ -1,7 +1,7 @@
 {% extends "examdesk/invigilator/base.html" %}
 {% load examdesk_tags %}
 {% block content %}
-<c-page-header title="Waiting for an answer" />
+<h1 class="sr-only">Waiting for an answer</h1>
 <c-live>
   {% for label, clarifications in groups %}
     <section class="mb-6">

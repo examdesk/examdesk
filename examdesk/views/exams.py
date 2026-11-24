@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -56,12 +56,15 @@ LANDING_FEATURES = [
 
 @require_GET
 def home(request: HttpRequest) -> HttpResponse:
+    """The exams this visitor joined or owns, found by `?q=` (name) and `?status=` (live or
+    closed); a visitor with none sees the landing page."""
     joined_ids = session.joined_member_ids(request.session)
     visible = Exam.objects.filter(members__in=joined_ids, members__removed=False)
     if request.user.is_authenticated:
         visible |= Exam.objects.filter(owner_id=request.user.pk)
-    paginator = Paginator(visible.distinct().order_by("-created_at"), settings.EXAMDESK_PAGE_SIZE)
-    if not paginator.count and not request.user.is_authenticated:
+    visible = Exam.objects.filter(pk__in=visible.values("pk"))
+    has_exams = visible.exists()
+    if not request.user.is_authenticated and not has_exams:
         return render(
             request,
             "examdesk/landing.html",
@@ -73,6 +76,16 @@ def home(request: HttpRequest) -> HttpResponse:
                 "ReportState": Report.State,
             },
         )
+    query = request.GET.get("q", "").strip()
+    matching = visible.filter(name__icontains=query)
+    counts = matching.aggregate(
+        live=Count("pk", filter=Q(is_live=True)), closed=Count("pk", filter=Q(is_live=False))
+    )
+    status = request.GET.get("status", "")
+    status = status if status in ("live", "closed") else ""
+    if status:
+        matching = matching.filter(is_live=status == "live")
+    paginator = Paginator(matching.order_by("-created_at"), settings.EXAMDESK_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
     exams = list(page_obj)
     open_counts = dict(
@@ -102,7 +115,19 @@ def home(request: HttpRequest) -> HttpResponse:
         )
         for exam in exams
     ]
-    return render(request, "examdesk/home.html", {"exam_rows": exam_rows, "page_obj": page_obj})
+    context = {
+        "exam_rows": exam_rows,
+        "page_obj": page_obj,
+        "has_exams": has_exams,
+        "query": query,
+        "status": status,
+        "tabs": [
+            ("", "All", counts["live"] + counts["closed"]),
+            ("live", "Live", counts["live"]),
+            ("closed", "Closed", counts["closed"]),
+        ],
+    }
+    return render(request, "examdesk/home.html", context)
 
 
 def staff_name(request: HttpRequest) -> str:

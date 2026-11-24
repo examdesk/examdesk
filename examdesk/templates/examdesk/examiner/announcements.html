@@ -1,7 +1,7 @@
 {% extends "examdesk/base.html" %}
 {% block content %}
 {% with pk=member.exam.pk %}
-<c-page-header title="Announcements" />
+<h1 class="sr-only">Announcements</h1>
 <div class="announcements-layout">
   {% if member.exam.is_live %}
     <form method="post" action="{% url 'examiner:announce' pk %}" class="card-box announcement-composer">
@@ -16,17 +16,17 @@
     {% for announcement, missing in page_obj %}
       {% with done=announcement.readouts.all|length todo=missing|length %}
       <article class="list-card">
-        <div class="flex items-start gap-3 px-5 py-4">
+        <div class="flex items-start gap-3 px-(--surface-padding) py-4">
           <div class="min-w-0 flex-1">
-            <p class="announcement-text max-w-prose">{{ announcement.text }}</p>
+            <p class="prose-answer max-w-prose font-medium">{{ announcement.text }}</p>
             <p class="meta mt-1.5">{% if announcement.label %}{{ announcement.label }} · {% endif %}{{ announcement.member.name }} · <span class="num">{{ announcement.created_at|time:"H:i" }}</span></p>
           </div>
-          <button type="button" class="btn btn-ghost btn-danger btn-sm btn-square -mr-2" commandfor="delete-{{ announcement.pk }}" command="show-modal" aria-label="Delete the announcement at {{ announcement.created_at|time:'H:i' }}…" title="Delete…"><c-icon name="trash-2" /></button>
+          <button type="button" class="btn btn-ghost btn-danger btn-sm btn-square -mr-2" commandfor="delete-{{ announcement.pk }}" command="show-modal" aria-label="Delete the announcement at {{ announcement.created_at|time:'H:i' }}" title="Delete"><c-icon name="trash-2" /></button>
           <c-dialog id="delete-{{ announcement.pk }}" title="Delete this announcement?" action="{% url 'examiner:delete_announcement' pk announcement.pk %}" submit="Delete" danger>
             <blockquote>{{ announcement.text }}</blockquote>
           </c-dialog>
         </div>
-        <div class="flex flex-col gap-2.5 bg-base-200/40 px-5 py-3">
+        <div class="flex flex-col gap-2.5 bg-base-200/40 px-(--surface-padding) py-3">
           <p class="text-meta font-medium {% if todo %}text-amber-800{% else %}text-green-700{% endif %}">{% if todo %}Read out in {{ done }} of {{ done|add:todo }} venues{% else %}Read out in every venue{% endif %}</p>
           {% if done|add:todo %}
           <div class="flex flex-wrap gap-1.5">

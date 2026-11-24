@@ -6,7 +6,7 @@
 <c-live id="file-header" class="contents">
   {% with read=file.read_count total=pages|length %}
   <c-page-header title="{{ file.name }}" subtitle="{{ total }} page{{ total|pluralize }} · {% if read == total %}all read{% else %}{{ read }} of {{ total }} read{% endif %}">
-    <button type="button" class="btn btn-danger" commandfor="delete-file" command="show-modal"><c-icon name="trash-2" />Delete…</button>
+    <button type="button" class="btn btn-danger" commandfor="delete-file" command="show-modal"><c-icon name="trash-2" />Delete file</button>
   </c-page-header>
   {% endwith %}
   <c-dialog id="delete-file" title="Delete {{ file.name }}?" action="{% url 'examiner:delete_file' pk file.pk %}" submit="Delete" danger>

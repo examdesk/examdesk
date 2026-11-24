@@ -36,10 +36,10 @@
           </section>
 
           <section class="clarification-pane" aria-label="Clarification" data-clarification data-el="pane-2a">
-            <div class="clarification-header">
+            <div class="pane-header">
               <h2 class="flex min-w-0 items-center gap-2.5"><span class="label-chip h-6 text-sm">2a</span><c-state-badge :state="State.OPEN" /></h2>
               <span class="meta wait late">6 min</span>
-              <div class="ml-auto flex items-center gap-1.5"><span class="btn btn-ghost btn-sm"><c-icon name="git-merge" />Merge…</span><span class="btn btn-ghost btn-sm">Next<c-icon name="chevron-right" /></span></div>
+              <div class="ml-auto flex items-center gap-1.5"><span class="btn btn-ghost btn-sm"><c-icon name="git-merge" />Merge</span><span class="btn btn-ghost btn-sm">Next<c-icon name="chevron-right" /></span></div>
             </div>
             <div class="clarification-body">
               <p class="wording-text">Is there a typo in 2a? The bound says n² but the code loops n times.</p>
@@ -54,15 +54,15 @@
             <div class="answer-composer">
               <div class="mb-2 flex flex-wrap gap-1.5">{% for text in canned %}<span class="reply-chip">{{ text }}</span>{% endfor %}</div>
               <textarea rows="2" placeholder="Answer"></textarea>
-              <div class="mt-3 flex items-center justify-end gap-2"><span class="btn btn-ghost btn-sm"><c-icon name="megaphone" />Announce…</span><span class="btn btn-primary btn-sm"><c-icon name="send" />Send</span></div>
+              <div class="mt-3 flex items-center justify-end gap-2"><span class="btn btn-ghost btn-sm"><c-icon name="megaphone" />Announce</span><span class="btn btn-primary btn-sm"><c-icon name="send" />Send</span></div>
             </div>
           </section>
 
           <section class="clarification-pane" aria-label="Clarification" data-clarification data-el="pane-3b" data-shown="0">
-            <div class="clarification-header">
+            <div class="pane-header">
               <h2 class="flex min-w-0 items-center gap-2.5"><span class="label-chip h-6 text-sm">3b</span><span data-el="state-open"><c-state-badge :state="State.OPEN" /></span><span data-el="state-answered" data-shown="0"><c-state-badge :state="State.ANSWERED" /></span></h2>
               <span class="meta wait" data-el="wait">&lt;1 min</span>
-              <div class="ml-auto flex items-center gap-1.5"><span class="btn btn-ghost btn-sm"><c-icon name="git-merge" />Merge…</span><span class="btn btn-ghost btn-sm">Next<c-icon name="chevron-right" /></span></div>
+              <div class="ml-auto flex items-center gap-1.5"><span class="btn btn-ghost btn-sm"><c-icon name="git-merge" />Merge</span><span class="btn btn-ghost btn-sm">Next<c-icon name="chevron-right" /></span></div>
             </div>
             <div class="clarification-body">
               <p class="wording-text">{{ question }}</p>
@@ -84,7 +84,7 @@
             <div class="answer-composer" data-el="composer">
               <div class="mb-2 flex flex-wrap gap-1.5">{% for text in canned %}<span class="reply-chip">{{ text }}</span>{% endfor %}</div>
               <textarea rows="2" placeholder="Answer" data-el="answer-text" data-text="{{ answer }}"></textarea>
-              <div class="mt-3 flex items-center justify-end gap-2"><span class="btn btn-ghost btn-sm"><c-icon name="megaphone" />Announce…</span><span class="btn btn-primary btn-sm" data-el="send"><c-icon name="send" />Send</span></div>
+              <div class="mt-3 flex items-center justify-end gap-2"><span class="btn btn-ghost btn-sm"><c-icon name="megaphone" />Announce</span><span class="btn btn-primary btn-sm" data-el="send"><c-icon name="send" />Send</span></div>
             </div>
           </section>
         </div>
@@ -103,7 +103,7 @@
             <div class="flex flex-col gap-3" data-el="new-form" data-shown="0">
               <h2 class="section-title mb-0">New clarification</h2>
               <textarea rows="3" placeholder="What is the student asking?" data-el="question" data-text="{{ question }}"></textarea>
-              <span class="btn btn-outline btn-block"><c-icon name="camera" />Take photo (optional)</span>
+              <span class="btn btn-outline btn-block"><c-icon name="camera" />Take photo</span>
               <span class="btn btn-primary btn-block btn-lg" data-el="save"><c-icon name="check" />Save clarification</span>
             </div>
           </div>

@@ -24,14 +24,14 @@
       {% if invigilator_screen %}
         <span class="flex min-w-0 items-center gap-2"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-7 shrink-0"><span class="truncate font-semibold">{{ member.exam.name }}</span></span>
       {% else %}
-        <a href="{% url 'home' %}" class="brand" aria-label="Exam Desk: all exams"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-7"><span{% if member %} class="sr-only"{% endif %}>Exam Desk</span></a>
-        {% if member %}
-          <span class="flex min-w-0 flex-1 items-center gap-2 lg:flex-none">
+        <span class="flex min-w-0 flex-1 items-center gap-2 lg:flex-none">
+          <a href="{% url 'home' %}" class="brand" aria-label="Exam Desk: all exams"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-7"><span{% if member %} class="sr-only"{% endif %}>Exam Desk</span></a>
+          {% if member %}
             <span class="truncate font-semibold">{{ member.exam.name }}</span>
             <c-live id="exam-status" as="span" class="contents"><c-exam-status :exam="member.exam" /></c-live>
-          </span>
-          {% block nav %}{% include "examdesk/includes/nav.html" %}{% endblock %}
-        {% endif %}
+          {% endif %}
+        </span>
+        {% if member %}{% block nav %}{% include "examdesk/includes/nav.html" %}{% endblock %}{% endif %}
       {% endif %}
       <div class="ml-auto flex shrink-0 items-center gap-2">
         <c-live id="appbar" as="span" class="contents">{% block appbar %}{% if member.is_examiner and member.exam.is_live %}<a href="{% url 'invigilator:report' member.exam.pk %}" class="btn btn-ghost btn-sm max-sm:btn-square" title="Invigilator view"><c-icon name="smartphone" /><span class="max-sm:sr-only">Invigilator view</span></a>{% endif %}{% endblock %}</c-live>
@@ -40,7 +40,7 @@
     </div>
     {% block below_appbar %}{% endblock %}
   </header>
-  <main class="page-container {% block main_class %}py-6 sm:py-8{% endblock %}">
+  <main class="page-container py-6 {% block main_class %}{% endblock %}">
     <div class="flash error offline" id="offline" role="alert" hidden>
       <c-icon name="wifi-off" />
       <span>Offline since <time></time>. <strong data-unsent hidden>Not sent.</strong></span>

@@ -115,7 +115,7 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
 
     # Closing the exam reloads every invigilator screen into the closed-exam page.
     prof.get_by_role("link", name="Settings").click()
-    prof.get_by_role("button", name="Close exam…").click()
+    prof.get_by_role("button", name="Close exam").click()
     prof.locator("dialog[open]").get_by_role("button", name="Close exam").click()
     expect(invigilator.get_by_text("This exam is closed.")).to_be_visible()
     expect(invigilator.locator(".dock").get_by_role("link", name="Deliver")).to_be_hidden()

@@ -1,7 +1,7 @@
 {% extends "examdesk/base.html" %}
 {% block main_class %}split-view{% endblock %}
 {% block content %}
-<c-page-header title="Clarifications" class="max-lg:hidden" />
+<h1 class="sr-only">Clarifications</h1>
 <div class="clarifications-layout">
   {% include "examdesk/examiner/includes/queue.html" %}
   <c-live id="clarification-pane" class="clarification-pane items-center justify-center bg-base-200/40">
@@ -9,7 +9,7 @@
       <div class="flex max-w-sm flex-col items-center px-6 text-center">
         <span class="qr size-48">{{ invite_link.qr }}</span>
         <h2 class="mt-5">Invite invigilators</h2>
-        <a class="btn btn-primary btn-sm mt-5" href="{% url 'examiner:members' member.exam.pk %}?invite=invigilator"><c-icon name="user-plus" />Invite</a>
+        <a class="btn btn-primary btn-sm mt-5" href="{% url 'examiner:members' member.exam.pk %}?invite=invigilator"><c-icon name="user-plus" />Invite people</a>
       </div>
     {% elif rows %}
       {% with first=rows.0.clarification %}

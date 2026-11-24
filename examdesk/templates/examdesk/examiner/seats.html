@@ -3,14 +3,14 @@
 {% block main_class %}split-view{% endblock %}
 {% block content %}
 {% with pk=member.exam.pk %}
-<c-page-header title="Seats" />
+<h1 class="sr-only">Seats</h1>
 <div class="seats-layout">
   <div class="seats-list-pane">
     <div class="seats-toolbar">
       <c-live id="seat-tabs" class="contents">
         {% if state %}<input type="hidden" name="state" value="{{ state }}" form="seat-search">{% endif %}
-        <nav class="tabs tabs-box tabs-sm no-scrollbar max-w-full flex-nowrap overflow-x-auto" aria-label="State">
-          {% for name, title, count in tabs %}<a class="tab shrink-0 gap-1.5" href="{% querystring state=name|default:None %}" hx-target="#seat-list" hx-select="#seat-list" hx-select-oob="#seat-tabs" hx-swap="outerHTML show:none"{% if name == state %} aria-current="true"{% endif %}>{% if name %}<span class="state-dot state-{{ name }}"></span>{% endif %}{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
+        <nav class="tabs tabs-box tabs-sm" aria-label="State">
+          {% for name, title, count in tabs %}<a class="tab gap-1.5" href="{% querystring state=name|default:None %}" hx-target="#seat-list" hx-select="#seat-list" hx-select-oob="#seat-tabs" hx-swap="outerHTML show:none"{% if name == state %} aria-current="true"{% endif %}>{% if name %}<span class="state-dot state-{{ name }}"></span>{% endif %}{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
         </nav>
       </c-live>
       <form method="get" action="{% url 'examiner:seats' pk %}" role="search" id="seat-search" class="relative w-full sm:ml-auto sm:w-56"
@@ -55,15 +55,15 @@
   <c-live id="seat-pane" class="seat-pane" data-seat="{% if selected_seat %}{{ selected_seat.0 }} {{ selected_seat.1 }}{% endif %}">
     {% if selected_seat %}
       {% with venue=selected_seat.0 seat=selected_seat.1 %}
-      <div class="flex items-center gap-2 border-b border-base-300 px-5 py-3.5">
+      <div class="pane-header">
         <a href="{{ seat_list_url }}" class="btn btn-ghost btn-sm btn-square -ml-2 lg:hidden" aria-label="Seats"><c-icon name="arrow-left" /></a>
         <h2 class="flex items-baseline gap-2 tabular-nums">{{ seat }}<span class="inline-flex items-center gap-1 text-sm font-medium text-subtle"><c-icon name="map-pin" />{{ venue }}</span></h2>
         <a href="{{ seat_list_url }}" hx-target="#seat-pane" hx-select="#seat-pane" hx-swap="outerHTML show:none" class="btn btn-ghost btn-sm btn-square ml-auto max-lg:hidden" aria-label="Close" title="Close"><c-icon name="x" /></a>
       </div>
-      <div class="flex flex-col gap-3 p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <div class="flex flex-col divide-y divide-base-300 px-(--surface-padding) lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
         {% for report in reports %}
           {% with clarification=report.clarification %}
-          <article class="card-box">
+          <article class="py-4">
             <div class="mb-2 flex items-start gap-3">
               <a href="{% url 'examiner:clarification' pk clarification.pk %}" class="line-clamp-3 min-w-0 flex-1 font-medium hover:underline">{% if clarification.label %}<span class="label-chip mr-1.5">{{ clarification.label }}</span>{% endif %}{{ clarification.summary }}</a>
               <c-state-badge :state="report.state" class="mt-0.5" />

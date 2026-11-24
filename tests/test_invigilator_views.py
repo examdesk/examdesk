@@ -222,7 +222,7 @@ def test_joining_an_answered_match_offers_its_answer(invigilator: Client, exam: 
     saved = invigilator.get(response["Location"]).content.decode()
     assert f'href="{show.replace("&", "&amp;")}"><svg' in saved
     assert "Report another</a>" in saved
-    assert "Delete this report…</button>" in saved
+    assert "Delete report</button>" in saved
     html = invigilator.get(show).content.decode()
     assert '<p class="answer-to-show">Yes</p>' in html
     assert "Delivered to 34</button>" in html
@@ -381,9 +381,7 @@ def test_invigilator_and_examiner_remove_a_seat(
     joined = report(exam, seat="15", clarification=first.clarification)
     matches = f"{url('invigilator:report', exam)}?venue=HALL1&seat=15&label=Q3b"
     html = invigilator.get(matches).content.decode()
-    assert (
-        f'commandfor="delete-report-{joined.pk}" command="show-modal">Delete this report…<' in html
-    )
+    assert f'commandfor="delete-report-{joined.pk}" command="show-modal">Delete report<' in html
     assert ">Delete the report from HALL1 15?</h2>" in html
     response = invigilator.post(
         url("delete_report", exam, joined.pk), {"next": matches}, follow=True

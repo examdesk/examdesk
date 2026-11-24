@@ -1,6 +1,7 @@
 """Joining, roles, names, refreshes, and pages across both roles."""
 
 import importlib
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlencode
@@ -285,6 +286,24 @@ def test_home_paginates_exams_newest_first(
     second = client.get(reverse("home") + "?page=2").content.decode()
     assert f"{exam.name}</a>" in second
     assert "Finals</a>" not in second
+
+
+def test_home_finds_exams_by_name_and_status(client: Client, exam: Exam, staff: User) -> None:
+    services.create_exam(name="Chemistry Midterm", owner=staff)
+    services.close_exam(services.create_exam(name="Biology Midterm", owner=staff))
+    client.force_login(staff)
+
+    def names(query: str) -> list[str]:
+        html = client.get(reverse("home") + query).content.decode()
+        return re.findall(r'class="row-target truncate font-semibold">([^<]+)</a>', html)
+
+    assert names("?q=biology") == ["Biology Midterm", "Biology Final"]
+    assert names("?q=biology&status=live") == ["Biology Final"]
+    assert names("?status=closed") == ["Biology Midterm"]
+    html = client.get(reverse("home") + "?q=biology").content.decode()
+    assert 'Live<span class="num">1</span>' in html
+    assert 'Closed<span class="num">1</span>' in html
+    assert "No exams match" in client.get(reverse("home") + "?q=nothing").content.decode()
 
 
 def test_home_is_a_landing_page_until_there_is_an_exam(

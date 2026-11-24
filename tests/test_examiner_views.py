@@ -399,7 +399,7 @@ def test_announce_from_a_clarification_uses_the_answer_box(examiner: Client, exa
     clarification = report(exam).clarification
     html = examiner.get(url("examiner:clarification", exam, clarification.pk)).content.decode()
     assert 'commandfor="announce-dialog" command="show-modal"><svg' in html
-    assert "Announce…</button>" in html
+    assert "Announce</button>" in html
     assert '<blockquote data-quote="answer-text"></blockquote>' in html
     assert '<input type="hidden" name="text" data-quote="answer-text">' in html
     response = examiner.post(
@@ -510,7 +510,7 @@ def test_members_page_lists_everyone_online_first(
     open_link(ben, exam.invigilator_token, "Ben")
     ben.get(url("invigilator:report", exam))
     html = examiner.get(url("examiner:members", exam)).content.decode()
-    html = html[html.index('<h1 class="truncate">People</h1>') :]
+    html = html[html.index('<h1 class="sr-only">People</h1>') :]
     assert html.count(">Online<") == 3  # Ann, Ben and Prof
     assert html.index("Ann") < html.index('<span class="badge">HALL1</span>') < html.index("Ben")
     assert 'Invigilators<span class="num">2</span>' in html

@@ -498,10 +498,13 @@ document.addEventListener("htmx:after:swap", () => {
   const matches = document.querySelector("#matches[data-searched]");
   if (matches && !matches.querySelector(".match")) document.getElementById("new-question").open = true;
 });
+// On phones the exam's tabs scroll sideways; the current one comes into view with each page.
+const showCurrentTab = () => document.querySelector("#exam-nav [aria-current=page]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
 // `element` and the elements in it that match `selector`.
 const queryAllIncludingSelf = (element, selector) => [element, ...element.querySelectorAll(selector)].filter((found) => found.matches(selector));
 htmx.onLoad((element) => {
   syncEventSource();
+  if (element.matches("body, main")) showCurrentTab();
   queryAllIncludingSelf(element, "dialog[data-autoopen]").forEach((dialog) => dialog.showModal());
   queryAllIncludingSelf(element, "[data-read-pages]").forEach(readPages);
   buzz();

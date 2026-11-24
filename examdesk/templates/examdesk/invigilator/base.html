@@ -5,7 +5,7 @@
           aria-label="Venue: {{ member.venue|default:'All venues' }}"><c-icon name="map-pin" />{{ member.venue|default:"All venues" }}<c-icon name="chevron-down" class="size-3.5" /></button>
 {% endblock %}
 {% block nav %}{% endblock %}
-{% block main_class %}pt-5 pb-32{% endblock %}
+{% block main_class %}pb-32{% endblock %}
 
 {% block below_appbar %}
 {% with pk=member.exam.pk %}

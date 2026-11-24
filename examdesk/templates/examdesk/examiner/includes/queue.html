@@ -41,9 +41,9 @@
     </div>
     {% if page_obj.has_other_pages %}
       <nav class="queue-pagination" aria-label="Pagination">
-        {% if page_obj.has_previous %}<a class="btn btn-ghost btn-xs" href="{% querystring query page=page_obj.previous_page_number %}" rel="prev" hx-target="#queue-list" hx-select="#queue-list" hx-swap="outerHTML show:none"><c-icon name="chevron-left" />Previous</a>{% else %}<span></span>{% endif %}
+        {% if page_obj.has_previous %}<a class="btn btn-ghost btn-sm" href="{% querystring query page=page_obj.previous_page_number %}" rel="prev" hx-target="#queue-list" hx-select="#queue-list" hx-swap="outerHTML show:none"><c-icon name="chevron-left" />Previous</a>{% else %}<span></span>{% endif %}
         <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}</span>
-        {% if page_obj.has_next %}<a class="btn btn-ghost btn-xs" href="{% querystring query page=page_obj.next_page_number %}" rel="next" hx-target="#queue-list" hx-select="#queue-list" hx-swap="outerHTML show:none">Next<c-icon name="chevron-right" /></a>{% else %}<span></span>{% endif %}
+        {% if page_obj.has_next %}<a class="btn btn-ghost btn-sm" href="{% querystring query page=page_obj.next_page_number %}" rel="next" hx-target="#queue-list" hx-select="#queue-list" hx-swap="outerHTML show:none">Next<c-icon name="chevron-right" /></a>{% else %}<span></span>{% endif %}
       </nav>
     {% endif %}
     {% endwith %}

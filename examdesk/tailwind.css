@@ -49,7 +49,11 @@
 }
 
 @layer base {
-  :root { --pane-width: 26rem; } /* every side pane: the queue, a seat, the composer */
+  :root {
+    --pane-width: 26rem; /* every side pane: the queue, a seat, the composer */
+    --surface-padding: --spacing(4); /* cards, list rows, table cells, panes */
+    @variant sm { --surface-padding: --spacing(5); }
+  }
   html { -webkit-tap-highlight-color: transparent; }
   body { @apply min-h-dvh bg-base-200 font-sans text-sm leading-6 text-base-content antialiased; }
   /* Invigilator screens are phones: 16px text avoids zoom on focus; 44px touch targets. */
@@ -81,7 +85,7 @@
   .num { @apply tabular-nums; }
 
   /* Links */
-  main a:not([class], .menu-panel *, .landing-stage *) {
+  main a:not([class], nav *, .menu-panel *, .landing-stage *) {
     @apply font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary;
   }
   .link-button { @apply cursor-pointer font-medium text-primary hover:underline; }
@@ -90,8 +94,7 @@
   .page-container { @apply mx-auto w-full max-w-7xl px-4 sm:px-6; }
   body.invigilator .page-container { @apply max-w-2xl sm:px-4; }
   .page-header {
-    @apply mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 sm:mb-6;
-    > div:first-child { @apply min-w-0; }
+    @apply mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3;
     p { @apply mt-0.5 text-meta text-subtle; }
   }
   /* Settings: the exam on the left, the AI service and its files on the right. */
@@ -102,23 +105,23 @@
   .announcement-composer { @apply lg:sticky lg:top-20 lg:order-last; }
   .vstack { @apply flex flex-col gap-3; }
 
-  /* Surfaces: a card (header, body, footer), a list card of rows, or a table card. The padding
-     steps up from phones; header and footer bleed to the card's edges. */
-  .card-box { @apply rounded-box border border-base-300 bg-base-100 p-4 sm:p-5; }
+  /* Surfaces: a card (header, body, footer), a list card of rows, or a table card. Header and
+     footer bleed to the card's edges. */
+  .card-box { @apply rounded-box border border-base-300 bg-base-100 p-(--surface-padding); }
   .card-box.danger { @apply border-red-600/25; }
   .card-header {
-    @apply -mx-4 -mt-4 mb-4 flex min-h-12 items-center justify-between gap-3 border-b border-base-300 px-4 py-2.5 sm:-mx-5 sm:-mt-5 sm:mb-5 sm:px-5;
+    @apply -mx-(--surface-padding) -mt-(--surface-padding) mb-(--surface-padding) flex min-h-12 items-center justify-between gap-3 border-b border-base-300 px-(--surface-padding) py-2;
   }
   .card-footer {
-    @apply -mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-b-box border-t border-base-300 bg-base-200/50 px-4 py-3 sm:-mx-5 sm:-mb-5 sm:mt-5 sm:px-5;
+    @apply -mx-(--surface-padding) -mb-(--surface-padding) mt-(--surface-padding) flex flex-wrap items-center justify-end gap-2 rounded-b-box border-t border-base-300 bg-base-200/50 px-(--surface-padding) py-3;
   }
   .list-card {
     @apply overflow-hidden rounded-box border border-base-300 bg-base-100;
     > * + * { @apply border-t border-base-300; }
   }
   /* A list card's heading row: its title and count. */
-  .list-card > header { @apply flex min-h-12 items-center gap-2 px-4 py-2.5 sm:px-5; }
-  .row-item { @apply flex items-center gap-3 px-4 py-3; }
+  .list-card > header { @apply flex min-h-12 items-center gap-2 px-(--surface-padding) py-2.5; }
+  .row-item { @apply flex items-center gap-3 px-(--surface-padding) py-3; }
   /* A list without a card, in a pane. */
   .pane-list {
     @apply border-y border-base-300;
@@ -181,8 +184,8 @@
   /* Tables */
   .table-card { @apply overflow-x-auto rounded-box border border-base-300 bg-base-100; }
   table { @apply w-full text-left text-sm; }
-  thead th { @apply border-b border-base-300 bg-base-200/50 px-4 py-2.5 text-xs font-medium whitespace-nowrap text-subtle; }
-  tbody td { @apply border-b border-base-300 px-4 py-3 align-middle; }
+  thead th { @apply border-b border-base-300 bg-base-200/50 px-(--surface-padding) py-2.5 text-xs font-medium whitespace-nowrap text-subtle; }
+  tbody td { @apply border-b border-base-300 px-(--surface-padding) py-3 align-middle; }
   tbody tr:last-child td { @apply border-b-0; }
   /* Rows made clickable by app.js; a stretched link would escape the row in Safari */
   tr.row-link { @apply cursor-pointer transition-colors hover:bg-base-200/60; .row-target { @apply text-base-content hover:underline; } }
@@ -211,7 +214,7 @@
 
   /* Split views (Clarifications, Seats): a list beside the open item. From lg they fill the window
      and each pane scrolls on its own; below lg the list and the item are separate screens. */
-  main.split-view { @apply py-4 sm:py-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:py-4; > .page-header { @apply lg:mb-4; } }
+  main.split-view { @apply lg:flex lg:min-h-0 lg:flex-1 lg:flex-col; }
   body:has(> main.split-view) { @apply lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden; }
   .clarifications-layout {
     @apply lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[var(--pane-width)_minmax(0,1fr)] lg:overflow-hidden lg:rounded-box lg:border lg:border-base-300 lg:bg-base-100;
@@ -219,25 +222,26 @@
     &:not(:has(.clarification-pane[data-clarification])) .clarification-pane { @apply max-lg:hidden; }
   }
   .queue { @apply flex min-h-0 flex-col lg:border-r lg:border-base-300; }
-  .queue-toolbar { @apply flex flex-col gap-2 pb-3 lg:border-b lg:border-base-300 lg:p-3; }
+  .queue-toolbar { @apply flex flex-col gap-2 pb-3 lg:border-b lg:border-base-300 lg:px-(--surface-padding) lg:py-3; }
   /* The rows scroll; the pages sit below them, outside the scroll. */
   .queue-list { @apply flex min-h-0 flex-1 flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 lg:rounded-none lg:border-0; }
   .queue-rows { @apply min-h-0 flex-1 lg:overflow-y-auto; }
   .queue-row {
-    @apply relative block border-b border-base-300 px-4 py-3 text-base-content last:border-b-0 hover:bg-base-200/60;
+    @apply relative block border-b border-base-300 px-(--surface-padding) py-3 text-base-content last:border-b-0 hover:bg-base-200/60;
     &[aria-current=page] { @apply bg-primary/6; &::before { content: ""; @apply absolute inset-y-0 left-0 w-0.5 bg-primary; } }
     > p { @apply line-clamp-2 text-sm leading-5 font-medium; }
   }
-  .queue-pagination { @apply flex shrink-0 items-center justify-between gap-2 border-t border-base-300 px-4 py-2 text-meta text-subtle; }
+  .queue-pagination { @apply flex shrink-0 items-center justify-between gap-2 border-t border-base-300 px-(--surface-padding) py-2 text-meta text-subtle; }
   /* A question label (Q3b), and a place: a venue and seat */
   .label-chip, .place-chip { @apply inline-flex items-center bg-base-200 text-xs font-semibold tabular-nums ring-1 ring-base-300 ring-inset; }
   .label-chip { @apply h-5 rounded px-1.5 text-base-content; }
-  .clarification-pane { @apply flex min-h-0 min-w-0 flex-col; }
-  .clarification-header { @apply flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3 pb-4 lg:border-b lg:border-base-300 lg:px-6 lg:py-3.5; }
-  .clarification-body { @apply flex flex-col gap-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-5; }
+  /* An item in a split view: a card on phones, a pane from lg. */
+  .clarification-pane { @apply flex min-h-0 min-w-0 flex-col; &[data-clarification] { @apply max-lg:rounded-box max-lg:border max-lg:border-base-300 max-lg:bg-base-100; } }
+  .pane-header { @apply flex min-h-15 flex-wrap items-center gap-2 border-b border-base-300 px-(--surface-padding) py-3; }
+  .clarification-body { @apply flex flex-col gap-6 p-(--surface-padding) lg:min-h-0 lg:flex-1 lg:overflow-y-auto; }
   /* Sections keep their height, so the pane scrolls instead of squashing them. */
-  .clarification-body > *, .clarification-header, .answer-composer { @apply shrink-0; }
-  .answer-composer { @apply mt-6 rounded-box border border-base-300 bg-base-100 p-4 lg:mt-0 lg:rounded-none lg:border-0 lg:border-t lg:px-6; }
+  .clarification-body > *, .pane-header, .answer-composer { @apply shrink-0; }
+  .answer-composer { @apply border-t border-base-300 p-(--surface-padding); }
   .reply-chip { @apply btn btn-ghost btn-xs bg-base-200 font-normal hover:bg-base-300; }
   /* The wording, edited in place in a text box of the same size. Not `text-pretty`: it would
      break lines where the text box doesn't. */
@@ -313,7 +317,7 @@
   }
   .file-page {
     @apply scroll-mt-28 overflow-hidden rounded-box border border-base-300 bg-base-100;
-    > header { @apply flex items-center gap-3 border-b border-base-300 px-5 py-3; }
+    > header { @apply flex items-center gap-3 border-b border-base-300 px-(--surface-padding) py-3; }
   }
   /* Invite dialog: one panel per role, shown by the checked role tab. */
   #invite-dialog:has([value=invigilator]:checked) [data-role=examiner],
@@ -347,6 +351,7 @@
   .ts-wrapper.input-hidden .ts-control > input { @apply absolute -left-[10000px] opacity-0; }
   .ts-wrapper.focus .ts-control { @apply border-primary ring-3 ring-primary/15; }
   .filters .ts-control { @apply min-h-9; }
+  .filters select { @apply h-9 min-h-9 text-sm; }
   .ts-dropdown {
     @apply absolute inset-x-0 top-full z-30 mt-1 rounded-box border border-base-300 bg-base-100 p-1 text-sm shadow-lg;
     .ts-dropdown-content { @apply max-h-60 overflow-y-auto; }
@@ -499,8 +504,16 @@
    changes to daisyUI classes sit directly in `utilities`, which beats its sublayers. */
 @layer utilities {
   .btn { @apply gap-2 font-medium shadow-none; }
-  /* daisyUI tabs: outlined, a count after the title; `fill` spreads them over the width */
-  .tabs-box { @apply ring-1 ring-base-300 ring-inset; > .tab { @apply flex-nowrap whitespace-nowrap; } .num { @apply text-subtle; } }
+  /* daisyUI sets btn-sm text to 12px and btn-xs to 11px. */
+  .btn-sm { @apply text-sm; }
+  .btn-xs { @apply text-meta; }
+  /* daisyUI tabs: outlined, a count after the title, scrolling sideways when narrow; `fill`
+     spreads them over the width */
+  .tabs-box {
+    @apply no-scrollbar max-w-full min-w-0 flex-nowrap overflow-x-auto ring-1 ring-base-300 ring-inset;
+    > .tab { @apply shrink-0 flex-nowrap whitespace-nowrap; }
+    .num { @apply text-subtle; }
+  }
   .tabs.fill > .tab { @apply flex-1; }
   .btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .btn-outline {
@@ -538,7 +551,7 @@
     @apply input w-full text-base-content;
   }
   select { @apply select w-full; }
-  textarea { @apply textarea w-full text-[15px] leading-6; }
+  textarea { @apply textarea w-full text-sm leading-6; }
   :is(body.invigilator, .landing-phone) textarea { @apply text-base; }
   :is(input:not([type=checkbox], [type=radio], [type=file], .ts-control > *), select, textarea, .input, .select, .textarea) {
     @apply border-base-300 shadow-xs;

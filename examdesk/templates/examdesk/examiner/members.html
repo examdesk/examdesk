@@ -1,14 +1,15 @@
 {% extends "examdesk/base.html" %}
 {% load examdesk_tags %}
 {% block content %}
-<c-page-header title="People">
-  <button type="button" class="btn btn-primary" commandfor="invite-dialog" command="show-modal"><c-icon name="user-plus" />Invite</button>
-</c-page-header>
+<h1 class="sr-only">People</h1>
 
 <c-live id="people" :refresh_in="presence_update_in">
-  <nav class="tabs tabs-box tabs-sm mb-4 w-fit" aria-label="Role">
-    {% for value, title, count in tabs %}<a class="tab gap-1.5" href="{% querystring role=value|default:None invite=None %}"{% if value == role %} aria-current="true"{% endif %}>{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
-  </nav>
+  <div class="mb-4 flex items-center justify-between gap-3">
+    <nav class="tabs tabs-box tabs-sm" aria-label="Role">
+      {% for value, title, count in tabs %}<a class="tab gap-1.5" href="{% querystring role=value|default:None invite=None %}"{% if value == role %} aria-current="true"{% endif %}>{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
+    </nav>
+    <button type="button" class="btn btn-primary btn-sm max-sm:btn-square" commandfor="invite-dialog" command="show-modal"><c-icon name="user-plus" /><span class="max-sm:sr-only">Invite people</span></button>
+  </div>
   {% if people %}
   <div class="table-card">
     <table>
@@ -30,7 +31,7 @@
             <td class="max-sm:hidden">{% if person.online %}<span class="inline-flex items-center gap-1.5 text-green-700"><span class="live-dot"></span>Online</span>{% else %}<span class="text-muted">Last seen {{ person.last_seen|time:"H:i" }}</span>{% endif %}</td>
             <td class="text-right">
               {% if person != member %}
-                <button type="button" class="btn btn-ghost btn-danger btn-xs btn-square" commandfor="remove-member-{{ person.pk }}" command="show-modal" aria-label="Remove {{ person.name }}…" title="Remove…"><c-icon name="user-minus" /></button>
+                <button type="button" class="btn btn-ghost btn-danger btn-xs btn-square" commandfor="remove-member-{{ person.pk }}" command="show-modal" aria-label="Remove {{ person.name }}" title="Remove"><c-icon name="user-minus" /></button>
                 <c-dialog id="remove-member-{{ person.pk }}" title="Remove {{ person.name }}?" action="{% url 'examiner:remove_member' member.exam.pk person.pk %}" submit="Remove" danger>
                   <p>Their devices lose access. They can rejoin with the current {{ person.get_role_display|lower }} link.</p>
                 </c-dialog>
@@ -43,7 +44,7 @@
   </div>
   {% else %}
     <c-empty icon="users" title="No one yet" class="boxed">
-      <button type="button" class="btn btn-primary mt-4" commandfor="invite-dialog" command="show-modal"><c-icon name="user-plus" />Invite</button>
+      <button type="button" class="btn btn-primary mt-4" commandfor="invite-dialog" command="show-modal"><c-icon name="user-plus" />Invite people</button>
     </c-empty>
   {% endif %}
 </c-live>
