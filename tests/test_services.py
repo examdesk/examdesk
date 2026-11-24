@@ -1,6 +1,7 @@
 import uuid
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -50,7 +51,7 @@ def test_retry_with_same_client_key_does_not_duplicate(exam: Exam) -> None:
 def test_client_key_of_another_exam_is_refused(exam: Exam) -> None:
     key = uuid.uuid4()
     report(exam, client_key=key)
-    other = services.create_exam(name="Other", owner=exam.owner)
+    other = services.create_exam(name="Other", owner=exam.owner, time_zone=ZoneInfo("UTC"))
     with pytest.raises(ServiceError, match="another exam"):
         report(other, client_key=key)
 

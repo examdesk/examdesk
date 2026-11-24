@@ -77,13 +77,16 @@ type View = Callable[..., HttpResponseBase]
 
 
 def exam_view(*, examiner_only: bool = False, live_only: bool = False) -> Callable[[View], View]:
-    """Resolve `exam_id` to this device's `Member` with `admit`."""
+    """Resolve `exam_id` to this device's `Member` with `admit`, in the exam's time zone."""
 
     def decorator(view: View) -> View:
         @wraps(view)
         def wrapper(request: HtmxRequest, exam_id: int, **kwargs: Any) -> HttpResponseBase:
             member = admit(request, exam_id, examiner_only=examiner_only, live_only=live_only)
-            return view(request, member, **kwargs) if isinstance(member, Member) else member
+            if not isinstance(member, Member):
+                return member
+            with timezone.override(member.exam.time_zone):
+                return view(request, member, **kwargs)
 
         return wrapper
 

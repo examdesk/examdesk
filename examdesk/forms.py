@@ -1,12 +1,14 @@
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, available_timezones
 
 from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import UploadedFile
 from django.http import HttpRequest
+from timezone_field import TimeZoneFormField
 
 from . import pdf
 from .labels import normalize_label, normalize_name, normalize_place
@@ -57,6 +59,17 @@ class SignupForm(BaseForm):
 
 class ExamForm(BaseForm):
     name = forms.CharField(max_length=200)
+    time_zone = forms.CharField(required=False)
+
+    def clean_time_zone(self) -> ZoneInfo:
+        """The browser's time zone, or the site's if this server doesn't know it."""
+        time_zone: str = self.cleaned_data["time_zone"]
+        return ZoneInfo(time_zone if time_zone in available_timezones() else settings.TIME_ZONE)
+
+
+class ExamSettingsForm(BaseForm):
+    name = forms.CharField(max_length=200, widget=forms.TextInput(attrs={"autocomplete": "off"}))
+    time_zone = TimeZoneFormField(label="Time zone")
 
 
 class NameForm(BaseForm):

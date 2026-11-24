@@ -1,7 +1,9 @@
 """The examiner screens."""
 
 import re
+from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.conf import settings
@@ -359,7 +361,7 @@ def test_move_stays_on_the_split_clarification_while_it_has_seats(
 def test_move_to_an_unknown_clarification_is_refused(examiner: Client, exam: Exam) -> None:
     first = report(exam)
     report(exam, seat="21", clarification=first.clarification)
-    other_exam = services.create_exam(name="Other", owner=exam.owner)
+    other_exam = services.create_exam(name="Other", owner=exam.owner, time_zone=ZoneInfo("UTC"))
     for target in ("", "999", str(report(other_exam).clarification_id)):
         html = examiner.post(
             url("examiner:move_report", exam, first.pk), {"target": target}, follow=True
@@ -669,3 +671,19 @@ def test_clarification_actions_are_in_a_menu(examiner: Client, exam: Exam) -> No
     assert 'commandfor="relabel-dialog"' in menu
     assert 'commandfor="merge-dialog"' in menu
     assert "Open</span>" not in html[: html.index('aria-label="Question"')]
+
+
+def test_times_show_in_the_exam_time_zone(examiner: Client, exam: Exam) -> None:
+    report(exam)
+    Report.objects.update(created_at=datetime(2026, 11, 24, 6, 5, tzinfo=UTC))
+    services.edit_exam(exam, name=exam.name, time_zone=ZoneInfo("Asia/Singapore"))
+    assert "Asked at 14:05" in examiner.get(url("examiner:clarifications", exam)).content.decode()
+
+
+def test_editing_the_exam(examiner: Client, exam: Exam) -> None:
+    page = url("examiner:edit_exam", exam)
+    assert examiner.post(page, {"name": "", "time_zone": "UTC"}).status_code == 400
+    assert examiner.post(page, {"name": "x", "time_zone": "Mars/Olympus"}).status_code == 400
+    examiner.post(page, {"name": " Biology Resit ", "time_zone": "Asia/Singapore"})
+    exam.refresh_from_db()
+    assert (exam.name, exam.time_zone) == ("Biology Resit", ZoneInfo("Asia/Singapore"))

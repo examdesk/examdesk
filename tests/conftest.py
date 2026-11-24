@@ -1,5 +1,6 @@
 import io
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.contrib.auth.models import User
@@ -29,7 +30,7 @@ def staff() -> User:
 
 @pytest.fixture
 def exam(staff: User) -> Exam:
-    return services.create_exam(name="Biology Final", owner=staff)
+    return services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
 
 
 @pytest.fixture

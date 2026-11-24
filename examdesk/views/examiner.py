@@ -31,6 +31,7 @@ from ..forms import (
     ClarificationFilterForm,
     DeleteExamForm,
     ExamFileForm,
+    ExamSettingsForm,
     LabelForm,
     TextForm,
     form_errors,
@@ -637,6 +638,7 @@ def settings_page(
     connect_form: AIConnectForm | None = None,
     models_form: AIModelsForm | None = None,
     file_form: ExamFileForm | None = None,
+    exam_form: ExamSettingsForm | None = None,
 ) -> HttpResponse:
     """A bound `delete_form` reopens the delete dialog with its errors."""
     exam = member.exam
@@ -644,19 +646,34 @@ def settings_page(
     connect_form = connect_form or AIConnectForm()
     models_form = models_form or AIModelsForm(exam=exam)
     file_form = file_form or ExamFileForm()
+    exam_form = exam_form or ExamSettingsForm(
+        initial={"name": exam.name, "time_zone": exam.time_zone}
+    )
     context = {
         "delete_form": delete_form,
         "connect_form": connect_form,
         "models_form": models_form,
         "file_form": file_form,
+        "exam_form": exam_form,
         "files": exam.files.prefetch_related("pages"),
     }
     path = reverse("examiner:settings", args=[exam.pk])
     template = "examdesk/examiner/settings.html"
     response = render_live(request, member, template, context, path=path)
-    forms = (delete_form, connect_form, models_form, file_form)
+    forms = (delete_form, connect_form, models_form, file_form, exam_form)
     response.status_code = 400 if any(form.errors for form in forms) else 200
     return response
+
+
+@require_POST
+@exam_view(examiner_only=True)
+def edit_exam(request: HtmxRequest, member: Member) -> HttpResponse:
+    form = ExamSettingsForm(request.POST)
+    if not form.is_valid():
+        return settings_page(request, member, exam_form=form)
+    services.edit_exam(member.exam, **form.cleaned_data)
+    messages.success(request, "Saved the exam.")
+    return redirect("examiner:settings", member.exam.pk)
 
 
 @require_POST

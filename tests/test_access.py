@@ -5,6 +5,7 @@ import re
 import sys
 from pathlib import Path
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.contrib.auth.models import User
@@ -37,7 +38,7 @@ def test_link_asks_for_a_name_per_exam_then_opens_role_page(client: Client, exam
     assert exam.members.get().name == "Ann Lee"
     assert client.get(url("exam", exam))["Location"] == url("invigilator:report", exam)
     assert client.get(join)["Location"] == url("exam", exam)
-    other = services.create_exam(name="Other", owner=exam.owner)
+    other = services.create_exam(name="Other", owner=exam.owner, time_zone=ZoneInfo("UTC"))
     other_join = reverse("join", args=[other.examiner_token])
     assert 'value="Ann Lee"' in client.get(other_join).content.decode()
     client.post(other_join, {"name": "Ann Lee"})
@@ -278,7 +279,7 @@ def test_home_paginates_exams_newest_first(
     client: Client, exam: Exam, staff: User, settings: Settings
 ) -> None:
     settings.EXAMDESK_PAGE_SIZE = 1
-    services.create_exam(name="Finals", owner=staff)
+    services.create_exam(name="Finals", owner=staff, time_zone=ZoneInfo("UTC"))
     client.force_login(staff)
     first = client.get(reverse("home")).content.decode()
     assert "Finals</a>" in first
@@ -289,8 +290,11 @@ def test_home_paginates_exams_newest_first(
 
 
 def test_home_finds_exams_by_name_and_status(client: Client, exam: Exam, staff: User) -> None:
-    services.create_exam(name="Chemistry Midterm", owner=staff)
-    services.set_live(services.create_exam(name="Biology Midterm", owner=staff), live=False)
+    services.create_exam(name="Chemistry Midterm", owner=staff, time_zone=ZoneInfo("UTC"))
+    services.set_live(
+        services.create_exam(name="Biology Midterm", owner=staff, time_zone=ZoneInfo("UTC")),
+        live=False,
+    )
     client.force_login(staff)
 
     def names(query: str) -> list[str]:
@@ -423,3 +427,16 @@ def test_server_refuses_to_start_without_a_secret_key(monkeypatch: pytest.Monkey
         importlib.import_module("examdesk.asgi")
     monkeypatch.setenv("DJANGO_SECRET_KEY", "x" * 50)
     importlib.import_module("examdesk.asgi")
+
+
+@pytest.mark.parametrize(
+    ("sent", "saved"),
+    [("Asia/Calcutta", "Asia/Calcutta"), ("Mars/Olympus", "Europe/London"), ("", "Europe/London")],
+)
+def test_new_exams_take_the_browser_time_zone(
+    client: Client, staff: User, settings: Settings, sent: str, saved: str
+) -> None:
+    settings.TIME_ZONE = "Europe/London"
+    client.force_login(staff)
+    client.post(reverse("create_exam"), {"name": "Physics Final", "time_zone": sent})
+    assert Exam.objects.get().time_zone == ZoneInfo(saved)

@@ -4,9 +4,9 @@ const pageFrameSelectOOB = ["exam-status", "appbar", "exam-nav", "announcement-b
   .concat("#toasts:beforeend")
   .join(", ");
 // Boosted responses. A full page for the current URL (a refresh, or a POST that redirects back)
-// swaps in only its live parts ([data-live]) and new toasts, and replaces the history entry. The
-// same path with another query morphs the page: from a link (a sort, a page) at the top, from a
-// form (a filter, a step) at the same scroll position. A POST that redirects back resets its form
+// swaps in only its live parts ([data-live]), title and new toasts, and replaces the history entry.
+// The same path with another query morphs the page: from a link (a sort, a page) at the top, from
+// a form (a filter, a step) at the same scroll position. A POST that redirects back resets its form
 // and closes the open dialog. Another page of the same exam and view swaps <main>; other pages
 // replace <body>, attributes included. A link or form aimed at one part of the page (hx-target)
 // swaps only that part.
@@ -35,6 +35,7 @@ document.addEventListener("htmx:after:request", (event) => {
     ctx.swap = "none";
     ctx.selectOOB = "[data-live]:outerMorph, #toasts:beforeend";
     ctx.replace = "true";
+    document.title = new DOMParser().parseFromString(ctx.text, "text/html").title;
   } else if (ctx.request.headers["HX-Request-Type"] === "full") {
     ctx.swap = ctx.sourceElement.localName === "a" ? "innerMorph show:top" : "innerMorph show:none";
   } else {
@@ -548,6 +549,7 @@ htmx.onLoad((element) => {
   if (element.matches("body, main")) showCurrentTab();
   queryAllIncludingSelf(element, "dialog[data-autoopen]").forEach((dialog) => dialog.showModal());
   queryAllIncludingSelf(element, "[data-read-pages]").forEach(readPages);
+  queryAllIncludingSelf(element, "[data-browser-time-zone]").forEach((field) => (field.value = Intl.DateTimeFormat().resolvedOptions().timeZone));
   buzz();
   announceNewClarifications();
   if (queryAllIncludingSelf(element, "[data-refresh-in]").length) scheduleRefresh();

@@ -4,6 +4,7 @@ import os
 import re
 import threading
 from collections.abc import Iterator
+from zoneinfo import ZoneInfo
 
 import pytest
 import uvicorn
@@ -46,7 +47,7 @@ def open_link(browser: Browser, url: str, name: str, phone: bool = False) -> Pag
 
 @pytest.mark.django_db(transaction=True)
 def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff: User) -> None:
-    exam = services.create_exam(name="Biology Final", owner=staff)
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
     invigilator = open_link(browser, f"{server}/join/{exam.invigilator_token}/", "Ann", phone=True)
 
@@ -126,7 +127,7 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
 def test_question_filter_applies_its_picks_when_closed(
     server: str, browser: Browser, staff: User
 ) -> None:
-    exam = services.create_exam(name="Biology Final", owner=staff)
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
     report(exam, label="Q10", text="Ten?")
     report(exam, seat="21", label="Q2", text="Two?")
     report(exam, seat="34", label="Q3b", text="Three?")
@@ -159,7 +160,7 @@ def test_find_a_seat_as_you_type(
     server: str, browser: Browser, staff: User, settings: Settings
 ) -> None:
     settings.EXAMDESK_PAGE_SIZE = 2
-    exam = services.create_exam(name="Biology Final", owner=staff)
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
     for seat in ("1", "2", "14"):
         report(exam, seat=seat)
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
@@ -179,7 +180,7 @@ def test_find_a_seat_as_you_type(
 
 @pytest.mark.django_db(transaction=True)
 def test_a_send_updates_only_what_changed(server: str, browser: Browser, staff: User) -> None:
-    exam = services.create_exam(name="Biology Final", owner=staff)
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
     first = report(exam)
     for n in range(12):
         report(exam, seat=f"{70 + n}", clarification=first.clarification)
@@ -222,7 +223,7 @@ def test_a_send_updates_only_what_changed(server: str, browser: Browser, staff: 
 def test_changes_by_others_show_live_around_unsent_text(
     server: str, browser: Browser, staff: User
 ) -> None:
-    exam = services.create_exam(name="Biology Final", owner=staff)
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
     first = report(exam)
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
     prof.get_by_role("link", name="Is x an integer?").click()
@@ -244,7 +245,7 @@ def test_changes_by_others_show_live_around_unsent_text(
 def test_pages_open_at_the_top_and_keep_the_exam_stream(
     server: str, browser: Browser, staff: User
 ) -> None:
-    exam = services.create_exam(name="Biology Final", owner=staff)
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
     first = report(exam)
     for n in range(12):
         report(exam, seat=f"{70 + n}", clarification=first.clarification)
@@ -277,7 +278,7 @@ def test_pages_open_at_the_top_and_keep_the_exam_stream(
 def test_a_clarification_pane_is_inert_while_another_loads(
     server: str, browser: Browser, staff: User
 ) -> None:
-    exam = services.create_exam(name="Biology Final", owner=staff)
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
     report(exam)
     report(exam, seat="2", label="Q1", text="Can we use a calculator?")
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")

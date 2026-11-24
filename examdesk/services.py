@@ -2,6 +2,7 @@ import shutil
 import uuid
 from functools import partial
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -61,8 +62,8 @@ def _close(
     clarification.save(update_fields=["closed_reason", "merged_into"])
 
 
-def create_exam(*, name: str, owner: User) -> Exam:
-    return Exam.objects.create(name=name, owner=owner)
+def create_exam(*, name: str, owner: User, time_zone: ZoneInfo) -> Exam:
+    return Exam.objects.create(name=name, owner=owner, time_zone=time_zone)
 
 
 @transaction.atomic
@@ -316,6 +317,11 @@ def set_live(exam: Exam, *, live: bool) -> None:
     """Close or reopen the exam."""
     Exam.objects.filter(pk=exam.pk).update(is_live=live, version=F("version") + 1)
     exam.is_live = live
+
+
+def edit_exam(exam: Exam, *, name: str, time_zone: ZoneInfo) -> None:
+    Exam.objects.filter(pk=exam.pk).update(name=name, time_zone=time_zone, version=F("version") + 1)
+    exam.name, exam.time_zone = name, time_zone
 
 
 def connect_ai_service(exam: Exam, *, base_url: str, api_key: str, models: list[str]) -> None:

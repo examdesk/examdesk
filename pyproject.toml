@@ -15,6 +15,7 @@ dependencies = [
     "django-cotton>=2.7.2",
     "django-htmx>=1.29.0",
     "django-tailwind-cli>=4.8.1",
+    "django-timezone-field>=7.2.2",
     "huggingface-hub>=1.33.0",
     "latex2mathml>=3.81.1",
     "lucide>=1.1.4",
@@ -28,6 +29,7 @@ dependencies = [
     "pypdfium2>=5.15.2",
     "segno>=1.6.6",
     "tokenizers>=0.23.2",
+    "tzdata>=2026.4",
     "whitenoise>=6",
 ]
 
@@ -65,7 +67,7 @@ plugins = ["mypy_django_plugin.main"]
 exclude = ["examdesk/migrations/"]
 
 [[tool.mypy.overrides]]
-module = ["segno.*", "onnxruntime.*", "allauth.*", "pypdfium2.*"]
+module = ["segno.*", "onnxruntime.*", "allauth.*", "pypdfium2.*", "timezone_field.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

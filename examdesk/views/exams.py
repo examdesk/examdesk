@@ -141,7 +141,7 @@ def create_exam(request: StaffRequest) -> HttpResponse:
     if not form.is_valid():
         messages.error(request, "Name the exam.")
         return redirect("home")
-    exam = services.create_exam(name=form.cleaned_data["name"], owner=request.user)
+    exam = services.create_exam(**form.cleaned_data, owner=request.user)
     owner = services.add_member(exam, name=staff_name(request), role=Role.EXAMINER)
     session.remember(request.session, owner)
     messages.success(request, f"Created {exam.name}.")

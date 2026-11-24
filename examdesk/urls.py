@@ -65,6 +65,7 @@ examiner_patterns: list[URLPattern | URLResolver] = [
     path("members/", examiner.members, name="members"),
     path("members/<int:member_id>/remove/", examiner.remove_member, name="remove_member"),
     path("settings/", examiner.exam_settings, name="settings"),
+    path("edit/", examiner.edit_exam, name="edit_exam"),
     path("ai-service/connect/", examiner.connect_ai_service, name="connect_ai_service"),
     path("ai-service/disconnect/", examiner.disconnect_ai_service, name="disconnect_ai_service"),
     path("ai-service/models/", examiner.choose_ai_models, name="choose_ai_models"),

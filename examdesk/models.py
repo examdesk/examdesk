@@ -8,6 +8,7 @@ from django.db import models
 from django.db.models import Exists, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Lower
 from django.utils import timezone
+from timezone_field import TimeZoneField
 
 from .fields import EncryptedTextField
 
@@ -27,6 +28,7 @@ class Exam(models.Model):
     examiner_token = models.CharField(max_length=64, unique=True, default=new_token)
     invigilator_token = models.CharField(max_length=64, unique=True, default=new_token)
     is_live = models.BooleanField(default=True)
+    time_zone = TimeZoneField()
     ai_base_url = models.URLField("API base URL", blank=True)
     ai_vision_model = models.CharField("vision model", max_length=200, blank=True)
     ai_text_model = models.CharField("text model", max_length=200, blank=True)

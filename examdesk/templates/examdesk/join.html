@@ -1,9 +1,10 @@
 {% extends "examdesk/base.html" %}
+{% load tz %}
 {% block title %}{{ exam.name }} · Exam Desk{% endblock %}
 {% block content %}
 {% if other %}
   <c-centered-card title="{{ other.name }} is already on this exam">
-    <c-slot name="lead">{% filter capfirst %}{% if other.venue %}In {{ other.venue }}, {% endif %}{% if other.online %}online now{% else %}last seen {{ other.last_seen|time:"H:i" }}{% endif %}{% endfilter %}. Is that you, on another device?</c-slot>
+    <c-slot name="lead">{% filter capfirst %}{% if other.venue %}In {{ other.venue }}, {% endif %}{% if other.online %}online now{% else %}last seen {{ other.last_seen|timezone:exam.time_zone|time:"H:i" }}{% endif %}{% endfilter %}. Is that you, on another device?</c-slot>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="name" value="{{ other.name }}">

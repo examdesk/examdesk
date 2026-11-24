@@ -4,6 +4,7 @@ import re
 import uuid
 from datetime import timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.conf import settings
@@ -46,7 +47,7 @@ def test_report_retry_does_not_duplicate(invigilator: Client, exam: Exam) -> Non
 
 
 def test_cannot_join_clarification_of_other_exam(invigilator: Client, exam: Exam) -> None:
-    other = services.create_exam(name="Other", owner=exam.owner)
+    other = services.create_exam(name="Other", owner=exam.owner, time_zone=ZoneInfo("UTC"))
     data = {"client_key": uuid.uuid4(), "venue": "HALL1", "seat": "14", "label": "Q3b"}
     data["clarification"] = report(other).clarification_id
     assert invigilator.post(url("invigilator:report", exam), data).status_code == 404
