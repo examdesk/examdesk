@@ -108,10 +108,7 @@ def icon(name: str, title: str = "", css: str = "") -> SafeString:
     return mark_safe(svg)
 
 
-@register.simple_tag
-def seat_url(view: str, exam_id: int, venue: str, seat: str, **params: str | int) -> str:
-    """See `seats.seat_url`."""
-    return seats.seat_url(view, exam_id, venue, seat, **params)
+register.simple_tag(seats.seat_url)
 
 
 @register.filter

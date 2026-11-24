@@ -4,10 +4,10 @@ import pytest
 from django.utils import timezone
 
 from examdesk.models import Clarification, Report
+from examdesk.seats import seat_url
 from examdesk.templatetags.examdesk_tags import (
     icon,
     markdown,
-    seat_url,
     state_icon,
     wait,
     wait_level,

@@ -29,7 +29,7 @@ pytestmark = pytest.mark.django_db
 
 
 def test_delete_requires_typed_name(examiner: Client, exam: Exam) -> None:
-    services.close_exam(exam)
+    services.set_live(exam, live=False)
     examiner.post(url("examiner:delete_exam", exam), {"name": "wrong"})
     assert Exam.objects.exists()
     response = examiner.post(url("examiner:delete_exam", exam), {"name": exam.name})
@@ -117,7 +117,7 @@ def test_invalid_relabel_reopens_its_dialog_with_the_error(examiner: Client, exa
 
 
 def test_wrong_delete_name_reopens_its_dialog(examiner: Client, exam: Exam) -> None:
-    services.close_exam(exam)
+    services.set_live(exam, live=False)
     response = examiner.post(url("examiner:delete_exam", exam), {"name": "Biology"})
     html = response.content.decode()
     assert response.status_code == 400

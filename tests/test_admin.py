@@ -18,7 +18,6 @@ def test_every_examdesk_page_renders(client: Client, exam: Exam, staff: User) ->
         answered.clarification, text="Yes.", member=prof, expected_answer=None
     )
     services.mark_delivered(answered, answer=answer, member=ann)
-    services.claim_seat(ann, venue="HALL1", seat="21")
     announced = report(exam, seat="15", label="Q4")
     announcement = services.announce(
         prof, text="Q4 is cancelled.", clarification=announced.clarification

@@ -9,7 +9,6 @@ from .models import (
     Member,
     Readout,
     Report,
-    SeatClaim,
 )
 
 
@@ -95,23 +94,6 @@ class ReportAdmin(admin.ModelAdmin):
     inlines = [DeliveryInline]
 
 
-@admin.register(Delivery)
-class DeliveryAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "answer", "created_at"]
-    list_select_related = ["report", "answer", "member"]
-    search_fields = ["report__venue", "report__seat", "member__name"]
-    autocomplete_fields = ["report", "answer", "member"]
-    readonly_fields = ["created_at"]
-
-
-@admin.register(SeatClaim)
-class SeatClaimAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "exam", "claimed_at"]
-    list_select_related = ["exam", "member"]
-    search_fields = ["venue", "seat", "member__name"]
-    autocomplete_fields = ["exam", "member"]
-
-
 class ReadoutInline(admin.TabularInline):
     model = Readout
     fields = ["venue", "member", "created_at"]
@@ -128,13 +110,3 @@ class AnnouncementAdmin(admin.ModelAdmin):
     autocomplete_fields = ["exam", "clarification", "member"]
     readonly_fields = ["created_at"]
     inlines = [ReadoutInline]
-
-
-@admin.register(Readout)
-class ReadoutAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "announcement", "created_at"]
-    list_filter = ["venue"]
-    list_select_related = ["announcement", "member"]
-    search_fields = ["venue", "member__name"]
-    autocomplete_fields = ["announcement", "member"]
-    readonly_fields = ["created_at"]

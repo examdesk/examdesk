@@ -241,8 +241,7 @@ class Report(models.Model):
         TO_READ_OUT = "to read out", "To read out"
         READ_OUT = "read out", "Read out"
 
-    PROGRESS = [State.OPEN, State.TO_READ_OUT, State.TO_DELIVER, State.DELIVERED]
-    UNRESOLVED = PROGRESS[:3]
+    UNRESOLVED = [State.OPEN, State.TO_READ_OUT, State.TO_DELIVER]
 
     clarification = models.ForeignKey(
         Clarification, on_delete=models.CASCADE, related_name="reports"

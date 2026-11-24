@@ -90,7 +90,7 @@ def test_a_device_turned_away_gets_one_version_to_refresh_its_page(exam: Exam) -
 
 
 def test_deleting_the_exam_refreshes_its_pages(examiner: Client, exam: Exam) -> None:
-    services.close_exam(exam)
+    services.set_live(exam, live=False)
     closed = version(exam)
     stream = events(examiner, f"{url('events', exam)}?version=0")
 

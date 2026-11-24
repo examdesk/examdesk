@@ -16,14 +16,14 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import connections
 from django.db.models import Prefetch, QuerySet, prefetch_related_objects
-from django.http import Http404, HttpResponse, HttpResponseBase, QueryDict
+from django.http import HttpResponse, HttpResponseBase, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET, require_POST
 
 from .. import ai, pdf, services, session
-from ..access import HtmxRequest, admit, exam_view
+from ..access import HtmxRequest, exam_view
 from ..forms import (
     AIConnectForm,
     AIModelsForm,
@@ -51,6 +51,7 @@ from ..models import (
 )
 from ..seats import seat_from
 from .common import (
+    ai_view,
     flash_errors,
     get_clarification,
     group_by_venue,
@@ -253,19 +254,12 @@ def rank_others(
 
 
 @require_GET
+@ai_view(examiner_only=True, live_only=True)
 async def clarification_duplicates(
-    request: HtmxRequest, exam_id: int, clarification_id: int
+    request: HtmxRequest, member: Member, clarification_id: int
 ) -> HttpResponseBase:
     """Of the most alike clarifications, those the AI service finds ask the same thing, likeliest
-    first. Without its answer, the most alike.
-
-    Async, and without a database connection while it waits on the AI service.
-    """
-    member = await sync_to_async(admit)(request, exam_id, examiner_only=True, live_only=True)
-    if not isinstance(member, Member):
-        return member
-    if not member.exam.has_ai_service:
-        raise Http404
+    first. Without its answer, the most alike."""
     clarification, ranked = await sync_to_async(rank_others)(member, clarification_id)
     candidates = sorted(
         (other for other, _ in ranked[:DUPLICATE_CANDIDATES]), key=lambda other: other.pk
@@ -334,31 +328,20 @@ def answer_clarification(
 
 
 def to_draft(member: Member, clarification_id: int) -> tuple[Clarification, list[ExamFile]]:
-    if not member.exam.has_ai_service:
-        raise Http404
     clarifications = member.exam.clarifications.prefetch_related("reports")
     files = member.exam.files.prefetch_related("pages")
     return get_object_or_404(clarifications, pk=clarification_id), list(files)
 
 
 @require_POST
+@ai_view(examiner_only=True, live_only=True)
 async def draft_answer(
-    request: HtmxRequest, exam_id: int, clarification_id: int
+    request: HtmxRequest, member: Member, clarification_id: int
 ) -> HttpResponseBase:
-    """A drafted answer, as plain text.
-
-    Async, and without a database connection while it waits on the AI service.
-    """
-    member = await sync_to_async(admit)(request, exam_id, examiner_only=True, live_only=True)
-    if not isinstance(member, Member):
-        return member
+    """A drafted answer, as plain text."""
     clarification, files = await sync_to_async(to_draft)(member, clarification_id)
     await sync_to_async(connections.close_all)()
-    try:
-        text = await ai.draft_answer(member.exam, clarification, files)
-    except openai.APIError as error:
-        logger.warning("Couldn't draft an answer: %s", error)
-        return HttpResponse(status=502)
+    text = await ai.draft_answer(member.exam, clarification, files)
     return HttpResponse(text, content_type="text/plain")
 
 
@@ -758,27 +741,14 @@ def page_image(request: HtmxRequest, member: Member, file_id: int, number: int) 
     return response
 
 
-def page_to_read(member: Member, file_id: int, number: int) -> tuple[FilePage, bytes]:
-    if not member.exam.has_ai_service:
-        raise Http404
-    return pdf_page(member, file_id, number)
-
-
 @require_POST
+@ai_view(examiner_only=True)
 async def read_page(
-    request: HtmxRequest, exam_id: int, file_id: int, number: int
+    request: HtmxRequest, member: Member, file_id: int, number: int
 ) -> HttpResponseBase:
-    """Async, and without a database connection while it waits on the AI service."""
-    member = await sync_to_async(admit)(request, exam_id, examiner_only=True)
-    if not isinstance(member, Member):
-        return member
-    page, document = await sync_to_async(page_to_read)(member, file_id, number)
+    page, document = await sync_to_async(pdf_page)(member, file_id, number)
     await sync_to_async(connections.close_all)()
-    try:
-        text = await ai.read_page(member.exam, document, number)
-    except openai.APIError as error:
-        logger.warning("Couldn't read a PDF page: %s", error)
-        return HttpResponse(status=502)
+    text = await ai.read_page(member.exam, document, number)
     await FilePage.objects.filter(pk=page.pk).aupdate(text=text, is_read=True)
     return HttpResponse(status=204)
 
@@ -796,7 +766,7 @@ def reset_link(request: HtmxRequest, member: Member) -> HttpResponse:
 @require_POST
 @exam_view(examiner_only=True)
 def close_exam(request: HtmxRequest, member: Member) -> HttpResponse:
-    services.close_exam(member.exam)
+    services.set_live(member.exam, live=False)
     messages.success(request, "Closed the exam.")
     return redirect("examiner:settings", member.exam.pk)
 
@@ -804,7 +774,7 @@ def close_exam(request: HtmxRequest, member: Member) -> HttpResponse:
 @require_POST
 @exam_view(examiner_only=True)
 def reopen_exam(request: HtmxRequest, member: Member) -> HttpResponse:
-    services.reopen_exam(member.exam)
+    services.set_live(member.exam, live=True)
     messages.success(request, "Reopened the exam.")
     return redirect("examiner:settings", member.exam.pk)
 

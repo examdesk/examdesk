@@ -163,7 +163,7 @@ def test_closed_exam_stops_invigilator_and_is_read_only(
     invigilator: Client, examiner: Client, exam: Exam
 ) -> None:
     clarification = report(exam).clarification
-    services.close_exam(exam)
+    services.set_live(exam, live=False)
     assert invigilator.get(url("invigilator:report", exam)).status_code == 403
     assert (
         invigilator.get(url("invigilator:to_deliver", exam), headers=HTMX)["HX-Refresh"] == "true"
@@ -177,7 +177,7 @@ def test_closed_exam_stops_invigilator_and_is_read_only(
 
 def test_deleted_exam_reloads_its_pages_into_the_404_page(examiner: Client, exam: Exam) -> None:
     pk = exam.pk
-    services.close_exam(exam)
+    services.set_live(exam, live=False)
     services.delete_exam(exam)
     refresh = examiner.get(reverse("examiner:clarifications", args=[pk]), headers=REFRESH)
     assert refresh["HX-Refresh"] == "true"
@@ -290,7 +290,7 @@ def test_home_paginates_exams_newest_first(
 
 def test_home_finds_exams_by_name_and_status(client: Client, exam: Exam, staff: User) -> None:
     services.create_exam(name="Chemistry Midterm", owner=staff)
-    services.close_exam(services.create_exam(name="Biology Midterm", owner=staff))
+    services.set_live(services.create_exam(name="Biology Midterm", owner=staff), live=False)
     client.force_login(staff)
 
     def names(query: str) -> list[str]:

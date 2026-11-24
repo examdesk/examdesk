@@ -312,17 +312,10 @@ def relabel_clarification(clarification: Clarification, label: str) -> None:
     Clarification.objects.filter(pk=clarification.pk).update(label=label)
 
 
-def _set_live(exam: Exam, *, live: bool) -> None:
+def set_live(exam: Exam, *, live: bool) -> None:
+    """Close or reopen the exam."""
     Exam.objects.filter(pk=exam.pk).update(is_live=live, version=F("version") + 1)
     exam.is_live = live
-
-
-def close_exam(exam: Exam) -> None:
-    _set_live(exam, live=False)
-
-
-def reopen_exam(exam: Exam) -> None:
-    _set_live(exam, live=True)
 
 
 def connect_ai_service(exam: Exam, *, base_url: str, api_key: str, models: list[str]) -> None:

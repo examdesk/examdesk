@@ -1,17 +1,55 @@
+import logging
 from collections import defaultdict
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Coroutine, Iterable, Iterator
 from contextlib import contextmanager
+from functools import wraps
 from typing import Any
 
+import openai
+from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.db.models import Model, Prefetch, QuerySet
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from .. import services
+from ..access import HtmxRequest, admit
 from ..labels import natural
 from ..models import Announcement, Clarification, Exam, Member, Readout, Report
+
+logger = logging.getLogger(__name__)
+
+type AsyncView = Callable[..., Coroutine[Any, Any, HttpResponseBase]]
+
+
+def ai_view(
+    *, examiner_only: bool = False, live_only: bool = False
+) -> Callable[[AsyncView], AsyncView]:
+    """An async `exam_view` for exams with an AI service, answering 502 when the service fails.
+
+    The view closes its database connections before waiting on the service.
+    """
+
+    def decorator(view: AsyncView) -> AsyncView:
+        @wraps(view)
+        async def wrapper(request: HtmxRequest, exam_id: int, **kwargs: Any) -> HttpResponseBase:
+            member = await sync_to_async(admit)(
+                request, exam_id, examiner_only=examiner_only, live_only=live_only
+            )
+            if not isinstance(member, Member):
+                return member
+            if not member.exam.has_ai_service:
+                raise Http404
+            try:
+                return await view(request, member, **kwargs)
+            except openai.APIError as error:
+                logger.warning("%s failed: %s", view.__name__, error)
+                return HttpResponse(status=502)
+
+        return wrapper
+
+    return decorator
 
 
 @contextmanager

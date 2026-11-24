@@ -393,7 +393,7 @@ def test_actions_bump_version(exam: Exam) -> None:
 
 def test_closed_exam_is_read_only_and_can_reopen(exam: Exam) -> None:
     r = report(exam)
-    services.close_exam(exam)
+    services.set_live(exam, live=False)
     actions: list[Any] = [
         lambda: report(exam, seat="21"),
         lambda: services.answer_clarification(
@@ -405,7 +405,7 @@ def test_closed_exam_is_read_only_and_can_reopen(exam: Exam) -> None:
     for action in actions:
         with pytest.raises(ServiceError, match="closed"):
             action()
-    services.reopen_exam(exam)
+    services.set_live(exam, live=True)
     report(exam, seat="21")
 
 
@@ -418,7 +418,7 @@ def test_delete_exam_needs_closed_and_removes_photo_folder(
     report(exam, photo=SimpleUploadedFile("p.jpg", jpeg, "image/jpeg"))
     with pytest.raises(ServiceError):
         services.delete_exam(exam)
-    services.close_exam(exam)
+    services.set_live(exam, live=False)
     with django_capture_on_commit_callbacks(execute=True):
         services.delete_exam(exam)
     assert not Exam.objects.exists()

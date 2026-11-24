@@ -1,6 +1,5 @@
 """The invigilator screens (phone), also open to examiners."""
 
-import logging
 import math
 import time
 import uuid
@@ -10,21 +9,20 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-import openai
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import connections
 from django.db.models import Exists, OuterRef, Prefetch
-from django.http import Http404, HttpResponse, HttpResponseBase
+from django.http import HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from .. import ai, services, session
-from ..access import HtmxRequest, admit, exam_view
+from ..access import HtmxRequest, exam_view
 from ..forms import PhotoForm, ReportForm, ReportStartForm, VenueForm, form_errors
 from ..labels import mismatched_label, natural, normalize_label, place_order, top_level
 from ..matching import rank_similar, same_question, similar_enough
@@ -41,6 +39,7 @@ from ..models import (
 )
 from ..seats import seat_from, seat_url
 from .common import (
+    ai_view,
     back_to_report,
     flash_errors,
     get_clarification,
@@ -50,8 +49,6 @@ from .common import (
     suggestions,
 )
 from .live import is_refresh, render_live
-
-logger = logging.getLogger(__name__)
 
 
 def invigilator_page(
@@ -181,26 +178,15 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
 
 
 @require_POST
-async def transcribe_photo(request: HtmxRequest, exam_id: int) -> HttpResponseBase:
-    """The handwriting in a photo, as plain text.
-
-    Async, and without a database connection while it waits on the AI service.
-    """
-    member = await sync_to_async(admit)(request, exam_id, live_only=True)
-    if not isinstance(member, Member):
-        return member
-    if not member.exam.has_ai_service:
-        raise Http404
+@ai_view(live_only=True)
+async def transcribe_photo(request: HtmxRequest, member: Member) -> HttpResponseBase:
+    """The handwriting in a photo, as plain text."""
     form = PhotoForm(request.POST, request.FILES)
     if not form.is_valid():
         return HttpResponse(form_errors(form), status=400)
     photo = form.cleaned_data["photo"]
     await sync_to_async(connections.close_all)()
-    try:
-        text = await ai.transcribe(member.exam, photo.read(), photo.content_type)
-    except openai.APIError as error:
-        logger.warning("Couldn't transcribe a photo: %s", error)
-        return HttpResponse(status=502)
+    text = await ai.transcribe(member.exam, photo.read(), photo.content_type)
     return HttpResponse(text, content_type="text/plain")
 
 
