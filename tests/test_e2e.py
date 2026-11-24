@@ -9,7 +9,7 @@ import pytest
 import uvicorn
 from django.contrib.auth.models import User
 from django.core.asgi import get_asgi_application
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, Page, Route, expect
 from pytest_django.fixtures import Settings
 
 from examdesk import services
@@ -271,3 +271,24 @@ def test_pages_open_at_the_top_and_keep_the_exam_stream(
     prof.get_by_role("button", name="Send", exact=True).click()
     expect(prof.get_by_text("Not sent.")).to_be_visible()
     expect(answer).to_have_value("Yes.")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_clarification_pane_is_inert_while_another_loads(
+    server: str, browser: Browser, staff: User
+) -> None:
+    exam = services.create_exam(name="Biology Final", owner=staff)
+    report(exam)
+    report(exam, seat="2", label="Q1", text="Can we use a calculator?")
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
+    pane = prof.locator("#clarification-pane")
+    wording = pane.get_by_role("button", name="Edit wording")
+    expect(wording).to_contain_text("Is x an integer?")
+    routes: list[Route] = []
+    prof.route("**/examiner/clarifications/*/", lambda route: routes.append(route))
+    prof.get_by_role("link", name="Can we use a calculator?").click()
+    expect(pane).to_have_attribute("inert", "")
+    for route in routes:
+        route.continue_()
+    expect(wording).to_contain_text("Can we use a calculator?")
+    expect(pane).not_to_have_attribute("inert", "")

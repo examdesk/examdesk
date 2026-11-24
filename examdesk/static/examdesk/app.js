@@ -89,25 +89,33 @@ htmx.registerExtension("keep-unsent-text-visible", {
     attrName !== "hidden" || ![...element.querySelectorAll("input, textarea")].some((field) => field.value !== field.defaultValue),
 });
 // While a link or a GET form loads, a bar at the top runs and the part it replaces is marked busy
-// (<main> for a whole page), which tailwind.css dims after 150 ms. A newer load aborts it
-// (`hx-sync` on <body>).
+// (<main> for a whole page), which tailwind.css dims after 150 ms. A clarification or seat pane is
+// also inert, since its replacement drops anything typed into it. A newer request aborts the load
+// (`hx-sync` on <body>); the busy state clears when the latest navigation finishes or is aborted.
 const isNavigation = ({ sourceEvent, request }) => ["click", "submit"].includes(sourceEvent?.type) && request.method === "GET";
 const loadingTarget = ({ target }) => (!target || target === document.body ? document.querySelector("main") : target);
 document.documentElement.insertAdjacentHTML("beforeend", '<div id="page-loading-bar" aria-hidden="true"></div>');
 const loadingBar = document.getElementById("page-loading-bar");
+let latestNavigation;
 document.addEventListener("htmx:before:request", (event) => {
   const { ctx } = event.detail;
   if (event.defaultPrevented || !isNavigation(ctx)) return;
+  latestNavigation = ctx;
   delete loadingBar.dataset.state;
   loadingBar.offsetWidth; // forces a reflow, so the transition restarts from 0
   loadingBar.dataset.state = "loading";
-  loadingTarget(ctx).setAttribute("aria-busy", "true");
+  const target = loadingTarget(ctx);
+  target.setAttribute("aria-busy", "true");
+  target.inert = target.matches("#clarification-pane, #seat-pane");
 });
 document.addEventListener("htmx:finally:request", (event) => {
   const { ctx } = event.detail;
-  if (!isNavigation(ctx) || ctx.request.signal.aborted) return;
+  if (ctx !== latestNavigation) return;
   loadingBar.dataset.state = "done";
-  document.querySelectorAll("[aria-busy=true]:not(.btn)").forEach((element) => element.removeAttribute("aria-busy"));
+  document.querySelectorAll("[aria-busy=true]:not(.btn)").forEach((element) => {
+    element.removeAttribute("aria-busy");
+    element.inert = false;
+  });
 });
 // The first clarification beside the queue ([data-first-clarification]) loads again once the newer
 // request that aborted it (a tab, the same page) has swapped, if it is still on the page.
