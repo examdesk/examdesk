@@ -12,8 +12,8 @@
   </div>
   {% if people %}
   <div class="table-card">
-    <table>
-      <thead><tr><th>Name</th><th class="w-36 max-sm:hidden">Role</th><th class="w-32">Venue</th><th class="w-40 max-sm:hidden">Status</th><th class="w-12"><span class="sr-only">Actions</span></th></tr></thead>
+    <table class="table-fixed">
+      <thead><tr><th>Name</th><th class="w-36 max-sm:hidden">Role</th><th class="w-32 max-sm:hidden">Venue</th><th class="w-40 max-sm:hidden">Status</th><th class="w-16"><span class="sr-only">Actions</span></th></tr></thead>
       <tbody>
         {% for person in people %}
           <tr>
@@ -22,12 +22,12 @@
                 <span class="initials relative">{{ person.name|initials }}{% if person.online %}<span class="live-dot absolute -right-0.5 -bottom-0.5 ring-2 ring-base-100" title="Online"></span>{% endif %}</span>
                 <div class="min-w-0">
                   <p class="truncate font-medium">{{ person.name }}{% if person == member %} <span class="font-normal text-subtle">(you)</span>{% endif %}</p>
-                  <p class="meta sm:hidden">{{ person.get_role_display }} · {% if person.online %}Online{% else %}Last seen {{ person.last_seen|time:"H:i" }}{% endif %}</p>
+                  <p class="meta sm:hidden">{{ person.get_role_display }}{% if person.venue %} · {{ person.venue }}{% endif %} · {% if person.online %}Online{% else %}Last seen {{ person.last_seen|time:"H:i" }}{% endif %}</p>
                 </div>
               </div>
             </td>
             <td class="text-muted max-sm:hidden">{{ person.get_role_display }}</td>
-            <td>{% if person.venue %}<span class="badge">{{ person.venue }}</span>{% else %}<span class="text-subtle">–</span>{% endif %}</td>
+            <td class="max-sm:hidden">{% if person.venue %}<span class="badge">{{ person.venue }}</span>{% else %}<span class="text-subtle">–</span>{% endif %}</td>
             <td class="max-sm:hidden">{% if person.online %}<span class="inline-flex items-center gap-1.5 text-green-700"><span class="live-dot"></span>Online</span>{% else %}<span class="text-muted">Last seen {{ person.last_seen|time:"H:i" }}</span>{% endif %}</td>
             <td class="text-right">
               {% if person != member %}

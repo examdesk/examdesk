@@ -181,7 +181,7 @@
   }
 
   /* Tables */
-  .table-card { @apply overflow-x-auto rounded-box border border-base-300 bg-base-100; }
+  .table-card { @apply relative overflow-x-auto rounded-box border border-base-300 bg-base-100; }
   table { @apply w-full text-left text-sm; }
   thead th { @apply border-b border-base-300 bg-base-200/50 px-(--surface-padding) py-2.5 text-xs font-medium whitespace-nowrap text-subtle; }
   tbody td { @apply border-b border-base-300 px-(--surface-padding) py-3 align-middle; }
@@ -196,7 +196,7 @@
 
   /* App bar: brand, exam, tabs, account. Tabs wrap to a second row below lg. */
   .appbar { @apply sticky top-0 z-20 border-b border-base-300 bg-base-100/95 backdrop-blur; }
-  .appbar-row { @apply flex min-h-14 flex-wrap items-center gap-x-4; }
+  .appbar-row { @apply flex min-h-14 flex-wrap items-center gap-x-4; &:has(> .tabs-nav) { @apply max-lg:pt-2; } }
   .brand { @apply flex shrink-0 items-center gap-2 font-semibold whitespace-nowrap text-base-content; }
   /* A person's initials, and the account menu's button showing them */
   .avatar-button, .initials { @apply grid size-8 shrink-0 place-items-center rounded-full bg-base-200 text-xs font-semibold text-muted ring-1 ring-base-300; }
@@ -228,11 +228,12 @@
   .queue-row {
     @apply relative block border-b border-base-300 px-(--surface-padding) py-3 text-base-content last:border-b-0 hover:bg-base-200/60;
     &[aria-current=page] { @apply bg-primary/6; &::before { content: ""; @apply absolute inset-y-0 left-0 w-0.5 bg-primary; } }
-    /* Two lines, the second fading out at its end. Not line-clamp: Safari counts the floated meta
-       as a line. */
+    /* Two lines, the second fading out at its end when the text overflows (a scroll timeline is
+       inactive without overflow). Not line-clamp: Safari counts the floated meta as a line. */
     > p {
       @apply max-h-10 overflow-hidden text-sm leading-5 font-medium;
-      mask: linear-gradient(#000 0 0) top / 100% 1.25rem no-repeat, linear-gradient(to left, transparent, #000 3rem) bottom / 100% 1.25rem no-repeat;
+      animation: fade-overflowing-text both;
+      animation-timeline: scroll(self);
     }
     .label-chip { @apply align-top; }
   }
@@ -640,6 +641,9 @@
 .toast > .alert.success { animation: toast 250ms ease-out, fade-out 300ms 4s forwards; }
 body.invigilator > .toast { bottom: calc(var(--spacing) * 20 + env(safe-area-inset-bottom)); }
 @keyframes fade-out { to { opacity: 0; visibility: hidden; } }
+@keyframes fade-overflowing-text {
+  from, to { mask: linear-gradient(#000 0 0) top / 100% 1.25rem no-repeat, linear-gradient(to left, transparent, #000 3rem) bottom / 100% 1.25rem no-repeat; }
+}
 
 /* The headline's logo: the lit seat pops in, then the rest rises in. */
 @media (prefers-reduced-motion: no-preference) {

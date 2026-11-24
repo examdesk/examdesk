@@ -49,7 +49,7 @@
     </form>
     <footer class="card-footer justify-between">
       <button type="button" class="btn btn-ghost btn-danger btn-sm -ml-3" commandfor="disconnect-dialog" command="show-modal"><c-icon name="unplug" />Disconnect AI service</button>
-      <button class="btn btn-primary btn-sm" form="models-form"><c-icon name="check" />Save models</button>
+      <button class="btn btn-primary btn-sm ml-auto" form="models-form"><c-icon name="check" />Save models</button>
     </footer>
   {% else %}
     <form method="post" action="{% url 'examiner:connect_ai_service' pk %}" id="connect-form">

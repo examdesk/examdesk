@@ -186,7 +186,7 @@
     {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<c-photo-viewer id="photo-{{ report.pk }}" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}" class="-my-1 shrink-0"><img class="size-7 rounded border border-base-300 object-cover" src="{{ photo }}" alt=""></c-photo-viewer>{% endif %}
     {% if report.state != "open" %}<c-state-badge :state="report.state" class="mt-0.5" />{% endif %}
     {% if can_answer %}
-      <button type="button" class="btn btn-ghost btn-xs btn-square" popovertarget="report-menu-{{ report.pk }}" style="anchor-name: --report-{{ report.pk }}" aria-label="{{ report.venue }} {{ report.seat }}: actions"><c-icon name="ellipsis" /></button>
+      <button type="button" class="btn btn-ghost btn-xs btn-square -mr-1" popovertarget="report-menu-{{ report.pk }}" style="anchor-name: --report-{{ report.pk }}" aria-label="{{ report.venue }} {{ report.seat }}: actions"><c-icon name="ellipsis" /></button>
       <ul class="menu-panel" id="report-menu-{{ report.pk }}" popover style="position-anchor: --report-{{ report.pk }}">
         <li><button type="button" commandfor="move-{{ report.pk }}" command="show-modal"><c-icon name="arrow-right-left" />Move…</button></li>
         <li><button type="button" class="text-error" commandfor="delete-report-{{ report.pk }}" command="show-modal"><c-icon name="trash-2" />Delete…</button></li>
