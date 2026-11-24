@@ -58,14 +58,8 @@
           <c-photo-viewer id="photo-{{ question_photo.pk }}" src="{{ photo }}" alt="Photo, {{ question_photo.venue }} {{ question_photo.seat }}" class="mt-3 block w-fit"><img class="max-h-80 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>
         {% endif %}
         {% if reports %}
-          <div class="seat-list mt-2" role="group" aria-label="Seats">
-            {% for report in reports|slice:":5" %}{% partial seat_row %}{% endfor %}
-            {% if reports|length > 5 %}
-              <details class="group/more">
-                <summary class="cursor-pointer list-none text-meta font-medium text-primary hover:underline group-open/more:hidden">Show {{ reports|length|add:"-5" }} more</summary>
-                <div class="seat-list">{% for report in reports|slice:"5:" %}{% partial seat_row %}{% endfor %}</div>
-              </details>
-            {% endif %}
+          <div class="seat-pills mt-3" role="group" aria-label="Seats">
+            {% for report in reports %}{% partial seat_chip %}{% endfor %}
           </div>
         {% endif %}
       </section>
@@ -177,30 +171,29 @@
   </c-live>
 </div>
 
-{% partialdef seat_row %}
-  <div class="row-item items-start">
-    <div class="min-w-0 flex-1">
-      <p class="flex flex-wrap items-baseline gap-x-2"><a href="{% seat_url 'examiner:seat' pk report.venue report.seat %}" class="font-medium hover:underline">{{ report.venue }} {{ report.seat }}</a><span class="meta">{{ report.member.name }} · {{ report.created_at|time:"H:i" }}</span></p>
-      {% if report.text and report.text != clarification.wording %}<button type="button" class="mt-0.5 line-clamp-2 cursor-pointer text-left text-sm text-muted" onclick="this.classList.toggle('line-clamp-2')">{{ report.text }}</button>{% endif %}
-    </div>
-    {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<c-photo-viewer id="photo-{{ report.pk }}" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}" class="-my-1 shrink-0"><img class="size-7 rounded border border-base-300 object-cover" src="{{ photo }}" alt=""></c-photo-viewer>{% endif %}
-    {% if report.state != "open" %}<c-state-badge :state="report.state" class="mt-0.5" />{% endif %}
+{% partialdef seat_chip %}{% with seat_state=report|seat_state %}
+  <button type="button" class="seat-pill state-{{ seat_state }} h-7" popovertarget="report-{{ report.pk }}" style="anchor-name: --report-{{ report.pk }}" aria-label="{{ report.venue }} {{ report.seat }}: {{ seat_state.label|lower }}{% if report.photo and report != question_photo %}, photo{% endif %}"><span class="font-medium opacity-70">{{ report.venue }}</span>{{ report.seat }}{% if report.photo and report != question_photo %}<c-icon name="image" class="size-3.5 opacity-70" />{% endif %}</button>
+  <div class="seat-card" id="report-{{ report.pk }}" popover style="position-anchor: --report-{{ report.pk }}">
+    <p class="flex flex-wrap items-center gap-x-2"><a href="{% seat_url 'examiner:seat' pk report.venue report.seat %}" class="font-semibold">{{ report.venue }} {{ report.seat }}</a><span class="meta">{{ report.member.name }} · {{ report.created_at|time:"H:i" }}</span><c-state-badge :state="report.state" class="ml-auto" /></p>
+    {% if report.text and report.text != clarification.wording %}<p class="mt-2">{{ report.text }}</p>{% endif %}
+    {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<c-photo-viewer id="photo-{{ report.pk }}" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}" class="mt-2.5 block w-fit"><img class="max-h-36 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>{% endif %}
     {% if can_answer %}
-      <button type="button" class="btn btn-ghost btn-xs btn-square -mr-1" popovertarget="report-menu-{{ report.pk }}" style="anchor-name: --report-{{ report.pk }}" aria-label="{{ report.venue }} {{ report.seat }}: actions"><c-icon name="ellipsis" /></button>
-      <ul class="menu-panel" id="report-menu-{{ report.pk }}" popover style="position-anchor: --report-{{ report.pk }}">
-        <li><button type="button" commandfor="move-{{ report.pk }}" command="show-modal"><c-icon name="arrow-right-left" />Move…</button></li>
-        <li><button type="button" class="text-error" commandfor="delete-report-{{ report.pk }}" command="show-modal"><c-icon name="trash-2" />Delete…</button></li>
-      </ul>
-      <c-delete-report-dialog :report="report" next="{% url 'examiner:clarification' pk clarification.pk %}" />
-      <c-dialog id="move-{{ report.pk }}" title="Move {{ report.venue }} {{ report.seat }}" action="{% url 'examiner:move_report' pk report.pk %}" submit="Move">
-        <select name="target" aria-label="Move to">
-          {% if reports|length > 1 %}<option value="new">New clarification</option>{% endif %}
-          {% for other in others %}<option value="{{ other.pk }}">{{ other|titled }}</option>{% endfor %}
-        </select>
-      </c-dialog>
+      <div class="-mx-1.5 mt-3 -mb-1.5 flex gap-1 border-t border-base-300 pt-1.5">
+        <button type="button" class="btn btn-ghost btn-xs font-normal text-muted" commandfor="move-{{ report.pk }}" command="show-modal"><c-icon name="arrow-right-left" />Move</button>
+        <button type="button" class="btn btn-ghost btn-danger btn-xs font-normal" commandfor="delete-report-{{ report.pk }}" command="show-modal"><c-icon name="trash-2" />Delete</button>
+      </div>
     {% endif %}
   </div>
-{% endpartialdef %}
+  {% if can_answer %}
+    <c-delete-report-dialog :report="report" next="{% url 'examiner:clarification' pk clarification.pk %}" />
+    <c-dialog id="move-{{ report.pk }}" title="Move {{ report.venue }} {{ report.seat }}" action="{% url 'examiner:move_report' pk report.pk %}" submit="Move">
+      <select name="target" aria-label="Move to">
+        {% if reports|length > 1 %}<option value="new">New clarification</option>{% endif %}
+        {% for other in others %}<option value="{{ other.pk }}">{{ other|titled }}</option>{% endfor %}
+      </select>
+    </c-dialog>
+  {% endif %}
+{% endwith %}{% endpartialdef %}
 
 {% partialdef duplicates %}{% if duplicates %}{% with pk=member.exam.pk %}
   <section class="group" aria-labelledby="duplicates-title">

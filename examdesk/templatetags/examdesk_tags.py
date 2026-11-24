@@ -16,7 +16,7 @@ from markdown_it import MarkdownIt
 from mdit_py_plugins.dollarmath import dollarmath_plugin
 
 from .. import forms, seats
-from ..models import Clarification
+from ..models import SEAT_STATES, Clarification, Report, SeatState
 
 register = template.Library()
 
@@ -88,6 +88,12 @@ def unique(messages: Iterable[Message]) -> list[Message]:
 @register.filter
 def state_icon(state: str) -> str:
     return STATE_ICONS[state]
+
+
+@register.filter
+def seat_state(report: Report) -> SeatState:
+    """The report's state as the Seats page colours it. Requires `with_state()`."""
+    return SEAT_STATES[report.state]
 
 
 @register.simple_tag

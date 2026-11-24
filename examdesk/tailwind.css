@@ -604,6 +604,15 @@
     li > .text-error:hover { @apply bg-red-50; }
     .menu-title { @apply px-3 pt-2 pb-1 text-xs font-medium text-subtle normal-case; }
   }
+  .seat-card {
+    @apply w-80 rounded-box border border-base-300 bg-base-100 p-3.5 text-sm shadow-lg;
+    /* A popover below its chip's left edge. */
+    inset: auto;
+    margin: 0.5rem 0 0;
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-block, flip-inline;
+    @variant max-sm { @apply mx-4 w-auto justify-self-stretch; position-area: bottom span-all; }
+  }
   .modal-box { @apply max-w-md rounded-2xl p-6 shadow-xl; }
   #invite-dialog > .modal-box { @apply max-w-xl overflow-hidden p-0; }
   .modal-box.full-screen { @apply h-dvh max-h-none w-full max-w-none rounded-none; }

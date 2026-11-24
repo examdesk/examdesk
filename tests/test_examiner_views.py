@@ -499,7 +499,7 @@ def test_announced_seats_wait_on_the_seats_pages_until_read_out(
     seats = examiner.get(url("examiner:seats", exam)).content.decode()
     assert 'aria-label="HALL1 14: delivered"' in seats
     page = examiner.get(url("examiner:clarification", exam, r.clarification_id)).content.decode()
-    assert 'class="badge state-read-out mt-0.5"' in page
+    assert 'class="badge state-read-out ml-auto"' in page
 
 
 def test_members_page_lists_everyone_online_first(
@@ -561,19 +561,33 @@ def test_a_removed_member_keeps_their_history_and_can_rejoin(
     assert f'commandfor="remove-member-{ann.pk}"' in examiner.get(members).content.decode()
 
 
-def test_clarification_shows_five_seats_and_the_rest_under_show_more(
+def test_clarification_shows_seats_as_chips_that_open_what_each_wrote(
     examiner: Client, exam: Exam
 ) -> None:
     first = report(exam, seat="1")
-    for n in range(2, 8):
-        report(exam, seat=f"{n}", clarification=first.clarification)
+    second = report(exam, seat="2", text="3a says 8, I count 9", clarification=first.clarification)
     html = examiner.get(
         url("examiner:clarification", exam, first.clarification_id)
     ).content.decode()
-    more = html[html.index('<details class="group/more">') :]
-    assert "Show 2 more</summary>" in more
-    assert "HALL1 5</a>" not in more
-    assert "HALL1 6</a>" in more
+    assert f'class="seat-pill state-waiting h-7" popovertarget="report-{second.pk}"' in html
+    card = html[html.index(f'<div class="seat-card" id="report-{second.pk}"') :]
+    assert "HALL1 2</a>" in card
+    assert "3a says 8, I count 9" in card
+
+
+def test_seat_chip_shows_an_image_icon_when_its_card_has_a_photo(
+    examiner: Client, exam: Exam, media: Path, jpeg: bytes
+) -> None:
+    first = report(exam, seat="1")
+    photo = SimpleUploadedFile("p.jpg", jpeg, "image/jpeg")
+    second = report(exam, seat="2", photo=photo, clarification=first.clarification)
+    html = examiner.get(
+        url("examiner:clarification", exam, first.clarification_id)
+    ).content.decode()
+    assert 'aria-label="HALL1 1: waiting">' in html
+    assert 'aria-label="HALL1 2: waiting, photo">' in html
+    card = html[html.index(f'<div class="seat-card" id="report-{second.pk}"') :]
+    assert f'src="{url("photo", exam, second.pk)}"' in card
 
 
 def test_photo_shows_as_the_question_without_wording(
