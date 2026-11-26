@@ -19,10 +19,11 @@ from django.db.models import Prefetch, QuerySet, prefetch_related_objects
 from django.http import HttpResponse, HttpResponseBase, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import content_disposition_header
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET, require_POST
 
-from .. import ai, pdf, services, session
+from .. import ai, export, pdf, services, session
 from ..access import HtmxRequest, exam_view
 from ..forms import (
     AIConnectForm,
@@ -169,6 +170,18 @@ def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
         context["invite_link"] = join_link(request, exam, Role.INVIGILATOR)
     template = "examdesk/examiner/clarifications.html"
     return render_live(request, member, template, context | suggestions(exam))
+
+
+@require_GET
+@exam_view(examiner_only=True)
+def export_clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
+    filename = f"{member.exam.name} clarifications.csv"
+    content_disposition = content_disposition_header(as_attachment=True, filename=filename)
+    return HttpResponse(
+        export.clarifications_csv(member.exam),
+        content_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": content_disposition},
+    )
 
 
 def clarification_page(

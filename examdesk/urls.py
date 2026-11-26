@@ -51,6 +51,7 @@ clarification_patterns = [
 examiner_patterns: list[URLPattern | URLResolver] = [
     path("clarifications/", examiner.clarifications, name="clarifications"),
     path("clarifications/merge/", examiner.merge_clarifications, name="merge_clarifications"),
+    path("clarifications/export/", examiner.export_clarifications, name="export_clarifications"),
     path("clarifications/<int:clarification_id>/", include(clarification_patterns)),
     path("reports/<int:report_id>/move/", examiner.move_report, name="move_report"),
     path("announcements/", examiner.announcements, name="announcements"),

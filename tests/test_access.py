@@ -95,6 +95,7 @@ def test_creating_an_exam_requires_staff(client: Client, staff: User) -> None:
             ("get", name)
             for name in (
                 "examiner:clarifications",
+                "examiner:export_clarifications",
                 "examiner:seats",
                 "examiner:settings",
                 "examiner:announcements",

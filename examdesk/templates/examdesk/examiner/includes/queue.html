@@ -9,6 +9,7 @@
     <form method="get" action="{{ request.path }}" id="queue-filters" class="filters flex gap-2" data-autosubmit hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs, #pane-empty-state" hx-swap="outerHTML show:none">
       <c-live id="queue-label-filter" class="min-w-0 flex-1">{{ form.label }}</c-live>
       <div class="shrink-0">{{ form.sort }}</div>
+      <a class="btn btn-ghost btn-sm btn-square shrink-0 self-center text-muted" href="{% url 'examiner:export_clarifications' member.exam.pk %}" download title="Export as CSV" aria-label="Export clarifications as CSV"><c-icon name="download" /></a>
       <noscript><button class="btn btn-outline btn-sm">Apply</button></noscript>
     </form>
     <c-error>{{ form|form_errors }}</c-error>
