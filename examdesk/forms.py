@@ -97,7 +97,11 @@ class ExamSettingsForm(BaseForm):
         required=False,
         validators=[validate_question_numbers],
         widget=forms.TextInput(
-            attrs={"autocomplete": "off", "placeholder": "e.g. 1-40 or 1a-c, 2"}
+            attrs={
+                "autocomplete": "off",
+                "placeholder": "e.g. 1-40 or 1a-c, 2",
+                "aria-describedby": "question-numbers-preview",
+            }
         ),
     )
     question_numbers_locked = forms.BooleanField(
@@ -277,7 +281,10 @@ class AnswerForm(TextForm):
 
 
 class LabelForm(BaseLabelForm):
-    label = LabelField(label="Question", widget=datalist_input("labels", {"required": True}))
+    label = LabelField(
+        label="Question",
+        widget=datalist_input("labels", {"required": True, "placeholder": "e.g. 3b"}),
+    )
 
 
 class DeleteExamForm(BaseForm):

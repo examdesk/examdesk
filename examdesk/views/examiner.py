@@ -731,7 +731,9 @@ def question_numbers_preview(text: str) -> dict[str, Any]:
 @require_GET
 @exam_view(examiner_only=True)
 def preview_question_numbers(request: HtmxRequest, member: Member) -> HttpResponse:
-    context = question_numbers_preview(request.GET.get("question_numbers", ""))
+    # `1-10, 11a-` previews as `1-10, 11a` while the range is typed.
+    text = request.GET.get("question_numbers", "").rstrip(" ,-\N{EN DASH}")
+    context = question_numbers_preview(text)
     return render(request, "examdesk/examiner/settings.html#question_numbers", context)
 
 

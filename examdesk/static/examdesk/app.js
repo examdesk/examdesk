@@ -576,6 +576,10 @@ const enhance = (field) => {
       changed = true;
       if (!multi || !tom.isOpen) apply();
     },
+    onDropdownOpen() {
+      // Tom Select can't scroll to the picked option before the menu has a height.
+      if (!multi && this.activeOption) this.scrollToOption(this.activeOption);
+    },
     onDropdownClose() {
       if (changed) apply();
       flushRefresh();

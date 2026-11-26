@@ -19,8 +19,9 @@ from django.http import HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import urlencode
 from django.views.decorators.http import require_GET, require_POST
-from django_htmx.http import HttpResponseClientRefresh
+from django_htmx.http import HttpResponseClientRedirect
 
 from .. import ai, services, session
 from ..access import HtmxRequest, exam_view
@@ -189,7 +190,9 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
     if request.htmx.request_type == "partial" and not is_refresh(request):
         # A page from before the examiners locked the question numbers has a text box for them.
         if exam.question_numbers_locked and start_form.has_error("label"):
-            return HttpResponseClientRefresh()
+            messages.info(request, "Pick the question from the examiners' list.")
+            seat = {name: query[name] for name in ("venue", "seat") if name in query}
+            return HttpResponseClientRedirect(f"{request.path}?{urlencode(seat)}")
         context |= {"member": member}
         return render(request, "examdesk/invigilator/report.html#matches", context)
     return invigilator_page(request, member, "report", context)

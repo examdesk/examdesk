@@ -388,6 +388,7 @@
     .ts-dropdown-content { @apply max-h-60 overflow-y-auto; }
     .option, .create { @apply cursor-pointer rounded-md px-3 py-1.5; }
     .active { @apply bg-base-200; }
+    .selected { @apply font-semibold text-primary; }
     .no-results { @apply px-3 py-1.5 text-muted; }
   }
   .ts-hidden-accessible { @apply sr-only!; } /* beats daisyUI's select, a layer above */
@@ -612,7 +613,7 @@
     &.state-delivered, &.state-read-out, &.state-answered, &.green { @apply bg-green-50 text-green-700 ring-green-600/20; }
     &.closed, &.state-announced, &.state-merged { @apply bg-gray-100 text-gray-600 ring-gray-500/15; }
   }
-  :is(.toast, .landing-toast) > .alert.success { @apply border-gray-900 bg-gray-900 text-white; }
+  :is(.toast, .landing-toast) > .alert:is(.success, .info) { @apply border-gray-900 bg-gray-900 text-white; }
   .menu-panel {
     @apply menu w-max max-w-80 min-w-44 rounded-box border border-base-300 bg-base-100 p-1.5 text-sm shadow-lg;
     /* A popover below its button's right edge. */
@@ -666,10 +667,10 @@
   }
 }
 
-/* Outside the layers: daisyUI's toast styles sit in a layer after utilities. A success enters as
+/* Outside the layers: daisyUI's toast styles sit in a layer after utilities. A success or info enters as
    daisyUI's do, then fades after 4 s (app.js then removes it). On invigilator screens toasts sit
    above the tab bar. */
-.toast > .alert.success { animation: toast 250ms ease-out, fade-out 300ms 4s forwards; }
+.toast > .alert:is(.success, .info) { animation: toast 250ms ease-out, fade-out 300ms 4s forwards; }
 body.invigilator > .toast { bottom: calc(var(--spacing) * 20 + env(safe-area-inset-bottom)); }
 @keyframes fade-out { to { opacity: 0; visibility: hidden; } }
 

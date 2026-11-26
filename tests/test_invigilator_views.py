@@ -201,7 +201,10 @@ def test_a_page_from_before_the_lock_reloads(invigilator: Client, exam: Exam) ->
     set_question_numbers(exam, "1-2", locked=True)
     query = "?venue=HALL1&seat=14&label=13"
     response = invigilator.get(url("invigilator:report", exam) + query, headers=HTMX)
-    assert response["HX-Refresh"] == "true"
+    assert response["HX-Redirect"] == url("invigilator:report", exam) + "?venue=HALL1&seat=14"
+    page = invigilator.get(response["HX-Redirect"]).content.decode()
+    assert "Pick the question from the examiners&#x27; list." in page
+    assert re.search(r'<input[^>]*name="seat"[^>]*value="14"', page)
 
 
 def test_unlocked_question_numbers_are_suggestions(invigilator: Client, exam: Exam) -> None:

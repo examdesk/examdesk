@@ -813,3 +813,4 @@ def test_question_numbers_preview_lists_them_as_typed(examiner: Client, exam: Ex
     assert 'data-show="more-question-numbers">Show all 30</button>' in html
     assert "Not a range: 3-1." in examiner.get(preview + "3-1", headers=HTMX).content.decode()
     assert "question" not in examiner.get(preview, headers=HTMX).content.decode()
+    assert "3 questions" in examiner.get(preview + "1-2, 3a-", headers=HTMX).content.decode()
