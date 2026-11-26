@@ -39,7 +39,14 @@ from ..forms import (
     TextForm,
     form_errors,
 )
-from ..labels import covers, natural, normalize_place, place_order, top_level
+from ..labels import (
+    covers,
+    natural,
+    normalize_place,
+    parse_question_numbers,
+    place_order,
+    top_level,
+)
 from ..matching import percent, rank_similar, same_question, similar_enough
 from ..models import (
     SEAT_STATES,
@@ -703,6 +710,7 @@ def settings_page(
         "models_form": models_form,
         "file_form": file_form,
         "exam_form": exam_form,
+        **question_numbers_preview(exam_form["question_numbers"].value() or ""),
         "files": exam.files.prefetch_related("pages"),
     }
     path = reverse("examiner:settings", args=[exam.pk])
@@ -711,6 +719,20 @@ def settings_page(
     forms = (delete_form, connect_form, models_form, file_form, exam_form)
     response.status_code = 400 if any(form.errors for form in forms) else 200
     return response
+
+
+def question_numbers_preview(text: str) -> dict[str, Any]:
+    try:
+        return {"question_labels": parse_question_numbers(text)}
+    except ValueError as error:
+        return {"question_numbers_error": str(error)}
+
+
+@require_GET
+@exam_view(examiner_only=True)
+def preview_question_numbers(request: HtmxRequest, member: Member) -> HttpResponse:
+    context = question_numbers_preview(request.GET.get("question_numbers", ""))
+    return render(request, "examdesk/examiner/settings.html#question_numbers", context)
 
 
 @require_POST

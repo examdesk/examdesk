@@ -17,6 +17,7 @@ from examdesk import services
 from examdesk.models import Clarification, Exam, Readout, Report
 from examdesk.similarity import similarity
 from tests.helpers import (
+    HTMX,
     REFRESH,
     fresh,
     icon_then,
@@ -799,3 +800,16 @@ def test_locked_question_numbers_limit_changing_the_question(examiner: Client, e
     examiner.post(relabel, {"label": "4"})
     assert fresh(clarification).label == "Q4"
     assert '<option value="Q4" selected>Q4</option>' in examiner.get(page).content.decode()
+
+
+def test_question_numbers_preview_lists_them_as_typed(examiner: Client, exam: Exam) -> None:
+    set_question_numbers(exam, "1-2, 3a-b", locked=False)
+    html = examiner.get(url("examiner:settings", exam)).content.decode()
+    assert "4 questions" in html
+    assert '<span class="label-chip">Q3b</span>' in html
+    preview = url("examiner:preview_question_numbers", exam) + "?question_numbers="
+    html = examiner.get(preview + "1-30", headers=HTMX).content.decode()
+    assert "30 questions" in html
+    assert 'data-show="more-question-numbers">Show all 30</button>' in html
+    assert "Not a range: 3-1." in examiner.get(preview + "3-1", headers=HTMX).content.decode()
+    assert "question" not in examiner.get(preview, headers=HTMX).content.decode()
