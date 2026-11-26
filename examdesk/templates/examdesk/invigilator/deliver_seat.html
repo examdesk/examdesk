@@ -11,7 +11,7 @@
 {% for report in undelivered %}
   {% with clarification=report.clarification %}
   <section class="card-box mb-4 flex flex-col gap-4" aria-label="{{ clarification.label|default:'Answer' }}">
-    <p class="flex items-start gap-2 text-sm text-muted">{% if clarification.label %}<span class="label-chip">{{ clarification.label }}</span>{% endif %}<span class="line-clamp-2">{{ clarification.summary }}</span></p>
+    <p class="flex items-start gap-2 text-sm text-muted">{% if clarification.label %}<span class="label-chip">{{ clarification.label }}</span>{% endif %}{% if clarification.question_photo_report %}<img class="max-h-32 min-w-0 rounded-md border border-base-300" src="{% url 'photo' pk clarification.question_photo_report.pk %}" alt="Photo of the question">{% else %}<span class="line-clamp-2">{{ clarification.summary }}</span>{% endif %}</p>
     <p class="answer-to-show">{{ clarification.current_answer.text }}</p>
     {% if undelivered|length > 1 %}{% partial mark_delivered_button %}{% endif %}
   </section>

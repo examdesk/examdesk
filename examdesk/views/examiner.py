@@ -231,10 +231,6 @@ def clarification_page(
         "can_answer": exam.is_live and not clarification.closed_reason,
         "next_in_queue": next((c for c in queued[after:] + queued if c != clarification), None),
         "waiting_since": waiting_since(reports),
-        # without a wording, a photo stands for the question
-        "question_photo": None
-        if clarification.wording
-        else next((r for r in reports if r.photo), None),
         # with a fast model, replaced by `clarification_duplicates`
         "duplicates": possible_duplicates(clarification, ranked),
         "answer_form": form,

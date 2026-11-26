@@ -10,7 +10,7 @@
       {% for clarification, reports in clarifications %}
         <div class="px-4 py-3">
           <div class="flex items-start gap-3">
-            <p class="line-clamp-2 min-w-0 flex-1 leading-snug font-medium">{{ clarification.summary }}</p>
+            {% if clarification.question_photo_report %}<img class="mr-auto max-h-32 min-w-0 rounded-md border border-base-300" src="{% url 'photo' member.exam.pk clarification.question_photo_report.pk %}" alt="Photo of the question">{% else %}<p class="line-clamp-2 min-w-0 flex-1 leading-snug font-medium">{{ clarification.summary }}</p>{% endif %}
             <span class="wait shrink-0 text-meta {{ reports.0.created_at|wait_level }}" data-wait-since="{{ reports.0.created_at|date:'U' }}" data-wait-level>{{ reports.0.created_at|wait }}</span>
           </div>
           <p class="mt-2 flex flex-wrap items-center gap-1.5">

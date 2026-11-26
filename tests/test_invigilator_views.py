@@ -280,6 +280,35 @@ def test_joining_an_answered_match_offers_its_answer(invigilator: Client, exam: 
     assert "Show the answer" not in html
 
 
+def test_photo_shows_as_the_question_without_wording(
+    invigilator: Client, exam: Exam, media: Path, jpeg: bytes
+) -> None:
+    photo_only_report = report(exam, text="", photo=SimpleUploadedFile("p.jpg", jpeg, "image/jpeg"))
+    photo_url = url("photo", exam, photo_only_report.pk)
+
+    def shows_photo_instead_of_summary(path: str) -> bool:
+        html = invigilator.get(path).content.decode()
+        return html.count(f'src="{photo_url}"') == 1 and "(photo)" not in html
+
+    data = {"client_key": uuid.uuid4(), "venue": "HALL1", "seat": "34", "label": "Q3b"}
+    response = invigilator.post(
+        url("invigilator:report", exam),
+        data | {"clarification": photo_only_report.clarification_id},
+    )
+    assert shows_photo_instead_of_summary(response["Location"])
+    assert shows_photo_instead_of_summary(
+        url("invigilator:report_saved", exam, photo_only_report.pk)
+    )
+    assert shows_photo_instead_of_summary(url("invigilator:open_clarifications", exam))
+    services.answer_clarification(
+        photo_only_report.clarification,
+        text="Yes",
+        member=named(exam, "Prof"),
+        expected_answer=None,
+    )
+    assert shows_photo_instead_of_summary(seat_page(exam, "HALL1", "34"))
+
+
 def test_tab_bar_badges_count_my_venue(invigilator: Client, exam: Exam) -> None:
     with_venue(invigilator, exam, "HALL1")
     answered = report(exam)

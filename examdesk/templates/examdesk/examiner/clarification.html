@@ -49,16 +49,16 @@
                 <button type="button" class="btn btn-ghost btn-sm btn-square" data-cancel-edit aria-label="Cancel" title="Cancel"><c-icon name="x" /></button>
               </div>
             </div>
-            {% if question_photo and member.exam.ai_vision_model %}<p class="meta mt-1 peer-[[hidden]]:hidden" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>{% endif %}
+            {% if clarification.question_photo_report and member.exam.ai_vision_model %}<p class="meta mt-1 peer-[[hidden]]:hidden" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>{% endif %}
           </form>
         {% elif clarification.wording %}
           <p class="wording-text">{{ clarification.wording }}</p>
         {% endif %}
-        {% if question_photo %}
-          {% url 'photo' pk question_photo.pk as photo %}
+        {% if clarification.question_photo_report %}
+          {% url 'photo' pk clarification.question_photo_report.pk as photo %}
           <div class="relative mt-3 w-fit">
-            <c-photo-viewer id="photo-{{ question_photo.pk }}" src="{{ photo }}" alt="Photo, {{ question_photo.venue }} {{ question_photo.seat }}" class="block"><img class="max-h-80 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>
-            {% if editable and member.exam.ai_vision_model %}<button type="button" form="wording-form" class="btn btn-outline btn-sm absolute right-2 bottom-2" data-transcribe-wording="{% url 'examiner:transcribe_photo' pk question_photo.pk %}" title="Read with AI"><c-icon name="sparkles" class="in-aria-busy:hidden" />Read photo</button>{% endif %}
+            <c-photo-viewer id="photo-{{ clarification.question_photo_report.pk }}" src="{{ photo }}" alt="Photo, {{ clarification.question_photo_report.venue }} {{ clarification.question_photo_report.seat }}" class="block"><img class="max-h-80 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>
+            {% if editable and member.exam.ai_vision_model %}<button type="button" form="wording-form" class="btn btn-outline btn-sm absolute right-2 bottom-2" data-transcribe-wording="{% url 'examiner:transcribe_photo' pk clarification.question_photo_report.pk %}" title="Read with AI"><c-icon name="sparkles" class="in-aria-busy:hidden" />Read photo</button>{% endif %}
           </div>
         {% endif %}
         {% if reports %}
@@ -178,11 +178,11 @@
 </div>
 
 {% partialdef seat_chip %}{% with seat_state=report|seat_state %}
-  <button type="button" class="seat-pill state-{{ seat_state }} h-7" popovertarget="report-{{ report.pk }}" style="anchor-name: --report-{{ report.pk }}" aria-label="{{ report.venue }} {{ report.seat }}: {{ seat_state.label|lower }}{% if report.photo and report != question_photo %}, photo{% endif %}"><span class="font-medium opacity-70">{{ report.venue }}</span>{{ report.seat }}{% if report.photo and report != question_photo %}<c-icon name="image" class="size-3.5 opacity-70" />{% endif %}</button>
+  <button type="button" class="seat-pill state-{{ seat_state }} h-7" popovertarget="report-{{ report.pk }}" style="anchor-name: --report-{{ report.pk }}" aria-label="{{ report.venue }} {{ report.seat }}: {{ seat_state.label|lower }}{% if report.photo and report != clarification.question_photo_report %}, photo{% endif %}"><span class="font-medium opacity-70">{{ report.venue }}</span>{{ report.seat }}{% if report.photo and report != clarification.question_photo_report %}<c-icon name="image" class="size-3.5 opacity-70" />{% endif %}</button>
   <div class="seat-card" id="report-{{ report.pk }}" popover style="position-anchor: --report-{{ report.pk }}">
     <p class="flex flex-wrap items-center gap-x-2"><a href="{% seat_url 'examiner:seat' pk report.venue report.seat %}" class="font-semibold">{{ report.venue }} {{ report.seat }}</a><span class="meta">{{ report.member.name }} · {{ report.created_at|time:"H:i" }}</span><c-state-badge :state="report.state" class="ml-auto" /></p>
     {% if report.text and report.text != clarification.wording %}<p class="mt-2">{{ report.text }}</p>{% endif %}
-    {% if report.photo and report != question_photo %}{% url 'photo' pk report.pk as photo %}<c-photo-viewer id="photo-{{ report.pk }}" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}" class="mt-2.5 block w-fit"><img class="max-h-36 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>{% endif %}
+    {% if report.photo and report != clarification.question_photo_report %}{% url 'photo' pk report.pk as photo %}<c-photo-viewer id="photo-{{ report.pk }}" src="{{ photo }}" alt="Photo, {{ report.venue }} {{ report.seat }}" class="mt-2.5 block w-fit"><img class="max-h-36 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>{% endif %}
     {% if can_answer %}
       <div class="-mx-1.5 mt-3 -mb-1.5 flex gap-1 border-t border-base-300 pt-1.5">
         {% if others or reports|length > 1 %}<button type="button" class="btn btn-ghost btn-xs font-normal text-muted" commandfor="move-dialog" command="show-modal" data-dialog-action="{% url 'examiner:move_report' pk report.pk %}" data-dialog-title="Move {{ report.venue }} {{ report.seat }}"><c-icon name="arrow-right-left" />Move</button>{% endif %}

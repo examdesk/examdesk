@@ -1,6 +1,7 @@
 import secrets
 from collections.abc import Iterable
 from datetime import datetime
+from functools import cached_property
 from typing import Self
 
 from django.conf import settings
@@ -192,6 +193,13 @@ class Clarification(models.Model):
     def summary(self) -> str:
         """The wording, or a stand-in for a clarification asked only by photo."""
         return self.wording or "(photo)"
+
+    @cached_property
+    def question_photo_report(self) -> Report | None:
+        """The first report with a photo, when there is no wording."""
+        if self.wording:
+            return None
+        return next((report for report in self.reports.all() if report.photo), None)
 
     @property
     def texts(self) -> list[str]:
