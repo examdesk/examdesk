@@ -354,15 +354,14 @@ def edit_exam(
             members_who_picked.exclude(venue__in=["", *venues]).update(venue=None)
 
 
-AI_MODEL_FIELDS = ["ai_vision_model", "ai_fast_model", "ai_careful_model"]
-
-
 def connect_ai_service(exam: Exam, *, base_url: str, api_key: str, models: list[str]) -> None:
     """The only listed model, if there is one, becomes the vision, fast and careful model."""
     exam.ai_base_url, exam.ai_api_key, exam.ai_models = base_url, api_key, models
+    exam.save(update_fields=["ai_base_url", "ai_api_key", "ai_models"])
     default_model = models[0] if len(models) == 1 else ""
-    exam.ai_vision_model = exam.ai_fast_model = exam.ai_careful_model = default_model
-    exam.save(update_fields=["ai_base_url", "ai_api_key", "ai_models", *AI_MODEL_FIELDS])
+    choose_ai_models(
+        exam, vision_model=default_model, fast_model=default_model, careful_model=default_model
+    )
 
 
 def disconnect_ai_service(exam: Exam) -> None:
@@ -373,7 +372,12 @@ def choose_ai_models(exam: Exam, *, vision_model: str, fast_model: str, careful_
     exam.ai_vision_model = vision_model
     exam.ai_fast_model = fast_model
     exam.ai_careful_model = careful_model
-    exam.save(update_fields=AI_MODEL_FIELDS)
+    Exam.objects.filter(pk=exam.pk).update(
+        ai_vision_model=vision_model,
+        ai_fast_model=fast_model,
+        ai_careful_model=careful_model,
+        version=F("version") + 1,
+    )
 
 
 @transaction.atomic

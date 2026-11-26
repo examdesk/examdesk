@@ -448,7 +448,8 @@ const transcribePhoto = async (input) => {
   const question = input.form.elements.text;
   const errorMessage = field.querySelector("[data-transcribe-failed]");
   errorMessage.hidden = true;
-  if (!field.dataset.transcribe || !input.files.length || question.value.trim()) return;
+  const url = field.querySelector("[data-transcribe]")?.dataset.transcribe;
+  if (!url || !input.files.length || question.value.trim()) return;
   const status = field.querySelector("[data-transcribe-status]");
   const skeleton = input.form.querySelector("[data-text-skeleton]");
   const cancelButton = field.querySelector("[data-cancel-transcribe]");
@@ -475,7 +476,7 @@ const transcribePhoto = async (input) => {
   });
   const body = new FormData();
   body.append("photo", input.files[0]);
-  const text = await askAI(field.dataset.transcribe, input.form, body, signal);
+  const text = await askAI(url, input.form, body, signal);
   if (signal.aborted) return;
   endTranscription();
   errorMessage.hidden = Boolean(text);

@@ -32,7 +32,7 @@ from pytest_django.fixtures import Settings
 from examdesk import ai as ai_service
 from examdesk import services
 from examdesk.models import Analysis, Exam, ExamFile, Report
-from tests.helpers import named, report, url
+from tests.helpers import REFRESH, named, report, url
 
 pytestmark = pytest.mark.django_db
 
@@ -250,6 +250,21 @@ def test_one_listed_model_does_everything(
     assert '<span class="truncate text-muted">qwen</span>' in page
     assert "models-form" not in page
     assert "Files for the AI" in page
+
+
+def test_open_report_pages_pick_up_the_vision_model(invigilator: Client, exam: Exam) -> None:
+    connect(exam)
+    version = saved(exam).version
+    services.choose_ai_models(exam, **CHOSEN_MODELS | {"vision_model": ""})
+    assert saved(exam).version == version + 1
+    query = {"venue": "HALL1", "seat": "14", "label": "Q3b"}
+    report_url = url("invigilator:report", exam)
+    page = invigilator.get(report_url, query, headers=REFRESH).content.decode()
+    assert '<span id="photo-reading" data-live></span>' in page
+    services.choose_ai_models(exam, **CHOSEN_MODELS)
+    page = invigilator.get(report_url, query, headers=REFRESH).content.decode()
+    transcribe_url = url("invigilator:transcribe_photo", exam)
+    assert f'<span id="photo-reading" data-live><span data-transcribe="{transcribe_url}">' in page
 
 
 def test_only_listed_models_can_be_picked(examiner: Client, exam: Exam) -> None:
