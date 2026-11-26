@@ -75,6 +75,16 @@ document.addEventListener("htmx:before:swap", (event) => {
     if (isFormRerender) delete task.swapSpec.show;
   }
 });
+// A refused Save in Settings cancels the form's pending and in-flight preview requests: its
+// previews keep the server's errors.
+document.addEventListener("htmx:response:error", (event) => {
+  const { ctx } = event.detail;
+  if (!ctx.sourceElement.matches("#settings form")) return;
+  for (const previewSource of ctx.sourceElement.querySelectorAll("[hx-get]")) {
+    htmx.trigger(previewSource, "htmx:abort");
+    htmx.process(previewSource, true);
+  }
+});
 // Swapped-in live parts leave focus where it is, and Tom Select is rebuilt in them (a morph would
 // strip its markup; htmx.onLoad below rebuilds it). A refresh keeps values not yet saved.
 const unsavedValues = new Map(); // field id → Tom Select value

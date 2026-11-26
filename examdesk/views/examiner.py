@@ -39,8 +39,9 @@ from ..forms import (
     ExamFileForm,
     ExamSettingsForm,
     LabelForm,
+    QuestionNumbersForm,
     TextForm,
-    VenuesAndQuestionsForm,
+    VenuesAndSeatsForm,
     form_errors,
 )
 from ..labels import (
@@ -771,7 +772,8 @@ def settings_page(
     models_form: AIModelsForm | None = None,
     file_form: ExamFileForm | None = None,
     exam_form: ExamSettingsForm | None = None,
-    venues_and_questions_form: VenuesAndQuestionsForm | None = None,
+    venues_and_seats_form: VenuesAndSeatsForm | None = None,
+    question_numbers_form: QuestionNumbersForm | None = None,
 ) -> HttpResponse:
     """A bound `delete_form` reopens the delete dialog with its errors."""
     exam = member.exam
@@ -782,8 +784,11 @@ def settings_page(
     exam_form = exam_form or ExamSettingsForm(
         initial=model_to_dict(exam, fields=ExamSettingsForm.base_fields)
     )
-    venues_and_questions_form = venues_and_questions_form or VenuesAndQuestionsForm(
-        initial=model_to_dict(exam, fields=VenuesAndQuestionsForm.base_fields), exam=exam
+    venues_and_seats_form = venues_and_seats_form or VenuesAndSeatsForm(
+        initial=model_to_dict(exam, fields=VenuesAndSeatsForm.base_fields), exam=exam
+    )
+    question_numbers_form = question_numbers_form or QuestionNumbersForm(
+        initial=model_to_dict(exam, fields=QuestionNumbersForm.base_fields)
     )
     context = {
         "delete_form": delete_form,
@@ -791,12 +796,13 @@ def settings_page(
         "models_form": models_form,
         "file_form": file_form,
         "exam_form": exam_form,
-        "venues_and_questions_form": venues_and_questions_form,
-        **question_numbers_preview(venues_and_questions_form["question_numbers"].value() or ""),
+        "venues_and_seats_form": venues_and_seats_form,
         "seat_numbers_by_venue": [
             (field, seat_numbers_preview(field.value() or ""))
-            for field in venues_and_questions_form.seat_numbers_fields
+            for field in venues_and_seats_form.seat_numbers_fields
         ],
+        "question_numbers_form": question_numbers_form,
+        **question_numbers_preview(question_numbers_form["question_numbers"].value() or ""),
         "files": exam.files.prefetch_related("pages"),
     }
     path = reverse("examiner:settings", args=[exam.pk])
@@ -808,7 +814,8 @@ def settings_page(
         models_form,
         file_form,
         exam_form,
-        venues_and_questions_form,
+        venues_and_seats_form,
+        question_numbers_form,
     )
     response.status_code = 400 if any(form.errors for form in forms) else 200
     return response
@@ -861,12 +868,23 @@ def edit_exam(request: HtmxRequest, member: Member) -> HttpResponse:
 
 @require_POST
 @exam_view(examiner_only=True)
-def edit_venues_and_questions(request: HtmxRequest, member: Member) -> HttpResponse:
-    form = VenuesAndQuestionsForm(request.POST, exam=member.exam)
+def edit_venues_and_seats(request: HtmxRequest, member: Member) -> HttpResponse:
+    form = VenuesAndSeatsForm(request.POST, exam=member.exam)
     if not form.is_valid():
-        return settings_page(request, member, venues_and_questions_form=form)
-    services.edit_venues_and_questions(member.exam, **form.cleaned_data)
-    messages.success(request, "Saved the venues and questions.")
+        return settings_page(request, member, venues_and_seats_form=form)
+    services.edit_venues_and_seats(member.exam, **form.cleaned_data)
+    messages.success(request, "Saved the venues and seats.")
+    return redirect("examiner:settings", member.exam.pk)
+
+
+@require_POST
+@exam_view(examiner_only=True)
+def edit_question_numbers(request: HtmxRequest, member: Member) -> HttpResponse:
+    form = QuestionNumbersForm(request.POST)
+    if not form.is_valid():
+        return settings_page(request, member, question_numbers_form=form)
+    services.edit_question_numbers(member.exam, **form.cleaned_data)
+    messages.success(request, "Saved the question numbers.")
     return redirect("examiner:settings", member.exam.pk)
 
 

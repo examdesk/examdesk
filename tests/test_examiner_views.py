@@ -766,7 +766,7 @@ def test_editing_the_exam(examiner: Client, exam: Exam) -> None:
 
 
 def test_question_numbers_are_saved_and_locked(examiner: Client, exam: Exam) -> None:
-    page = url("examiner:edit_venues_and_questions", exam)
+    page = url("examiner:edit_question_numbers", exam)
     response = examiner.post(page, {"question_numbers": "1-3, x"})
     assert response.status_code == 400
     assert "Not a question: x." in response.content.decode()
@@ -812,7 +812,7 @@ def test_question_numbers_preview_lists_them_as_typed(examiner: Client, exam: Ex
 
 def test_venues_are_saved_and_locked(examiner: Client, exam: Exam) -> None:
     report(exam, venue="GYM")
-    page = url("examiner:edit_venues_and_questions", exam)
+    page = url("examiner:edit_venues_and_seats", exam)
     response = examiner.post(page, {"venues": ["HALL1", "x" * 31]})
     assert response.status_code == 400
     html = response.content.decode()
@@ -856,7 +856,7 @@ def test_seat_numbers_are_saved_by_venue_and_locked(examiner: Client, exam: Exam
         r'<label for="id_(seat_numbers_\d)"[^>]*><span class="truncate">(\w+)<', html
     )
     assert boxes == [("seat_numbers_0", "HALL1"), ("seat_numbers_1", "HALL2")]
-    page = url("examiner:edit_venues_and_questions", exam)
+    page = url("examiner:edit_venues_and_seats", exam)
     data = {"venues": ["HALL1", "HALL2"], "seat_numbers_0": "1-200", "seat_numbers_1": " a1-30 "}
     response = examiner.post(page, data | {"seat_numbers_1": "3-1"})
     assert response.status_code == 400
@@ -894,13 +894,26 @@ def test_seat_numbers_preview_counts_the_seats_as_typed(examiner: Client, exam: 
     assert "31 seats" in examiner.get(preview + "A1-A30, B1 - b", headers=HTMX).content.decode()
 
 
-def test_saving_one_settings_card_leaves_the_other(examiner: Client, exam: Exam) -> None:
+def test_settings_tab_stays_current_after_a_refused_save(examiner: Client, exam: Exam) -> None:
+    response = examiner.post(url("examiner:edit_question_numbers", exam), {"question_numbers": "x"})
+    assert response.status_code == 400
+    settings_tab = f'<a href="{url("examiner:settings", exam)}" aria-current="page">Settings</a>'
+    assert settings_tab in response.content.decode()
+
+
+def test_saving_one_settings_card_leaves_the_others(examiner: Client, exam: Exam) -> None:
     set_venues(exam, ["HALL1"], locked=True)
+    set_question_numbers(exam, "1-4", locked=True)
     examiner.post(url("examiner:edit_exam", exam), {"name": "Resit", "time_zone": "UTC"})
     exam.refresh_from_db()
-    assert (exam.name, exam.venues, exam.venues_locked) == ("Resit", ["HALL1"], True)
-    page = url("examiner:edit_venues_and_questions", exam)
+    assert (exam.venues, exam.venues_locked, exam.question_numbers) == (["HALL1"], True, "1-4")
+    page = url("examiner:edit_venues_and_seats", exam)
     response = examiner.post(page, {"venues": ["HALL2"]}, follow=True)
-    assert "Saved the venues and questions." in response.content.decode()
+    assert "Saved the venues and seats." in response.content.decode()
+    exam.refresh_from_db()
+    assert (exam.question_numbers, exam.question_numbers_locked) == ("1-4", True)
+    page = url("examiner:edit_question_numbers", exam)
+    response = examiner.post(page, {"question_numbers": "1-5"}, follow=True)
+    assert "Saved the question numbers." in response.content.decode()
     exam.refresh_from_db()
     assert (exam.name, exam.venues, exam.venues_locked) == ("Resit", ["HALL2"], False)

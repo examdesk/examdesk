@@ -132,7 +132,7 @@ class ExamSettingsForm(BaseForm):
     time_zone = TimeZoneFormField(label="Time zone")
 
 
-class VenuesAndQuestionsForm(BaseForm):
+class VenuesAndSeatsForm(BaseForm):
     venues = VenuesField(
         required=False,
         widget=forms.SelectMultiple(
@@ -151,25 +151,6 @@ class VenuesAndQuestionsForm(BaseForm):
         ),
     )
     seat_numbers_locked = forms.BooleanField(
-        label="Allow only these",
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={"class": "checkbox checkbox-sm checkbox-primary rounded-sm"}
-        ),
-    )
-    question_numbers = forms.CharField(
-        max_length=500,
-        required=False,
-        validators=[validate_question_numbers],
-        widget=forms.TextInput(
-            attrs={
-                "autocomplete": "off",
-                "placeholder": "e.g. 1-40 or 1a-c, 2",
-                "aria-describedby": "question-numbers-preview",
-            }
-        ),
-    )
-    question_numbers_locked = forms.BooleanField(
         label="Allow only these",
         required=False,
         widget=forms.CheckboxInput(
@@ -204,11 +185,6 @@ class VenuesAndQuestionsForm(BaseForm):
             self[f"seat_numbers_{index}"] for index in range(len(exam.venues))
         ]
 
-    def clean_question_numbers_locked(self) -> bool:
-        """Without question numbers, nothing is locked."""
-        locked: bool = self.cleaned_data["question_numbers_locked"]
-        return locked and bool(self.cleaned_data.get("question_numbers"))
-
     def clean_venues_locked(self) -> bool:
         """Without venues, nothing is locked."""
         locked: bool = self.cleaned_data["venues_locked"]
@@ -228,6 +204,34 @@ class VenuesAndQuestionsForm(BaseForm):
         locked = cleaned_data["seat_numbers_locked"]
         cleaned_data["seat_numbers_locked"] = locked and bool(seat_numbers)
         return cleaned_data
+
+
+class QuestionNumbersForm(BaseForm):
+    question_numbers = forms.CharField(
+        max_length=500,
+        required=False,
+        validators=[validate_question_numbers],
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "off",
+                "placeholder": "e.g. 1-40 or 1a-c, 2",
+                "aria-labelledby": "question-numbers-title",
+                "aria-describedby": "question-numbers-preview",
+            }
+        ),
+    )
+    question_numbers_locked = forms.BooleanField(
+        label="Allow only these",
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={"class": "checkbox checkbox-sm checkbox-primary rounded-sm"}
+        ),
+    )
+
+    def clean_question_numbers_locked(self) -> bool:
+        """Without question numbers, nothing is locked."""
+        locked: bool = self.cleaned_data["question_numbers_locked"]
+        return locked and bool(self.cleaned_data.get("question_numbers"))
 
 
 class NameForm(BaseForm):

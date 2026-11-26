@@ -1,5 +1,5 @@
 {% if member.is_examiner %}
-  {% with pk=member.exam.pk here=request.resolver_match.url_name %}
+  {% with pk=member.exam.pk here=page_url_name %}
   <nav class="tabs-nav" id="exam-nav" aria-label="Exam">
     <a href="{% url 'examiner:clarifications' pk %}" {% if here == "clarifications" or here == "clarification" %}aria-current="page"{% endif %}>Clarifications<c-live as="span" id="clarifications-badge"><span class="count action" title="Open clarifications" data-open-count="{{ counts.open_clarifications }}"{% if not counts.open_clarifications %} hidden{% endif %}>{{ counts.open_clarifications }}</span></c-live></a>
     <a href="{% url 'examiner:announcements' pk %}" {% if here == "announcements" %}aria-current="page"{% endif %}>Announcements<c-live as="span" id="announcements-badge">{% if counts.not_read_out %}<span class="count" title="Not read out in every venue yet">{{ counts.not_read_out }}</span>{% endif %}</c-live></a>

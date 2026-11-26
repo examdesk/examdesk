@@ -74,11 +74,8 @@ examiner_patterns: list[URLPattern | URLResolver] = [
     path("members/<int:member_id>/remove/", examiner.remove_member, name="remove_member"),
     path("settings/", examiner.exam_settings, name="settings"),
     path("edit/", examiner.edit_exam, name="edit_exam"),
-    path(
-        "venues-and-questions/",
-        examiner.edit_venues_and_questions,
-        name="edit_venues_and_questions",
-    ),
+    path("venues-and-seats/", examiner.edit_venues_and_seats, name="edit_venues_and_seats"),
+    path("question-numbers/", examiner.edit_question_numbers, name="edit_question_numbers"),
     path(
         "question-numbers/preview/",
         examiner.preview_question_numbers,

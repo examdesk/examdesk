@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db import connections
 from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
 from django.shortcuts import render
+from django.urls import resolve
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 from django_htmx.http import replace_url
@@ -43,6 +44,7 @@ def render_live(
     context |= {
         "member": member,
         "page_url": path or request.get_full_path(),
+        "page_url_name": resolve(path or request.path_info).url_name,
         "is_refresh": is_refresh(request),
         **navigation(request, member, context),
     }
