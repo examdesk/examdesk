@@ -37,7 +37,7 @@ from ..forms import (
     form_errors,
 )
 from ..labels import covers, natural, normalize_place, place_order, top_level
-from ..matching import rank_similar, same_question, similar_enough
+from ..matching import percent, rank_similar, same_question, similar_enough
 from ..models import (
     SEAT_STATES,
     Announcement,
@@ -235,11 +235,13 @@ def unmerged_others(exam: Exam, clarification: Clarification) -> QuerySet[Clarif
 def possible_duplicates(
     clarification: Clarification, ranked: list[tuple[Clarification, float]]
 ) -> list[tuple[Clarification, int]]:
-    """Those under the same question or similar enough, with the similarity in percent."""
+    """Those under the same question or similar enough, with the similarity in percent, except
+    any that rounds to 0%."""
     return [
-        (other, round(score * 100))
+        (other, similarity_percent)
         for other, score in ranked
-        if same_question(clarification.label, other.label) or similar_enough(score)
+        if (similarity_percent := percent(score)) > 0
+        and (same_question(clarification.label, other.label) or similar_enough(score))
     ]
 
 
@@ -263,7 +265,8 @@ async def clarification_duplicates(
     first. Without its answer, the most alike."""
     clarification, ranked = await sync_to_async(rank_others)(member, clarification_id)
     candidates = sorted(
-        (other for other, _ in ranked[:DUPLICATE_CANDIDATES]), key=lambda other: other.pk
+        (other for other, score in ranked[:DUPLICATE_CANDIDATES] if percent(score) > 0),
+        key=lambda other: other.pk,
     )
     key = ai.duplicates_cache_key(member.exam, clarification, candidates)
     probabilities: list[float] | None = await cache.aget(key) if candidates else []

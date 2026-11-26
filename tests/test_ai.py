@@ -468,6 +468,17 @@ def test_no_duplicates_when_the_ai_finds_none(
 
 
 @pytest.mark.django_db(transaction=True)
+def test_ai_is_not_asked_about_a_photo_without_wording(
+    examiner: Client, exam: Exam, ai: FakeService, media: Path, jpeg: bytes
+) -> None:
+    report(exam)
+    photo = SimpleUploadedFile("p.jpg", jpeg, "image/jpeg")
+    report(exam, seat="21", text="", photo=photo)
+    assert duplicates(examiner, exam) == (200, "")
+    assert not ai.requests
+
+
+@pytest.mark.django_db(transaction=True)
 def test_replies_are_cached(examiner: Client, exam: Exam, ai: FakeService) -> None:
     three_clarifications(exam)
     ai.content = "C1: Yes\nC2: Yes"

@@ -644,6 +644,18 @@ def test_photo_shows_as_the_question_without_wording(
     assert html.count(f'src="{url("photo", exam, asked.pk)}"') == 2  # the photo and its viewer
 
 
+def test_no_possible_duplicates_between_a_photo_without_wording_and_a_worded_clarification(
+    examiner: Client, exam: Exam, media: Path, jpeg: bytes
+) -> None:
+    worded_report = report(exam, label="Q2a", text="Is x an integer?")
+    photo_report = report(
+        exam, seat="21", label="Q2a", text="", photo=SimpleUploadedFile("p.jpg", jpeg, "image/jpeg")
+    )
+    for clarification_id in (photo_report.clarification_id, worded_report.clarification_id):
+        html = examiner.get(url("examiner:clarification", exam, clarification_id)).content.decode()
+        assert "Possible duplicates" not in html
+
+
 def test_seats_show_under_the_question(examiner: Client, exam: Exam) -> None:
     clarification = report(exam).clarification
     report(exam, seat="21", clarification=clarification)

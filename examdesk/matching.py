@@ -25,5 +25,10 @@ def same_question(label: str, other: str) -> bool:
     return covers(top_level(label), other)
 
 
+def percent(score: float) -> int:
+    """The similarity rounded to a whole percent, as displayed."""
+    return round(score * 100)
+
+
 def similar_enough(score: float) -> bool:
     return score >= settings.EXAMDESK_SIMILARITY_THRESHOLD
