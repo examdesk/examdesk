@@ -319,9 +319,23 @@ def set_live(exam: Exam, *, live: bool) -> None:
     exam.is_live = live
 
 
-def edit_exam(exam: Exam, *, name: str, time_zone: ZoneInfo) -> None:
-    Exam.objects.filter(pk=exam.pk).update(name=name, time_zone=time_zone, version=F("version") + 1)
+def edit_exam(
+    exam: Exam,
+    *,
+    name: str,
+    time_zone: ZoneInfo,
+    question_numbers: str,
+    question_numbers_locked: bool,
+) -> None:
     exam.name, exam.time_zone = name, time_zone
+    exam.question_numbers, exam.question_numbers_locked = question_numbers, question_numbers_locked
+    Exam.objects.filter(pk=exam.pk).update(
+        name=name,
+        time_zone=time_zone,
+        question_numbers=question_numbers,
+        question_numbers_locked=question_numbers_locked,
+        version=F("version") + 1,
+    )
 
 
 def connect_ai_service(exam: Exam, *, base_url: str, api_key: str, models: list[str]) -> None:

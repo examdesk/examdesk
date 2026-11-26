@@ -11,8 +11,8 @@ from django.http import HttpRequest
 from timezone_field import TimeZoneFormField
 
 from . import pdf
-from .labels import normalize_label, normalize_name, normalize_place
-from .models import Clarification, Exam
+from .labels import GENERAL, natural, normalize_label, normalize_name, normalize_place
+from .models import Clarification, Exam, validate_question_numbers
 
 
 def form_errors(form: forms.Form) -> str:
@@ -35,12 +35,34 @@ class LabelField(forms.CharField):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(max_length=30, required=False, **kwargs)
+        self.choices: list[str] = []
+
+    def restrict_to(self, labels: Iterable[str]) -> None:
+        """Allow only `labels` and `General`, picked from a list."""
+        self.choices = sorted({*labels, GENERAL}, key=natural)
+        attrs = self.widget.attrs.copy()
+        del attrs["list"], attrs["maxlength"]
+        self.widget = forms.Select(attrs, [("", ""), *((label, label) for label in self.choices)])
 
     def to_python(self, value: Any) -> str:
         try:
             return normalize_label(super().to_python(value) or "")
         except ValueError as error:
             raise forms.ValidationError(str(error)) from error
+
+    def validate(self, value: Any) -> None:
+        super().validate(value)
+        if self.choices and value not in self.choices:
+            raise forms.ValidationError("Pick a question from the list.")
+
+
+class BaseLabelForm(BaseForm):
+    """A form with a `label`, picked from the exam's question numbers when they are locked."""
+
+    def __init__(self, *args: Any, exam: Exam, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if exam.question_numbers_locked:
+            self.fields["label"].restrict_to(exam.question_labels)  # type: ignore[attr-defined]
 
 
 class SignupForm(BaseForm):
@@ -70,6 +92,26 @@ class ExamForm(BaseForm):
 class ExamSettingsForm(BaseForm):
     name = forms.CharField(max_length=200, widget=forms.TextInput(attrs={"autocomplete": "off"}))
     time_zone = TimeZoneFormField(label="Time zone")
+    question_numbers = forms.CharField(
+        max_length=500,
+        required=False,
+        validators=[validate_question_numbers],
+        widget=forms.TextInput(
+            attrs={"autocomplete": "off", "placeholder": "e.g. 1-40 or 1a-c, 2"}
+        ),
+    )
+    question_numbers_locked = forms.BooleanField(
+        label="Allow only these",
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={"class": "checkbox checkbox-sm checkbox-primary rounded-sm"}
+        ),
+    )
+
+    def clean_question_numbers_locked(self) -> bool:
+        """Without question numbers, nothing is locked."""
+        locked: bool = self.cleaned_data["question_numbers_locked"]
+        return locked and bool(self.cleaned_data.get("question_numbers"))
 
 
 class NameForm(BaseForm):
@@ -93,7 +135,7 @@ def datalist_input(name: str, attrs: Attrs | None = None) -> forms.TextInput:
     return forms.TextInput(attrs={"list": name, "autocomplete": "off", **(attrs or {})})
 
 
-class ReportStartForm(BaseForm):
+class ReportStartForm(BaseLabelForm):
     """Step 1 of a report: the seat and the question."""
 
     venue = PlaceField(
@@ -234,7 +276,7 @@ class AnswerForm(TextForm):
     expected_answer = forms.IntegerField(required=False)
 
 
-class LabelForm(BaseForm):
+class LabelForm(BaseLabelForm):
     label = LabelField(label="Question", widget=datalist_input("labels", {"required": True}))
 
 

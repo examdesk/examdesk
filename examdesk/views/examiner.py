@@ -17,6 +17,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import connections
 from django.db.models import Prefetch, QuerySet, prefetch_related_objects
+from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseBase, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -232,7 +233,7 @@ def clarification_page(
         "withdrawable": current and not current.deliveries.exists(),
         "others": [other for other, _ in ranked if not other.closed_reason],
         "canned": settings.EXAMDESK_CANNED_ANSWERS,
-        "label_form": label_form or LabelForm(initial={"label": clarification.label}),
+        "label_form": label_form or LabelForm(initial={"label": clarification.label}, exam=exam),
         "correcting": correcting,
         **suggestions(exam),
     }
@@ -475,7 +476,7 @@ def relabel_clarification(
     request: HtmxRequest, member: Member, clarification_id: int
 ) -> HttpResponse:
     clarification = get_clarification(member.exam, clarification_id)
-    form = LabelForm(request.POST)
+    form = LabelForm(request.POST, exam=member.exam)
     if not form.is_valid():
         return clarification_page(request, member, clarification_id, label_form=form)
     label = form.cleaned_data["label"]
@@ -694,7 +695,7 @@ def settings_page(
     models_form = models_form or AIModelsForm(exam=exam)
     file_form = file_form or ExamFileForm()
     exam_form = exam_form or ExamSettingsForm(
-        initial={"name": exam.name, "time_zone": exam.time_zone}
+        initial=model_to_dict(exam, fields=ExamSettingsForm.base_fields)
     )
     context = {
         "delete_form": delete_form,

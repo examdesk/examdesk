@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
+from django_htmx.http import HttpResponseClientRefresh
 
 from .. import ai, services, session
 from ..access import HtmxRequest, exam_view
@@ -138,7 +139,7 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
     a new one. Typing what the student asks ranks them by similarity."""
     exam = member.exam
     if request.method == "POST":
-        form = ReportForm(request.POST, request.FILES)
+        form = ReportForm(request.POST, request.FILES, exam=exam)
         if form.is_valid():
             data = form.cleaned_data
             clarification = (
@@ -156,7 +157,7 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
                     clarification=clarification,
                 )
                 return redirect("invigilator:report_saved", exam.pk, saved.pk)
-        start_form = ReportStartForm(request.POST)
+        start_form = ReportStartForm(request.POST, exam=exam)
         query = request.POST
         context: dict[str, Any] = {
             "report_form": form,
@@ -165,7 +166,9 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
     else:
         query = request.GET
         submitted = "seat" in query or "label" in query
-        start_form = ReportStartForm(query if submitted else None, initial={"venue": member.venue})
+        start_form = ReportStartForm(
+            query if submitted else None, initial={"venue": member.venue}, exam=exam
+        )
         context = {"client_key": uuid.uuid4()}
     text = query.get("text", "")
     with suppress(ValueError):
@@ -184,6 +187,9 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
     context |= {"start_form": start_form, "text": text}
     # typing re-ranks the matches
     if request.htmx.request_type == "partial" and not is_refresh(request):
+        # A page from before the examiners locked the question numbers has a text box for them.
+        if exam.question_numbers_locked and start_form.has_error("label"):
+            return HttpResponseClientRefresh()
         context |= {"member": member}
         return render(request, "examdesk/invigilator/report.html#matches", context)
     return invigilator_page(request, member, "report", context)

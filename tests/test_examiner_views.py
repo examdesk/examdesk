@@ -24,6 +24,7 @@ from tests.helpers import (
     named,
     open_link,
     report,
+    set_question_numbers,
     url,
 )
 
@@ -749,7 +750,13 @@ def test_clarification_actions_are_in_a_menu(examiner: Client, exam: Exam) -> No
 def test_times_show_in_the_exam_time_zone(examiner: Client, exam: Exam) -> None:
     report(exam)
     Report.objects.update(created_at=datetime(2026, 11, 24, 6, 5, tzinfo=UTC))
-    services.edit_exam(exam, name=exam.name, time_zone=ZoneInfo("Asia/Singapore"))
+    services.edit_exam(
+        exam,
+        name=exam.name,
+        time_zone=ZoneInfo("Asia/Singapore"),
+        question_numbers="",
+        question_numbers_locked=False,
+    )
     assert "Asked at 14:05" in examiner.get(url("examiner:clarifications", exam)).content.decode()
 
 
@@ -760,3 +767,35 @@ def test_editing_the_exam(examiner: Client, exam: Exam) -> None:
     examiner.post(page, {"name": " Biology Resit ", "time_zone": "Asia/Singapore"})
     exam.refresh_from_db()
     assert (exam.name, exam.time_zone) == ("Biology Resit", ZoneInfo("Asia/Singapore"))
+
+
+def test_question_numbers_are_saved_and_locked(examiner: Client, exam: Exam) -> None:
+    page = url("examiner:edit_exam", exam)
+    data = {"name": exam.name, "time_zone": "UTC"}
+    response = examiner.post(page, data | {"question_numbers": "1-3, x"})
+    assert response.status_code == 400
+    assert "Not a question: x." in response.content.decode()
+    examiner.post(page, data | {"question_numbers_locked": "on"})
+    exam.refresh_from_db()
+    assert not exam.question_numbers_locked  # nothing to lock to
+    examiner.post(page, data | {"question_numbers": "1-2, 3a-b", "question_numbers_locked": "on"})
+    exam.refresh_from_db()
+    assert exam.question_labels == ["Q1", "Q2", "Q3a", "Q3b"]
+    assert exam.question_numbers_locked
+    html = examiner.get(url("examiner:settings", exam)).content.decode()
+    assert re.search(r'<input[^>]*name="question_numbers"[^>]*value="1-2, 3a-b"', html)
+    assert re.search(r'<input[^>]*name="question_numbers_locked"[^>]*checked', html)
+
+
+def test_locked_question_numbers_limit_changing_the_question(examiner: Client, exam: Exam) -> None:
+    clarification = report(exam).clarification
+    set_question_numbers(exam, "1-4", locked=True)
+    page = url("examiner:clarification", exam, clarification.pk)
+    assert re.search(r'<select name="label"[^>]*required', examiner.get(page).content.decode())
+    relabel = url("examiner:relabel_clarification", exam, clarification.pk)
+    response = examiner.post(relabel, {"label": "5"})
+    assert response.status_code == 400
+    assert "Pick a question from the list." in response.content.decode()
+    examiner.post(relabel, {"label": "4"})
+    assert fresh(clarification).label == "Q4"
+    assert '<option value="Q4" selected>Q4</option>' in examiner.get(page).content.decode()

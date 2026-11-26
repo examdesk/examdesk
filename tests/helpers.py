@@ -32,6 +32,16 @@ def report(exam: Exam, **kwargs: Any) -> Report:
     return services.add_report(**(fields | kwargs))
 
 
+def set_question_numbers(exam: Exam, numbers: str, *, locked: bool) -> None:
+    services.edit_exam(
+        exam,
+        name=exam.name,
+        time_zone=exam.time_zone,
+        question_numbers=numbers,
+        question_numbers_locked=locked,
+    )
+
+
 def state(report: Report) -> Report.State:
     return Report.objects.with_state().get(pk=report.pk).state
 

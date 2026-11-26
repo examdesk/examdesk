@@ -28,6 +28,7 @@ from tests.helpers import (
     open_link,
     report,
     seat_page,
+    set_question_numbers,
     url,
     with_venue,
 )
@@ -179,6 +180,38 @@ def test_report_page_starts_blank_in_my_venue(invigilator: Client, exam: Exam) -
     invigilator.post(url("invigilator:choose_venue", exam), {"venue": "HALL2"})
     page = invigilator.get(url("invigilator:report", exam)).content.decode()
     assert '<input type="hidden" name="venue" value="HALL2">' in page
+
+
+def test_locked_question_numbers_are_picked_from_a_list(invigilator: Client, exam: Exam) -> None:
+    set_question_numbers(exam, "1-2", locked=True)
+    html = invigilator.get(url("invigilator:report", exam)).content.decode()
+    assert re.search(r'<select name="label"[^>]*placeholder="e.g. 3b"', html)
+    assert '<option value="General">General</option>' in html
+    assert '<option value="Q2">Q2</option>' in html
+    data = {"client_key": uuid.uuid4(), "venue": "HALL1", "seat": "14", "label": "3b", "text": "?"}
+    html = invigilator.post(url("invigilator:report", exam), data).content.decode()
+    assert "Pick a question from the list." in html
+    assert not Report.objects.exists()
+    response = invigilator.post(url("invigilator:report", exam), data | {"label": "2"})
+    assert response.status_code == 302
+    assert Report.objects.get().clarification.label == "Q2"
+
+
+def test_a_page_from_before_the_lock_reloads(invigilator: Client, exam: Exam) -> None:
+    set_question_numbers(exam, "1-2", locked=True)
+    query = "?venue=HALL1&seat=14&label=13"
+    response = invigilator.get(url("invigilator:report", exam) + query, headers=HTMX)
+    assert response["HX-Refresh"] == "true"
+
+
+def test_unlocked_question_numbers_are_suggestions(invigilator: Client, exam: Exam) -> None:
+    report(exam, label="Q7")
+    set_question_numbers(exam, "1-2", locked=False)
+    html = invigilator.get(url("invigilator:report", exam)).content.decode()
+    assert '<datalist id="labels"><option value="Q1"><option value="Q2"><option value="Q7">' in html
+    assert re.search(r'<input[^>]*name="label"[^>]*list="labels"', html)
+    data = {"client_key": uuid.uuid4(), "venue": "HALL1", "seat": "21", "label": "8", "text": "?"}
+    assert invigilator.post(url("invigilator:report", exam), data).status_code == 302
 
 
 def test_match_list_marks_what_the_seat_already_asked(invigilator: Client, exam: Exam) -> None:

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Self
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Exists, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Lower
@@ -11,6 +12,7 @@ from django.utils import timezone
 from timezone_field import TimeZoneField
 
 from .fields import EncryptedTextField
+from .labels import parse_question_numbers
 
 
 def new_token() -> str:
@@ -20,6 +22,13 @@ def new_token() -> str:
 class Role(models.TextChoices):
     INVIGILATOR = "invigilator", "Invigilator"
     EXAMINER = "examiner", "Examiner"
+
+
+def validate_question_numbers(value: str) -> None:
+    try:
+        parse_question_numbers(value)
+    except ValueError as error:
+        raise ValidationError(str(error)) from error
 
 
 class Exam(models.Model):
@@ -34,11 +43,20 @@ class Exam(models.Model):
     ai_text_model = models.CharField("text model", max_length=200, blank=True)
     ai_api_key = EncryptedTextField("API key", blank=True)
     ai_models = models.JSONField("models", default=list, blank=True)
+    question_numbers = models.CharField(
+        max_length=500, blank=True, validators=[validate_question_numbers]
+    )
+    question_numbers_locked = models.BooleanField(default=False)
     version = models.PositiveBigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def question_labels(self) -> list[str]:
+        """The question numbers as labels, e.g. `Q1`, `Q3b`."""
+        return parse_question_numbers(self.question_numbers)
 
     @property
     def has_ai_service(self) -> bool:

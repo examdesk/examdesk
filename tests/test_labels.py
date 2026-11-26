@@ -7,6 +7,7 @@ from examdesk.labels import (
     normalize_label,
     normalize_name,
     normalize_place,
+    parse_question_numbers,
     place_order,
     top_level,
 )
@@ -33,6 +34,35 @@ def test_normalize_label(raw: str, label: str) -> None:
 def test_normalize_label_rejects_unknown_forms(raw: str) -> None:
     with pytest.raises(ValueError, match="question"):
         normalize_label(raw)
+
+
+@pytest.mark.parametrize(
+    ("raw", "labels"),
+    [
+        ("1-3", ["Q1", "Q2", "Q3"]),
+        ("2, 1a-c, Q3(b)", ["Q1a", "Q1b", "Q1c", "Q2", "Q3b"]),
+        ("4b \N{EN DASH} 4d, 1, 1,", ["Q1", "Q4b", "Q4c", "Q4d"]),
+        ("general, 2", ["General", "Q2"]),
+        ("", []),
+    ],
+)
+def test_parse_question_numbers(raw: str, labels: list[str]) -> None:
+    assert parse_question_numbers(raw) == labels
+
+
+@pytest.mark.parametrize(
+    ("raw", "error"),
+    [
+        ("1, x", "Not a question: x"),
+        ("3-1", "Not a range: 3-1"),
+        ("1a-2c", "Not a range: 1a-2c"),
+        ("1-3b", "Not a range: 1-3b"),
+        ("1-1000", "Too many questions in 1-1000"),
+    ],
+)
+def test_parse_question_numbers_rejects(raw: str, error: str) -> None:
+    with pytest.raises(ValueError, match=error):
+        parse_question_numbers(raw)
 
 
 @pytest.mark.parametrize(("raw", "place"), [(" 14 ", "14"), ("hall 1", "HALL1")])

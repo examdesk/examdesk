@@ -19,7 +19,8 @@ Invigilators have four tabs:
 
 Examiners answer clarifications, merge duplicates and move seats between them. Announcing a
 clarification sends its answer to every venue to read out. A corrected answer goes back to the
-seats that had the old one. Closing an exam makes it read-only and stops the invigilator link.
+seats that had the old one. Settings can list the exam's question numbers, as suggestions or as
+the only ones allowed. Closing an exam makes it read-only and stops the invigilator link.
 Settings exports the clarifications to CSV.
 
 ## AI service

@@ -81,7 +81,7 @@ def suggestions(exam: Exam) -> dict[str, Any]:
     reports = Report.objects.of_exam(exam)
     labels = exam.clarifications.exclude(label="").values_list("label", flat=True)
     return {
-        "labels": lambda: sorted(set(labels), key=natural),
+        "labels": lambda: sorted({*labels, *exam.question_labels}, key=natural),
         "venues": reports.values_list("venue", flat=True).distinct().order_by("venue"),
         "seats": reports.values_list("seat", flat=True).distinct().order_by("seat"),
     }
