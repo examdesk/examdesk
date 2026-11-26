@@ -662,9 +662,14 @@ const enhance = (field) => {
 };
 
 // Reporting: once the seat and question find no clarification already asked, open New clarification.
-document.addEventListener("htmx:after:swap", () => {
+// While the search runs, everything after Question is hidden, so Tab from Question focuses the tab bar.
+document.addEventListener("htmx:after:swap", (event) => {
   const matches = document.querySelector("#matches[data-searched]");
-  if (matches && !matches.querySelector(".match")) document.getElementById("new-question").open = true;
+  if (!matches) return;
+  if (!matches.querySelector(".match")) document.getElementById("new-question").open = true;
+  if (event.target.contains(matches) && document.activeElement.matches(".dock :focus-visible")) {
+    [...matches.closest("form").querySelectorAll("a[href], button, summary, textarea")].find((control) => control.checkVisibility())?.focus();
+  }
 });
 // On phones the exam's tabs scroll sideways; the current one comes into view with each page.
 const showCurrentTab = () => document.querySelector("#exam-nav [aria-current=page]")?.scrollIntoView({ block: "nearest", inline: "nearest" });

@@ -126,6 +126,8 @@
   .list-card {
     @apply overflow-hidden rounded-box border border-base-300 bg-base-100;
     > * + *, > details > :not(summary) + * { @apply border-t border-base-300; }
+    /* The card's overflow-hidden would clip the focus ring of its full-width rows. */
+    > :focus-visible, > details > :focus-visible { @apply -outline-offset-2; }
   }
   /* A list card's heading row: its title and count. */
   .list-card > header { @apply flex min-h-12 items-center gap-2 px-(--surface-padding) py-2.5; }
