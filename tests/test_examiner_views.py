@@ -63,6 +63,17 @@ def test_clarification_filters_come_back_on_the_plain_url(examiner: Client, exam
     assert back.status_code == 200
 
 
+def test_a_clarification_url_without_a_query_redirects_to_the_saved_filters(
+    examiner: Client, exam: Exam
+) -> None:
+    clarification = report(exam).clarification
+    page = url("examiner:clarification", exam, clarification.pk)
+    assert examiner.get(page).status_code == 200  # nothing saved yet
+    examiner.get(url("examiner:clarifications", exam) + "?state=closed")
+    assert examiner.get(page)["Location"] == page + "?state=closed"
+    assert examiner.get(page, headers=REFRESH).status_code == 200
+
+
 def test_a_saved_filter_forgets_a_label_that_is_gone(examiner: Client, exam: Exam) -> None:
     r = report(exam, label="Q3b")
     page = url("examiner:clarifications", exam)
@@ -275,10 +286,11 @@ def test_clarifications_sort_by_question_and_tabs_count_each_state(
     assert html.index("Two?") < html.index("Ten?")
     assert "Three?" not in html
     assert '<option value="question" selected>Question</option>' in html
-    tabs = re.findall(r'href="\?([^"]+)"[^>]*>(\w+)<span class="num">(\d+)</span>', html)
+    tabs = re.findall(r'href="[^"?]*\?([^"]+)"[^>]*>(\w+)<span class="num">(\d+)</span>', html)
     assert tabs == [
         ("sort=question&amp;state=open", "Open", "2"),
         ("sort=question&amp;state=answered", "Answered", "1"),
+        ("sort=question&amp;state=delivered", "Delivered", "0"),
         ("sort=question&amp;state=closed", "Closed", "0"),
     ]
     assert 'aria-current="true">Open<span class="num">2</span>' in html
@@ -286,6 +298,63 @@ def test_clarifications_sort_by_question_and_tabs_count_each_state(
     assert "Three?" in html
     assert "Two?" not in html
     assert 'title="Open clarifications" data-open-count="2">2</span>' in html
+
+
+def test_an_answer_delivered_to_every_seat_moves_to_delivered(examiner: Client, exam: Exam) -> None:
+    first = report(exam)
+    second = report(exam, seat="21", clarification=first.clarification)
+    prof, ann = named(exam, "Prof"), named(exam, "Ann")
+    answer = services.answer_clarification(
+        first.clarification, text="Yes", member=prof, expected_answer=None
+    )
+    page = url("examiner:clarifications", exam)
+
+    def in_tab(state: str) -> bool:
+        return "Is x an integer?" in examiner.get(f"{page}?state={state}").content.decode()
+
+    services.mark_delivered(first, answer=answer, member=ann)
+    assert in_tab("answered")
+    services.mark_delivered(second, answer=answer, member=ann)
+    assert not in_tab("answered")
+    html = examiner.get(f"{page}?state=delivered").content.decode()
+    assert "Is x an integer?" in html
+    assert "to deliver</span>" not in html
+    assert "Answered</span>" not in html
+    clarification_url = url("examiner:clarification", exam, first.clarification_id)
+
+    def header_badge() -> str:
+        html = examiner.get(clarification_url, follow=True).content.decode()
+        header = html[html.index('class="pane-header"') : html.index('aria-label="Question"')]
+        badge = re.search(r'<span\s+class="badge state-(\w+)', header)
+        return badge[1] if badge else ""
+
+    assert header_badge() == "delivered"
+    other = report(exam, seat="34", text="Is x whole?").clarification
+    html = examiner.get(url("examiner:clarification", exam, other.pk), follow=True).content.decode()
+    duplicates = html[html.index('id="duplicates-title"') :]
+    assert '<span\n  class="badge state-delivered mt-0.5">' in duplicates
+    merge_choices = html[html.index('aria-label="Clarifications"', html.index("radiogroup")) :]
+    assert '<span\n  class="badge state-delivered">' in merge_choices
+    services.answer_clarification(
+        first.clarification, text="No", member=prof, expected_answer=answer.pk
+    )
+    assert in_tab("answered")  # both seats need the corrected answer
+    assert header_badge() == "answered"
+
+
+def test_the_empty_pane_describes_the_tab(examiner: Client, exam: Exam) -> None:
+    report(exam)
+    announced = report(exam, seat="21", label="Q5").clarification
+    services.announce(text="!", member=named(exam, "Prof"), clarification=announced)
+    page = url("examiner:clarifications", exam)
+
+    def pane_html(query: str) -> str:
+        html = examiner.get(page + query).content.decode()
+        return html[html.index('id="clarification-pane"') :]
+
+    assert "<strong>Select a clarification</strong><p>1 open</p>" in pane_html("?state=open")
+    assert "<strong>No answered clarifications</strong>" in pane_html("?state=answered")
+    assert "<strong>No clarifications match</strong>" in pane_html("?state=open&label=Q5")
 
 
 def test_clarification_page_links_keep_the_sort(
@@ -465,7 +534,7 @@ def test_queue_shows_seats_to_deliver_and_wait(examiner: Client, exam: Exam) -> 
     open_one = report(exam, seat="34", label="Q5").clarification
     html = examiner.get(url("examiner:clarifications", exam) + "?state=open").content.decode()
     assert re.search(r'<span class="wait " data-wait-since="\d+" data-wait-level', html)
-    assert f'href="{url("examiner:clarification", exam, open_one.pk)}"' in html
+    assert f'href="{url("examiner:clarification", exam, open_one.pk)}?state=open"' in html
 
 
 def test_clarification_page_lists_what_seats_asked_and_duplicates(
@@ -664,14 +733,6 @@ def test_seats_show_under_the_question(examiner: Client, exam: Exam) -> None:
     question = html[start : html.index("</section>", start)]
     assert "HALL1 14</a>" in question
     assert "HALL1 21</a>" in question
-
-
-def test_the_first_clarification_opens_beside_the_queue(examiner: Client, exam: Exam) -> None:
-    report(exam, text="Older?")
-    newer = report(exam, seat="21", label="Q5", text="Newer?").clarification
-    html = examiner.get(url("examiner:clarifications", exam) + "?sort=-wait").content.decode()
-    assert f'hx-get="{url("examiner:clarification", exam, newer.pk)}"' in html
-    assert "hx-trigger=\"load[matchMedia('(min-width: 64rem)').matches], retry\"" in html
 
 
 def test_clarification_actions_are_in_a_menu(examiner: Client, exam: Exam) -> None:

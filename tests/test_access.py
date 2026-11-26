@@ -219,7 +219,7 @@ def test_every_page_and_fragment_renders_with_data(
             examiner,
             url("examiner:clarifications", exam) + "?state=answered&label=Q3b&label=Q5&sort=-seats",
         ),
-        (examiner, url("examiner:clarification", exam, answered.clarification_id)),
+        (examiner, url("examiner:clarification", exam, answered.clarification_id) + "?state=open"),
         (examiner, url("examiner:seats", exam)),
         (examiner, url("examiner:members", exam)),
         (examiner, url("examiner:seat", exam) + "?venue=HALL1&seat=14"),

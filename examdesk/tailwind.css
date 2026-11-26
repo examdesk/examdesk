@@ -240,6 +240,8 @@
   /* A question label (Q3b), and a place: a venue and seat */
   .label-chip, .place-chip { @apply inline-flex items-center bg-base-200 text-xs font-semibold tabular-nums ring-1 ring-base-300 ring-inset; }
   .label-chip { @apply h-5 rounded px-1.5 text-base-content; }
+  /* From lg, an empty queue shows its empty state in the clarification pane instead of the list. */
+  .clarifications-layout:has(#pane-empty-state) .queue-rows > .empty { @apply lg:hidden; }
   /* An item in a split view: a card on phones, a pane from lg. */
   .clarification-pane { @apply flex min-h-0 min-w-0 flex-col; &[data-clarification] { @apply max-lg:rounded-box max-lg:border max-lg:border-base-300 max-lg:bg-base-100; } }
   .pane-header { @apply flex min-h-15 flex-wrap items-center gap-2 border-b border-base-300 px-(--surface-padding) py-3; }

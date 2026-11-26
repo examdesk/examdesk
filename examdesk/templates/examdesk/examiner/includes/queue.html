@@ -1,12 +1,12 @@
 {% load examdesk_tags %}
-{# The clarification queue: state tabs, filters and a page of rows; `clarification` is the open one. Tabs, filters and pages swap the list; a row swaps the clarification. #}
+{# The clarification queue: state tabs, filters and a page of rows; `clarification` is the open one. Tabs, filters and pages swap the list; tabs also deselect the clarification and filters update the pane's empty state. A row swaps the clarification. #}
 <section class="queue" aria-label="Clarifications">
   <div class="queue-toolbar">
     <c-live id="queue-tabs" as="nav" class="tabs tabs-box tabs-sm fill" aria-label="State">
       {{ form.state }}
-      {% for name, title, count in tabs %}<a class="tab gap-1.5" href="{% querystring query state=name page=None %}" hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs" hx-swap="outerHTML show:none"{% if name == state %} aria-current="true"{% endif %}>{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
+      {% for name, title, count in tabs %}<a class="tab gap-1.5" href="{% url 'examiner:clarifications' member.exam.pk %}{% querystring query state=name page=None %}" hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs, #queue-filters, #clarification-pane" hx-swap="outerHTML show:none"{% if name == state %} aria-current="true"{% endif %}>{{ title }}<span class="num">{{ count }}</span></a>{% endfor %}
     </c-live>
-    <form method="get" action="{{ request.path }}" id="queue-filters" class="filters flex gap-2" data-autosubmit hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs" hx-swap="outerHTML show:none">
+    <form method="get" action="{{ request.path }}" id="queue-filters" class="filters flex gap-2" data-autosubmit hx-target="#queue-list" hx-select="#queue-list" hx-select-oob="#queue-tabs, #pane-empty-state" hx-swap="outerHTML show:none">
       <c-live id="queue-label-filter" class="min-w-0 flex-1">{{ form.label }}</c-live>
       <div class="shrink-0">{{ form.sort }}</div>
       <noscript><button class="btn btn-outline btn-sm">Apply</button></noscript>
@@ -18,13 +18,13 @@
     <div class="queue-rows">
     {% for row in page_obj %}
       {% with item=row.clarification %}
-      <a class="queue-row" href="{% url 'examiner:clarification' pk item.pk %}"{% if item.pk == clarification.pk %} aria-current="page"{% endif %} hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">
+      <a class="queue-row" href="{% url 'examiner:clarification' pk item.pk %}{% querystring query state=state %}"{% if item.pk == clarification.pk %} aria-current="page"{% endif %} hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">
         <span class="queue-row-head">
           <span class="label-chip{% if not item.label %} font-medium text-subtle{% endif %}">{{ item.label|default:"No question" }}</span>
           {% if row.reports|length > 1 %}<span class="inline-flex items-center gap-1" title="Seats"><c-icon name="users" />{{ row.reports|length }}</span>{% endif %}
           {% if item.photo_report_id %}<c-icon name="image" title="Photo" />{% endif %}
           <span class="queue-row-status">
-            {% if item.state != "open" and item.state != state %}<c-state-badge :state="item.state" />{% endif %}
+            {% if item.closed_reason %}<c-state-badge :state="item.state" />{% endif %}
             {% if item.state == "open" and row.waiting_since %}
               <span class="wait {{ row.waiting_since|wait_level }}" data-wait-since="{{ row.waiting_since|date:'U' }}" data-wait-level title="Asked at {{ row.waiting_since|time:'H:i' }}">{{ row.waiting_since|wait }}</span>
             {% elif item.state == "answered" and row.unresolved %}
@@ -36,8 +36,7 @@
       </a>
       {% endwith %}
     {% empty %}
-      {% if filtered %}<c-empty icon="search" title="No clarifications match" />
-      {% else %}<c-empty icon="inbox" title="No {{ state }} clarifications" />{% endif %}
+      {% partialdef empty_state inline %}{% if filtered %}<c-empty icon="search" title="No clarifications match" />{% else %}<c-empty icon="inbox" title="No {{ state }} clarifications" />{% endif %}{% endpartialdef %}
     {% endfor %}
     </div>
     {% if page_obj.has_other_pages %}

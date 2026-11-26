@@ -118,16 +118,6 @@ document.addEventListener("htmx:finally:request", (event) => {
     element.inert = false;
   });
 });
-// The first clarification beside the queue ([data-first-clarification]) loads again once the newer
-// request that aborted it (a tab, the same page) has swapped, if it is still on the page.
-let abortedFirstClarification = null;
-document.addEventListener("htmx:finally:request", ({ detail: { ctx } }) => {
-  if (ctx.request.signal.aborted && ctx.sourceElement.hasAttribute("data-first-clarification")) abortedFirstClarification = ctx.sourceElement;
-});
-document.addEventListener("htmx:after:swap", () => {
-  if (abortedFirstClarification?.isConnected) htmx.trigger(abortedFirstClarification, "retry");
-  abortedFirstClarification = null;
-});
 // A link that loads a clarification or a seat beside its list is marked current in the list at once.
 const listItemSelectors = { "clarification-pane": ".queue-row", "seat-pane": ".seat-pill" };
 document.addEventListener("htmx:before:request", (event) => {

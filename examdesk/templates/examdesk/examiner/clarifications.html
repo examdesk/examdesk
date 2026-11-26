@@ -11,9 +11,11 @@
         <h2 class="mt-5">Invite invigilators</h2>
         <a class="btn btn-primary btn-sm mt-5" href="{% url 'examiner:members' member.exam.pk %}?invite=invigilator"><c-icon name="user-plus" />Invite people</a>
       </div>
-    {% elif rows %}
-      {# Opens the first clarification beside the queue; phones show only the queue. Queued behind the navigation that is still finishing; app.js retries it when a newer request aborts it. #}
-      <div data-first-clarification hx-get="{% url 'examiner:clarification' member.exam.pk page_obj.0.clarification.pk %}" hx-trigger="load[matchMedia('(min-width: 64rem)').matches], retry" hx-sync="body:queue last" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML" hx-replace-url="true"></div>
+    {% else %}
+      <div id="pane-empty-state" class="contents">
+        {% if rows %}<c-empty icon="inbox" title="Select a clarification"><p>{{ rows|length }} {{ state }}</p></c-empty>
+        {% else %}{% include "examdesk/examiner/includes/queue.html#empty_state" %}{% endif %}
+      </div>
     {% endif %}
   </c-live>
 </div>

@@ -159,6 +159,14 @@ class Clarification(models.Model):
         return self.State.ANSWERED if self.current_answer_id else self.State.OPEN
 
     @property
+    def display_state(self) -> State | Report.State:
+        """Delivered once the current answer is delivered to every seat, else `state`. Requires
+        reports prefetched with `with_state()`."""
+        if self.state == self.State.ANSWERED and all(r.delivered for r in self.reports.all()):
+            return Report.State.DELIVERED
+        return self.state
+
+    @property
     def summary(self) -> str:
         """The wording, or a stand-in for a clarification asked only by photo."""
         return self.wording or "(photo)"

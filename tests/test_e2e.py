@@ -135,7 +135,10 @@ def test_question_filter_applies_its_picks_when_closed(
     report(exam, seat="34", label="Q3b", text="Three?")
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
     prof.get_by_role("link", name="Clarifications").first.click()
-    expect(prof.locator("[data-clarification]")).to_be_visible()  # the first clarification opens
+    expect(prof.locator(".queue-row").first).to_be_visible()
+    expect(prof.locator("[data-clarification]")).to_have_count(0)
+    prof.locator(".queue-row").first.click()
+    expect(prof.locator("[data-clarification]")).to_be_visible()
     queue = prof.locator(".queue")
     search = prof.get_by_role("combobox", name="Questions")
     search.click()
@@ -151,10 +154,22 @@ def test_question_filter_applies_its_picks_when_closed(
     chips.filter(has_text="Q10").get_by_role("button").click()
     expect(queue.get_by_text("Ten?")).to_be_hidden()
     expect(chips).to_have_count(1)
-    # A state tab keeps the other filters.
+    # A state tab keeps the other filters and deselects the clarification.
     prof.get_by_role("link", name="Answered").click()
-    expect(prof).to_have_url(re.compile(r"state=answered&label=Q3"))
+    expect(prof).to_have_url(re.compile(r"/clarifications/\?state=answered&label=Q3"))
     expect(chips).to_have_count(1)
+    expect(prof.locator("[data-clarification]")).to_have_count(0)
+    # Back shows the clarification under the tab it was opened from.
+    prof.go_back()
+    expect(prof).to_have_url(re.compile(r"/clarifications/\d+/\?state=&label=Q3"))
+    expect(prof.locator("[data-clarification]")).to_be_visible()
+    expect(prof.locator('#queue-tabs [aria-current="true"]')).to_contain_text("Open")
+    prof.go_forward()
+    expect(prof.locator("[data-clarification]")).to_have_count(0)
+    chips.get_by_role("button").click()  # the filter form now submits to the list URL
+    expect(prof).to_have_url(re.compile(r"/clarifications/\?state=answered&sort="))
+    expect(prof.locator("[data-clarification]")).to_have_count(0)
+    expect(prof.locator("#clarification-pane")).to_contain_text("No answered clarifications")
 
 
 @pytest.mark.django_db(transaction=True)
@@ -286,6 +301,7 @@ def test_a_clarification_pane_is_inert_while_another_loads(
     prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
     pane = prof.locator("#clarification-pane")
     wording = pane.get_by_role("button", name="Edit wording")
+    prof.get_by_role("link", name="Is x an integer?").click()
     expect(wording).to_contain_text("Is x an integer?")
     routes: list[Route] = []
     prof.route("**/examiner/clarifications/*/", lambda route: routes.append(route))

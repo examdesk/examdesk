@@ -119,7 +119,7 @@ def queue(request: HtmxRequest, exam: Exam, query: QueryDict) -> dict[str, Any]:
     rows = []
     counts: Counter[str] = Counter()
     for clarification in found:
-        tab = "closed" if clarification.closed_reason else clarification.state
+        tab = "closed" if clarification.closed_reason else clarification.display_state
         counts[tab] += 1
         if state == tab:
             reports = list(clarification.reports.all())
@@ -143,14 +143,21 @@ def queue(request: HtmxRequest, exam: Exam, query: QueryDict) -> dict[str, Any]:
     }
 
 
+def saved_filters_redirect(request: HtmxRequest, exam: Exam) -> HttpResponse | None:
+    """A redirect to this device's saved filters for a page opened without a query string, except
+    on Back or a refresh."""
+    saved = session.filters(request.session, exam)
+    if request.GET or not saved or request.htmx.history_restore_request or is_refresh(request):
+        return None
+    return redirect(f"{request.path}?{saved}")
+
+
 @require_GET
 @exam_view(examiner_only=True)
 def clarifications(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Restores this device's last filters when opened without a query, except on Back."""
     exam = member.exam
-    saved = session.filters(request.session, exam)
-    if not request.GET and saved and not request.htmx.history_restore_request:
-        return redirect(f"{request.path}?{saved}")
+    if response := saved_filters_redirect(request, exam):
+        return response
     context = queue(request, exam, request.GET)
     no_open_clarifications = (
         not context["rows"]
@@ -188,9 +195,10 @@ def clarification_page(
     context = queue(request, exam, query)
     queued = [row.clarification for row in context["rows"]]
     after = queued.index(clarification) + 1 if clarification in queued else 0
-    reports = list(
-        Report.objects.with_state().filter(clarification=clarification).select_related("member")
+    prefetch_related_objects(
+        [clarification], Prefetch("reports", Report.objects.with_state().select_related("member"))
     )
+    reports = list(clarification.reports.all())
     ranked = rank_similar(clarification.texts, unmerged_others(exam, clarification))
     current = clarification.current_answer
     context |= {
@@ -228,7 +236,7 @@ def unmerged_others(exam: Exam, clarification: Clarification) -> QuerySet[Clarif
     return (
         exam.clarifications.exclude(pk=clarification.pk)
         .exclude(closed_reason=Clarification.ClosedReason.MERGED)
-        .prefetch_related("reports")
+        .prefetch_related(Prefetch("reports", Report.objects.with_state()))
     )
 
 
@@ -301,7 +309,9 @@ async def clarification_duplicates(
 @require_GET
 @exam_view(examiner_only=True)
 def clarification(request: HtmxRequest, member: Member, clarification_id: int) -> HttpResponse:
-    return clarification_page(request, member, clarification_id)
+    return saved_filters_redirect(request, member.exam) or clarification_page(
+        request, member, clarification_id
+    )
 
 
 @require_POST

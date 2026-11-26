@@ -191,6 +191,7 @@ class ClarificationFilterForm(BaseForm):
     STATES = {
         Clarification.State.OPEN: "Open",
         Clarification.State.ANSWERED: "Answered",
+        "delivered": "Delivered",
         "closed": "Closed",
     }
 

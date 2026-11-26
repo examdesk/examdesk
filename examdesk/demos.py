@@ -160,7 +160,7 @@ class DemoExam:
 
 def queue_row(clarification: Clarification) -> str:
     """The queue row of `clarification`."""
-    return f'.queue-row[href$="/clarifications/{clarification.pk}/"]'
+    return f'.queue-row[href*="/clarifications/{clarification.pk}/"]'
 
 
 SEND_BUTTON = "#correction .join > button:first-child"

@@ -12,7 +12,7 @@
       <a href="{% url 'examiner:clarifications' pk %}" class="btn btn-ghost btn-sm btn-square -ml-2 lg:hidden" aria-label="Clarifications"><c-icon name="arrow-left" /></a>
       <h2 class="flex min-w-0 items-center gap-2.5">
         <span class="label-chip h-6 text-sm{% if not label %} font-medium text-subtle{% endif %}">{{ label|default:"No question" }}</span>
-        {% if clarification.state != 'open' %}<c-state-badge :state="clarification.state" />{% endif %}
+        {% if clarification.state != 'open' %}<c-state-badge :state="clarification.display_state" />{% endif %}
       </h2>
       {% if waiting_since and clarification.state == 'open' %}<span class="meta wait lg:hidden {{ waiting_since|wait_level }}" data-wait-since="{{ waiting_since|date:'U' }}" data-wait-level title="Asked at {{ waiting_since|time:'H:i' }}">{{ waiting_since|wait }}</span>{% endif %}
       <div class="-mr-2 ml-auto flex items-center gap-1">
@@ -24,7 +24,7 @@
           </ul>
         {% endif %}
         {% if next_in_queue %}
-          <a href="{% url 'examiner:clarification' pk next_in_queue.pk %}" class="btn btn-sm max-sm:btn-square lg:hidden {% if clarification.state == 'open' %}btn-ghost{% else %}btn-primary{% endif %}" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body" title="Next (J)"><span class="max-sm:sr-only">Next</span><c-icon name="chevron-right" /></a>
+          <a href="{% url 'examiner:clarification' pk next_in_queue.pk %}{% querystring query state=state %}" class="btn btn-sm max-sm:btn-square lg:hidden {% if clarification.state == 'open' %}btn-ghost{% else %}btn-primary{% endif %}" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body" title="Next (J)"><span class="max-sm:sr-only">Next</span><c-icon name="chevron-right" /></a>
         {% endif %}
       </div>
     </div>
@@ -204,7 +204,7 @@
         <span class="queue-row-head">
           <span class="label-chip{% if not other.label %} font-medium text-subtle{% endif %}">{{ other.label|default:"No question" }}</span>
           {% with seats=other.reports.all|length %}{% if seats > 1 %}<span class="inline-flex items-center gap-1" title="Seats"><c-icon name="users" />{{ seats }}</span>{% endif %}{% endwith %}
-          {% if other.state != "open" %}<span class="queue-row-status"><c-state-badge :state="other.state" /></span>{% endif %}
+          {% if other.state != "open" %}<span class="queue-row-status"><c-state-badge :state="other.display_state" /></span>{% endif %}
         </span>
         <span class="queue-row-text">{{ other.summary }}</span>
       </label>
@@ -230,7 +230,7 @@
         <input type="checkbox" class="checkbox checkbox-sm checkbox-primary mt-0.5 rounded-sm" form="merge-selected" name="source" value="{{ other.pk }}" aria-labelledby="duplicate-{{ other.pk }}"{% if other.closed_reason %} disabled{% endif %}>
         <a href="{{ other_url }}" id="duplicate-{{ other.pk }}" class="line-clamp-2 min-w-0 flex-1 hover:underline" hx-target="#clarification-pane" hx-select="#clarification-pane" hx-swap="outerHTML show:top showTarget:body">{% if other.label %}<span class="label-chip mr-1.5">{{ other.label }}</span>{% endif %}{{ other.summary }}</a>
         <span class="meta mt-0.5 shrink-0">{{ percent }}% {% if confirmed_by_ai %}match{% else %}alike{% endif %}</span>
-        {% if other.state != "open" %}<c-state-badge :state="other.state" class="mt-0.5" />{% endif %}
+        {% if other.state != "open" %}<c-state-badge :state="other.display_state" class="mt-0.5" />{% endif %}
         {% if not other.closed_reason or not clarification.current_answer %}
           <button type="button" class="btn btn-ghost btn-xs btn-square" commandfor="merge-{{ other.pk }}" command="show-modal" aria-label="Merge into {{ other.label|default:'this clarification' }}" title="Merge into it"><c-icon name="git-merge" /></button>
           <c-dialog id="merge-{{ other.pk }}" title="Merge into {{ other.label|default:'this clarification' }}?" action="{% url 'examiner:merge_clarifications' pk %}" submit="Merge">
