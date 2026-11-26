@@ -132,11 +132,11 @@ def test_export_is_a_csv_file_excel_reads_as_utf8(examiner: Client, exam: Exam) 
     assert "Is ∑ the sum?" in response.content.decode("utf-8-sig")
 
 
-def test_examiners_export_closed_exams_from_the_queue(examiner: Client, exam: Exam) -> None:
+def test_examiners_export_closed_exams_from_settings(examiner: Client, exam: Exam) -> None:
     services.set_live(exam, live=False)
     export_url = url("examiner:export_clarifications", exam)
     assert examiner.get(export_url).status_code == 200
-    html = examiner.get(url("examiner:clarifications", exam)).content.decode()
+    html = examiner.get(url("examiner:settings", exam)).content.decode()
     assert f'href="{export_url}" download' in html
 
 

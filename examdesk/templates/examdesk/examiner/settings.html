@@ -28,6 +28,10 @@
     <button class="btn btn-primary btn-sm" form="exam-form"><c-icon name="check" />Save</button>
   </footer>
 </section>
+<section class="card-box flex flex-wrap items-center justify-between gap-4" aria-labelledby="export-title">
+  <h2 id="export-title">Export clarifications</h2>
+  <a class="btn btn-outline btn-sm" href="{% url 'examiner:export_clarifications' pk %}" download><c-icon name="download" />Download CSV</a>
+</section>
 {% if not exam.is_live %}
   <section class="card-box danger flex flex-wrap items-center justify-between gap-4" aria-labelledby="delete-title">
     <h2 id="delete-title">Delete the exam</h2>
