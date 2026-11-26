@@ -22,12 +22,12 @@
   <header class="appbar">
     <div class="appbar-row page-container">
       {% if invigilator_screen %}
-        <span class="flex min-w-0 items-center gap-2"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-7 shrink-0"><c-live id="exam-name" as="span" class="truncate font-semibold">{{ member.exam.name }}</c-live></span>
+        <span class="flex min-w-0 flex-1 items-center gap-2"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-7 shrink-0"><c-live id="exam-name" as="span" class="truncate font-semibold" title="{{ member.exam.name }}">{{ member.exam.name }}</c-live></span>
       {% else %}
         <span class="flex min-w-0 flex-1 items-center gap-2 lg:flex-none">
           <a href="{% url 'home' %}" class="brand" aria-label="Exam Desk: all exams"><img src="{% static 'examdesk/logo.svg' %}" alt="" class="size-7"><span{% if member %} class="sr-only"{% endif %}>Exam Desk</span></a>
           {% if member %}
-            <c-live id="exam-name" as="span" class="truncate font-semibold">{{ member.exam.name }}</c-live>
+            <c-live id="exam-name" as="span" class="truncate font-semibold" title="{{ member.exam.name }}">{{ member.exam.name }}</c-live>
             <c-live id="exam-status" as="span" class="contents"><c-exam-status :exam="member.exam" /></c-live>
           {% endif %}
         </span>

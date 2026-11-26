@@ -2,7 +2,7 @@
 {% block appbar %}
   {% if member.is_examiner %}<a href="{% url 'examiner:clarifications' member.exam.pk %}" class="btn btn-ghost btn-sm max-sm:hidden">Examiner view</a>{% endif %}
   <button type="button" class="venue-picker-button" commandfor="venue-dialog" command="show-modal" title="Change my venue"
-          aria-label="Venue: {{ member.venue|default:'All venues' }}"><c-icon name="map-pin" />{{ member.venue|default:"All venues" }}<c-icon name="chevron-down" class="size-3.5" /></button>
+          aria-label="Venue: {{ member.venue|default:'All venues' }}"><c-icon name="map-pin" /><span class="truncate">{{ member.venue|default:"All venues" }}</span><c-icon name="chevron-down" class="size-3.5" /></button>
 {% endblock %}
 {% block nav %}{% endblock %}
 {% block main_class %}pb-32{% endblock %}

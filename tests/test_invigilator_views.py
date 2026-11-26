@@ -587,3 +587,13 @@ def test_snooze_puts_off_the_alert_on_this_device(
     invigilator.post(later)
     html = invigilator.get(page).content.decode()
     assert re.search(rf'data-alert="{announcement.pk}\.[1-9]\d*"', html)
+
+
+def test_account_menu_offers_examiners_the_examiner_view(
+    invigilator: Client, examiner: Client, exam: Exam
+) -> None:
+    examiner_view = url("examiner:clarifications", exam)
+    item = f'<li class="sm:hidden"><a href="{examiner_view}">Examiner view</a></li>'
+    assert item in examiner.get(url("invigilator:report", exam)).content.decode()
+    assert item not in examiner.get(examiner_view).content.decode()
+    assert "Examiner view" not in invigilator.get(url("invigilator:report", exam)).content.decode()

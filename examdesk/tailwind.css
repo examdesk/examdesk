@@ -301,10 +301,12 @@
     &.claimed { @apply bg-base-200/60; }
     &.done > strong { @apply text-subtle; }
   }
+  /* The invigilator app bar's venue and account buttons. ::after makes each touch target 44px. */
   .venue-picker-button {
-    @apply inline-flex h-8 cursor-pointer items-center gap-1 rounded-full bg-base-200 px-2.5 text-sm font-semibold whitespace-nowrap ring-1 ring-base-300 ring-inset hover:bg-base-300/60;
-    .icon { @apply size-4 text-subtle; }
+    @apply relative inline-flex h-9 cursor-pointer items-center gap-1 rounded-full bg-base-200 px-2.5 text-sm font-semibold whitespace-nowrap ring-1 ring-base-300 ring-inset after:absolute after:-inset-1 hover:bg-base-300/60 max-sm:max-w-40;
+    .icon { @apply size-4 shrink-0 text-subtle; }
   }
+  :is(body.invigilator, .landing-phone) .avatar-button { @apply relative size-9 after:absolute after:-inset-1; }
 
   /* Announcement banner under the invigilator app bar */
   .announcement-bar {
@@ -611,6 +613,7 @@
     li > .text-error:hover { @apply bg-red-50; }
     .menu-title { @apply px-3 pt-2 pb-1 text-xs font-medium text-subtle normal-case; }
   }
+  :is(body.invigilator, .landing-phone) .menu-panel li > :is(a, button) { @apply min-h-11 content-center; }
   .seat-card {
     @apply w-80 rounded-box border border-base-300 bg-base-100 p-3.5 text-sm shadow-lg;
     /* A popover below its chip's left edge. */
