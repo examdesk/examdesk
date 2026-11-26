@@ -109,7 +109,7 @@
     {% if match.similarity is not None %}<span class="meta ml-auto">{{ match.similarity }}% alike</span>{% endif %}
   </span>
   <span class="mt-1.5 block leading-snug font-medium">{{ clarification.summary }}</span>
-  {% if clarification.photo_report_id %}<img class="mt-2 max-h-24 w-fit rounded-md border border-base-300" src="{% url 'photo' pk clarification.photo_report_id %}" alt="Photo">{% endif %}
+  {% if clarification.photo_report_id %}<img class="mt-2 max-h-32 rounded-md border border-base-300" src="{% url 'photo' pk clarification.photo_report_id %}" alt="Photo">{% endif %}
 {% endpartialdef %}
 {% endwith %}
 {% endblock %}
