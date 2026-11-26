@@ -12,7 +12,13 @@ from timezone_field import TimeZoneFormField
 
 from . import pdf
 from .labels import GENERAL, natural, normalize_label, normalize_name, normalize_place
-from .models import Clarification, Exam, Report, validate_question_numbers
+from .models import (
+    Clarification,
+    Exam,
+    Report,
+    validate_question_numbers,
+    validate_seat_numbers,
+)
 
 
 def form_errors(form: forms.Form) -> str:
@@ -67,26 +73,34 @@ class LabelField(forms.CharField):
 
 
 class BaseExamForm(BaseForm):
-    """A form with a `venue` or a `label`, picked from the exam's venues or question numbers when
-    they are locked."""
+    """A form whose `venue`, `seat` and `label` become pick lists while the exam locks them."""
 
     def __init__(self, *args: Any, exam: Exam, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         if exam.venues_locked and "venue" in self.fields:
-            attrs = self.fields["venue"].widget.attrs
-            self.fields["venue"] = forms.ChoiceField(
-                choices=[("", ""), *((venue, venue) for venue in exam.venues)],
-                error_messages={"invalid_choice": "Pick a venue from the list."},
-                widget=forms.Select(
-                    {
-                        name: value
-                        for name, value in attrs.items()
-                        if name not in ("list", "maxlength")
-                    }
-                ),
-            )
+            self._restrict_to_choices("venue", exam.venues, "Pick a venue from the list.")
+        if (
+            exam.seat_numbers_locked
+            and "seat" in self.fields
+            and (seats := exam.venue_seats(normalize_place(self["venue"].value() or "")))
+        ):
+            self._restrict_to_choices("seat", seats, "Pick a seat from the list.")
+            if all(seat.isdigit() for seat in seats):
+                self.fields["seat"].widget.attrs["inputmode"] = "numeric"
         if exam.question_numbers_locked and "label" in self.fields:
             self.fields["label"].restrict_to(exam.question_labels)  # type: ignore[attr-defined]
+
+    def _restrict_to_choices(
+        self, name: str, choices: list[str], invalid_choice_message: str
+    ) -> None:
+        attrs = self.fields[name].widget.attrs
+        self.fields[name] = forms.ChoiceField(
+            choices=[("", ""), *((choice, choice) for choice in choices)],
+            error_messages={"invalid_choice": invalid_choice_message},
+            widget=forms.Select(
+                {key: value for key, value in attrs.items() if key not in ("list", "maxlength")}
+            ),
+        )
 
 
 class SignupForm(BaseForm):
@@ -116,6 +130,33 @@ class ExamForm(BaseForm):
 class ExamSettingsForm(BaseForm):
     name = forms.CharField(max_length=200, widget=forms.TextInput(attrs={"autocomplete": "off"}))
     time_zone = TimeZoneFormField(label="Time zone")
+
+
+class VenuesAndQuestionsForm(BaseForm):
+    venues = VenuesField(
+        required=False,
+        widget=forms.SelectMultiple(
+            attrs={
+                "placeholder": "e.g. HALL1",
+                "autocapitalize": "characters",
+                "data-create-places": True,
+            }
+        ),
+    )
+    venues_locked = forms.BooleanField(
+        label="Allow only these",
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={"class": "checkbox checkbox-sm checkbox-primary rounded-sm"}
+        ),
+    )
+    seat_numbers_locked = forms.BooleanField(
+        label="Allow only these",
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={"class": "checkbox checkbox-sm checkbox-primary rounded-sm"}
+        ),
+    )
     question_numbers = forms.CharField(
         max_length=500,
         required=False,
@@ -135,31 +176,33 @@ class ExamSettingsForm(BaseForm):
             attrs={"class": "checkbox checkbox-sm checkbox-primary rounded-sm"}
         ),
     )
-    venues = VenuesField(
-        required=False,
-        widget=forms.SelectMultiple(
-            attrs={
-                "placeholder": "e.g. HALL1",
-                "autocapitalize": "characters",
-                "data-create-places": True,
-            }
-        ),
-    )
-    venues_locked = forms.BooleanField(
-        label="Allow only these",
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={"class": "checkbox checkbox-sm checkbox-primary rounded-sm"}
-        ),
-    )
 
     def __init__(self, *args: Any, exam: Exam, **kwargs: Any) -> None:
         """Suggests the venues that reports came from. The field's own values are options too: a
-        select drops values it has no option for."""
+        select drops values it has no option for. Each saved venue gets a seat numbers box."""
         super().__init__(*args, **kwargs)
         report_venues = Report.objects.of_exam(exam).values_list("venue", flat=True)
         venues = sorted({*report_venues, *(self["venues"].value() or [])}, key=natural)
         self.fields["venues"].widget.choices = [(venue, venue) for venue in venues]
+        for index, venue in enumerate(exam.venues):
+            self.fields[f"seat_numbers_{index}"] = forms.CharField(
+                label=venue,
+                max_length=500,
+                required=False,
+                validators=[validate_seat_numbers],
+                initial=exam.seat_numbers.get(venue, ""),
+                widget=forms.TextInput(
+                    attrs={
+                        "autocomplete": "off",
+                        "autocapitalize": "characters",
+                        "placeholder": "e.g. 1-200 or A1-A30",
+                        "aria-describedby": f"seat-numbers-preview-{index}",
+                    }
+                ),
+            )
+        self.seat_numbers_fields = [
+            self[f"seat_numbers_{index}"] for index in range(len(exam.venues))
+        ]
 
     def clean_question_numbers_locked(self) -> bool:
         """Without question numbers, nothing is locked."""
@@ -170,6 +213,21 @@ class ExamSettingsForm(BaseForm):
         """Without venues, nothing is locked."""
         locked: bool = self.cleaned_data["venues_locked"]
         return locked and bool(self.cleaned_data.get("venues"))
+
+    def clean(self) -> dict[str, Any]:
+        """`seat_numbers` of the venues still listed; nothing is locked without seat numbers."""
+        super().clean()
+        cleaned_data = self.cleaned_data
+        venues = cleaned_data.get("venues", [])
+        seat_numbers = {}
+        for field in self.seat_numbers_fields:
+            text = cleaned_data.pop(field.name, "")
+            if text and field.label in venues:
+                seat_numbers[field.label] = text
+        cleaned_data["seat_numbers"] = seat_numbers
+        locked = cleaned_data["seat_numbers_locked"]
+        cleaned_data["seat_numbers_locked"] = locked and bool(seat_numbers)
+        return cleaned_data
 
 
 class NameForm(BaseForm):
@@ -185,7 +243,7 @@ type Attrs = dict[str, str | bool]
 
 
 def datalist_input(name: str, attrs: Attrs | None = None) -> forms.TextInput:
-    """A text input backed by one of the datalists in base.html."""
+    """A text input backed by one of the page's datalists."""
     return forms.TextInput(attrs={"list": name, "autocomplete": "off", **(attrs or {})})
 
 

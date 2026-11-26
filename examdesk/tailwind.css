@@ -620,7 +620,7 @@
     @apply border-primary ring-3 ring-primary/15;
     outline: none;
   }
-  [aria-invalid=true] { @apply border-error; }
+  :is(input, select, textarea)[aria-invalid=true] { @apply border-error; }
   /* Badges; states add `state-{{ state|slugify }}`, or pick a colour. */
   .badge {
     @apply inline-flex h-auto items-center gap-1 rounded-md border-0 bg-gray-50 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-gray-700 ring-1 ring-gray-500/15 ring-inset;

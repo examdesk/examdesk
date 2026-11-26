@@ -26,7 +26,14 @@ from django_htmx.http import HttpResponseClientRedirect
 from .. import ai, services, session
 from ..access import HtmxRequest, exam_view
 from ..forms import PhotoForm, ReportForm, ReportStartForm, VenueForm, form_errors
-from ..labels import mismatched_label, natural, normalize_label, place_order, top_level
+from ..labels import (
+    mismatched_label,
+    natural,
+    normalize_label,
+    normalize_place,
+    place_order,
+    top_level,
+)
 from ..matching import rank_similar, same_question, similar_enough
 from ..models import (
     Announcement,
@@ -166,9 +173,9 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
         }
     else:
         query = request.GET
-        submitted = "seat" in query or "label" in query
+        initial = {"venue": member.venue or query.get("venue"), "seat": query.get("seat")}
         start_form = ReportStartForm(
-            query if submitted else None, initial={"venue": member.venue}, exam=exam
+            query if "label" in query else None, initial=initial, exam=exam
         )
         context = {"client_key": uuid.uuid4()}
     text = query.get("text", "")
@@ -185,17 +192,41 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
             "collapsed_matches": collapsed_matches,
             "other_question_matches": other_question_matches,
         }
-    context |= {"start_form": start_form, "text": text}
+    venue = normalize_place(start_form["venue"].value() or "")
+    context |= {
+        "start_form": start_form,
+        "text": text,
+        "seats": lambda: known_seats(exam, venue),
+    }
     # typing re-ranks the matches
     if request.htmx.request_type == "partial" and not is_refresh(request):
-        # A report page opened before the lock has a text box for the question.
+        # A report page opened before a lock has text boxes for the seat and the question. An
+        # invigilator without a venue may change it in the form; the seat field then reloads
+        # instead of refusing.
+        unlisted_fields = []
+        if member.venue and start_form.has_error("seat", "invalid_choice"):
+            unlisted_fields.append("seat")
         if exam.question_numbers_locked and start_form.has_error("label"):
-            messages.info(request, "Pick the question from the examiners' list.")
-            place = {name: query[name] for name in ("venue", "seat") if name in query}
+            unlisted_fields.append("question")
+        if unlisted_fields:
+            messages.info(
+                request, f"Pick the {' and '.join(unlisted_fields)} from the examiners' list."
+            )
+            place = {
+                name: query[name]
+                for name in ("venue", "seat")
+                if query.get(name) and not start_form.has_error(name)
+            }
             return HttpResponseClientRedirect(f"{request.path}?{urlencode(place)}")
         context |= {"member": member}
         return render(request, "examdesk/invigilator/report.html#matches", context)
     return invigilator_page(request, member, "report", context)
+
+
+def known_seats(exam: Exam, venue: str) -> list[str]:
+    """The seats listed for `venue` and those that reports came from."""
+    report_seats = Report.objects.of_exam(exam).values_list("seat", flat=True)
+    return sorted({*exam.venue_seats(venue), *report_seats}, key=natural)
 
 
 @require_POST

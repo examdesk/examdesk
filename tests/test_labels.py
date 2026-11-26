@@ -8,6 +8,7 @@ from examdesk.labels import (
     normalize_name,
     normalize_place,
     parse_question_numbers,
+    parse_seats,
     place_order,
     top_level,
 )
@@ -63,6 +64,34 @@ def test_parse_question_numbers(raw: str, labels: list[str]) -> None:
 def test_parse_question_numbers_rejects(raw: str, error: str) -> None:
     with pytest.raises(ValueError, match=error):
         parse_question_numbers(raw)
+
+
+@pytest.mark.parametrize(
+    ("raw", "seats"),
+    [
+        ("1-3", ["1", "2", "3"]),
+        ("a1 - a3, 10, b 2-3", ["10", "A1", "A2", "A3", "B2", "B3"]),
+        ("A9\N{EN DASH}11, 9,", ["9", "A9", "A10", "A11"]),
+        ("", []),
+    ],
+)
+def test_parse_seats(raw: str, seats: list[str]) -> None:
+    assert parse_seats(raw) == seats
+
+
+@pytest.mark.parametrize(
+    ("raw", "error"),
+    [
+        ("3-1", "Not a range: 3-1"),
+        ("A1-B3", "Not a range: A1-B3"),
+        ("1-A3", "Not a range: 1-A3"),
+        ("1-2000", "Too many seats in 1-2000"),
+        ("x" * 31, "Too long: X{31}"),
+    ],
+)
+def test_parse_seats_rejects(raw: str, error: str) -> None:
+    with pytest.raises(ValueError, match=error):
+        parse_seats(raw)
 
 
 @pytest.mark.parametrize(("raw", "place"), [(" 14 ", "14"), ("hall 1", "HALL1")])

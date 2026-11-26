@@ -321,29 +321,34 @@ def set_live(exam: Exam, *, live: bool) -> None:
     exam.is_live = live
 
 
+def edit_exam(exam: Exam, *, name: str, time_zone: ZoneInfo) -> None:
+    exam.name, exam.time_zone = name, time_zone
+    Exam.objects.filter(pk=exam.pk).update(name=name, time_zone=time_zone, version=F("version") + 1)
+
+
 @transaction.atomic
-def edit_exam(
+def edit_venues_and_questions(
     exam: Exam,
     *,
-    name: str,
-    time_zone: ZoneInfo,
     question_numbers: str,
     question_numbers_locked: bool,
     venues: list[str],
     venues_locked: bool,
+    seat_numbers: dict[str, str],
+    seat_numbers_locked: bool,
 ) -> None:
     """Locking the venues asks members in an unlisted venue to pick again. Locking one venue moves
     everyone who has picked into it."""
-    exam.name, exam.time_zone = name, time_zone
     exam.question_numbers, exam.question_numbers_locked = question_numbers, question_numbers_locked
     exam.venues, exam.venues_locked = venues, venues_locked
+    exam.seat_numbers, exam.seat_numbers_locked = seat_numbers, seat_numbers_locked
     Exam.objects.filter(pk=exam.pk).update(
-        name=name,
-        time_zone=time_zone,
         question_numbers=question_numbers,
         question_numbers_locked=question_numbers_locked,
         venues=venues,
         venues_locked=venues_locked,
+        seat_numbers=seat_numbers,
+        seat_numbers_locked=seat_numbers_locked,
         version=F("version") + 1,
     )
     if venues_locked:

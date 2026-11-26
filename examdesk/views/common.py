@@ -88,12 +88,10 @@ def known_venues(exam: Exam) -> list[str]:
 def suggestions(exam: Exam) -> dict[str, Any]:
     """The datalists' options. `labels` and `venues` are lazy, as refreshes don't render the
     datalists."""
-    reports = Report.objects.of_exam(exam)
     labels = exam.clarifications.exclude(label="").values_list("label", flat=True)
     return {
         "labels": lambda: sorted({*labels, *exam.question_labels}, key=natural),
         "venues": lambda: known_venues(exam),
-        "seats": reports.values_list("seat", flat=True).distinct().order_by("seat"),
     }
 
 

@@ -48,7 +48,6 @@
     {% block content %}{% endblock %}
     <datalist id="labels">{% for value in labels %}<option value="{{ value }}">{% endfor %}</datalist>
     <datalist id="venues">{% for value in venues %}<option value="{{ value }}">{% endfor %}</datalist>
-    <datalist id="seats">{% for value in seats %}<option value="{{ value }}">{% endfor %}</datalist>
   </main>
   {% block after_main %}{% endblock %}
   {% endblock %}{% if not request.headers.examdesk_frame %}

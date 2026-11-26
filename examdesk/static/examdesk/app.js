@@ -655,12 +655,22 @@ const enhance = (field) => {
   field.setAttribute("aria-hidden", "true");
   field.removeAttribute("aria-label");
   tom.control.addEventListener("click", () => setTimeout(() => tom.isFocused && tom.open()));
-  for (const name of ["autocapitalize", "placeholder"]) {
+  for (const name of ["autocapitalize", "inputmode", "placeholder"]) {
     if (field.hasAttribute(name)) tom.control_input.setAttribute(name, field.getAttribute(name));
   }
   if (field.autofocus) tom.focus();
 };
+// An [autofocus] field hidden by Tom Select passes the focus to its search box.
+document.addEventListener("focusin", (event) => event.target.tomselect?.focus());
 
+// Reporting: the seat field lists one venue's seats (data-venue). It reloads when the form's venue
+// changes, from the venue field or a refresh.
+const reloadSeatField = () => {
+  const seatField = document.getElementById("report-seat");
+  if (seatField && seatField.closest("form").elements.venue.value !== seatField.dataset.venue) htmx.trigger(seatField, "venue-changed");
+};
+document.addEventListener("htmx:after:swap", reloadSeatField);
+document.addEventListener("change", reloadSeatField);
 // Reporting: once the seat and question find no clarification already asked, open New clarification.
 // While the search runs, everything after Question is hidden, so Tab from Question focuses the tab bar.
 document.addEventListener("htmx:after:swap", (event) => {

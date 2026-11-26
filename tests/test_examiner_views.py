@@ -752,15 +752,7 @@ def test_clarification_actions_are_in_a_menu(examiner: Client, exam: Exam) -> No
 def test_times_show_in_the_exam_time_zone(examiner: Client, exam: Exam) -> None:
     report(exam)
     Report.objects.update(created_at=datetime(2026, 11, 24, 6, 5, tzinfo=UTC))
-    services.edit_exam(
-        exam,
-        name=exam.name,
-        time_zone=ZoneInfo("Asia/Singapore"),
-        question_numbers="",
-        question_numbers_locked=False,
-        venues=[],
-        venues_locked=False,
-    )
+    services.edit_exam(exam, name=exam.name, time_zone=ZoneInfo("Asia/Singapore"))
     assert "Asked at 14:05" in examiner.get(url("examiner:clarifications", exam)).content.decode()
 
 
@@ -774,15 +766,14 @@ def test_editing_the_exam(examiner: Client, exam: Exam) -> None:
 
 
 def test_question_numbers_are_saved_and_locked(examiner: Client, exam: Exam) -> None:
-    page = url("examiner:edit_exam", exam)
-    data = {"name": exam.name, "time_zone": "UTC"}
-    response = examiner.post(page, data | {"question_numbers": "1-3, x"})
+    page = url("examiner:edit_venues_and_questions", exam)
+    response = examiner.post(page, {"question_numbers": "1-3, x"})
     assert response.status_code == 400
     assert "Not a question: x." in response.content.decode()
-    examiner.post(page, data | {"question_numbers_locked": "on"})
+    examiner.post(page, {"question_numbers_locked": "on"})
     exam.refresh_from_db()
     assert not exam.question_numbers_locked  # nothing to lock to
-    examiner.post(page, data | {"question_numbers": "1-2, 3a-b", "question_numbers_locked": "on"})
+    examiner.post(page, {"question_numbers": "1-2, 3a-b", "question_numbers_locked": "on"})
     exam.refresh_from_db()
     assert exam.question_labels == ["Q1", "Q2", "Q3a", "Q3b"]
     assert exam.question_numbers_locked
@@ -821,18 +812,17 @@ def test_question_numbers_preview_lists_them_as_typed(examiner: Client, exam: Ex
 
 def test_venues_are_saved_and_locked(examiner: Client, exam: Exam) -> None:
     report(exam, venue="GYM")
-    page = url("examiner:edit_exam", exam)
-    data = {"name": exam.name, "time_zone": "UTC"}
-    response = examiner.post(page, data | {"venues": ["HALL1", "x" * 31]})
+    page = url("examiner:edit_venues_and_questions", exam)
+    response = examiner.post(page, {"venues": ["HALL1", "x" * 31]})
     assert response.status_code == 400
     html = response.content.decode()
     assert f"Too long: {'X' * 31}. Use up to 30 characters." in html
     assert f'<option value="{"x" * 31}" selected>' in html  # rejected, but still shown
-    examiner.post(page, data | {"venues_locked": "on"})
+    examiner.post(page, {"venues_locked": "on"})
     exam.refresh_from_db()
     assert not exam.venues_locked  # nothing to lock to
     venues = ["hall 10", "Hall 2", "", "hall2 "]
-    examiner.post(page, data | {"venues": venues, "venues_locked": "on"})
+    examiner.post(page, {"venues": venues, "venues_locked": "on"})
     exam.refresh_from_db()
     assert (exam.venues, exam.venues_locked) == (["HALL2", "HALL10"], True)
     html = examiner.get(url("examiner:settings", exam)).content.decode()
@@ -855,3 +845,62 @@ def test_announcements_wait_to_be_read_out_in_listed_venues(examiner: Client, ex
     html = examiner.get(url("examiner:announcements", exam)).content.decode()
     assert icon_then("clock", "HALL2</span>") in html
     assert icon_then("clock", "GYM</span>") not in html
+
+
+def test_seat_numbers_are_saved_by_venue_and_locked(examiner: Client, exam: Exam) -> None:
+    settings_page = url("examiner:settings", exam)
+    assert "Seat numbers" not in examiner.get(settings_page).content.decode()
+    set_venues(exam, ["HALL1", "HALL2"], locked=False)
+    html = examiner.get(settings_page).content.decode()
+    boxes = re.findall(
+        r'<label for="id_(seat_numbers_\d)"[^>]*><span class="truncate">(\w+)<', html
+    )
+    assert boxes == [("seat_numbers_0", "HALL1"), ("seat_numbers_1", "HALL2")]
+    page = url("examiner:edit_venues_and_questions", exam)
+    data = {"venues": ["HALL1", "HALL2"], "seat_numbers_0": "1-200", "seat_numbers_1": " a1-30 "}
+    response = examiner.post(page, data | {"seat_numbers_1": "3-1"})
+    assert response.status_code == 400
+    html = response.content.decode()
+    hall2_row = re.search(
+        r'name="seat_numbers_1" value="3-1"[^>]*aria-invalid="true"[^>]*>\s*'
+        r'<div id="seat-numbers-preview-1"[^>]*><p class="errorlist">Not a range: 3-1\.',
+        html,
+    )
+    assert hall2_row  # the error shows under its own box
+    assert 'name="seat_numbers_0" value="1-200"' in html
+    examiner.post(page, {"venues": ["HALL1", "HALL2"], "seat_numbers_locked": "on"})
+    exam.refresh_from_db()
+    assert not exam.seat_numbers_locked  # nothing to lock to
+    examiner.post(page, data | {"seat_numbers_locked": "on"})
+    exam.refresh_from_db()
+    assert exam.seat_numbers == {"HALL1": "1-200", "HALL2": "a1-30"}
+    assert exam.seat_numbers_locked
+    assert exam.venue_seats("HALL2")[-1] == "A30"
+    html = examiner.get(settings_page).content.decode()
+    assert re.search(r'<input[^>]*name="seat_numbers_1"[^>]*value="a1-30"', html)
+    assert "200 seats" in html
+    assert re.search(r'<input[^>]*name="seat_numbers_locked"[^>]*checked', html)
+    examiner.post(page, data | {"venues": ["HALL1"], "seat_numbers_locked": "on"})
+    exam.refresh_from_db()
+    assert exam.seat_numbers == {"HALL1": "1-200"}  # HALL2 was removed
+
+
+def test_seat_numbers_preview_counts_the_seats_as_typed(examiner: Client, exam: Exam) -> None:
+    preview = url("examiner:preview_seat_numbers", exam) + "?seat_numbers="
+    assert "200 seats" in examiner.get(preview + "1-200", headers=HTMX).content.decode()
+    assert "Not a range: A1-B3." in examiner.get(preview + "A1-B3", headers=HTMX).content.decode()
+    assert "seat" not in examiner.get(preview, headers=HTMX).content.decode()
+    assert "11 seats" in examiner.get(preview + "1-10, 11-", headers=HTMX).content.decode()
+    assert "31 seats" in examiner.get(preview + "A1-A30, B1 - b", headers=HTMX).content.decode()
+
+
+def test_saving_one_settings_card_leaves_the_other(examiner: Client, exam: Exam) -> None:
+    set_venues(exam, ["HALL1"], locked=True)
+    examiner.post(url("examiner:edit_exam", exam), {"name": "Resit", "time_zone": "UTC"})
+    exam.refresh_from_db()
+    assert (exam.name, exam.venues, exam.venues_locked) == ("Resit", ["HALL1"], True)
+    page = url("examiner:edit_venues_and_questions", exam)
+    response = examiner.post(page, {"venues": ["HALL2"]}, follow=True)
+    assert "Saved the venues and questions." in response.content.decode()
+    exam.refresh_from_db()
+    assert (exam.name, exam.venues, exam.venues_locked) == ("Resit", ["HALL2"], False)

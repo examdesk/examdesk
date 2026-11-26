@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import mimetypes
+import re
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -39,6 +40,7 @@ from ..forms import (
     ExamSettingsForm,
     LabelForm,
     TextForm,
+    VenuesAndQuestionsForm,
     form_errors,
 )
 from ..labels import (
@@ -46,6 +48,7 @@ from ..labels import (
     natural,
     normalize_place,
     parse_question_numbers,
+    parse_seats,
     place_order,
     top_level,
 )
@@ -768,6 +771,7 @@ def settings_page(
     models_form: AIModelsForm | None = None,
     file_form: ExamFileForm | None = None,
     exam_form: ExamSettingsForm | None = None,
+    venues_and_questions_form: VenuesAndQuestionsForm | None = None,
 ) -> HttpResponse:
     """A bound `delete_form` reopens the delete dialog with its errors."""
     exam = member.exam
@@ -776,7 +780,10 @@ def settings_page(
     models_form = models_form or AIModelsForm(exam=exam)
     file_form = file_form or ExamFileForm(exam=exam)
     exam_form = exam_form or ExamSettingsForm(
-        initial=model_to_dict(exam, fields=ExamSettingsForm.base_fields), exam=exam
+        initial=model_to_dict(exam, fields=ExamSettingsForm.base_fields)
+    )
+    venues_and_questions_form = venues_and_questions_form or VenuesAndQuestionsForm(
+        initial=model_to_dict(exam, fields=VenuesAndQuestionsForm.base_fields), exam=exam
     )
     context = {
         "delete_form": delete_form,
@@ -784,13 +791,25 @@ def settings_page(
         "models_form": models_form,
         "file_form": file_form,
         "exam_form": exam_form,
-        **question_numbers_preview(exam_form["question_numbers"].value() or ""),
+        "venues_and_questions_form": venues_and_questions_form,
+        **question_numbers_preview(venues_and_questions_form["question_numbers"].value() or ""),
+        "seat_numbers_by_venue": [
+            (field, seat_numbers_preview(field.value() or ""))
+            for field in venues_and_questions_form.seat_numbers_fields
+        ],
         "files": exam.files.prefetch_related("pages"),
     }
     path = reverse("examiner:settings", args=[exam.pk])
     template = "examdesk/examiner/settings.html"
     response = render_live(request, member, template, context, path=path)
-    forms = (delete_form, connect_form, models_form, file_form, exam_form)
+    forms = (
+        delete_form,
+        connect_form,
+        models_form,
+        file_form,
+        exam_form,
+        venues_and_questions_form,
+    )
     response.status_code = 400 if any(form.errors for form in forms) else 200
     return response
 
@@ -811,14 +830,43 @@ def preview_question_numbers(request: HtmxRequest, member: Member) -> HttpRespon
     return render(request, "examdesk/examiner/settings.html#question_numbers_preview", context)
 
 
+def seat_numbers_preview(text: str) -> dict[str, Any]:
+    try:
+        return {"seat_count": len(parse_seats(text))}
+    except ValueError as error:
+        return {"seat_numbers_error": str(error)}
+
+
+@require_GET
+@exam_view(examiner_only=True)
+def preview_seat_numbers(request: HtmxRequest, member: Member) -> HttpResponse:
+    row_box_values = list(request.GET.dict().values())
+    text = row_box_values[0] if row_box_values else ""
+    # `1-10, A1-A` previews as `1-10, A1` while the range is typed.
+    text = re.sub(r"\s*[-\N{EN DASH}][a-zA-Z\s]*$", "", text)
+    context = seat_numbers_preview(text.rstrip(" ,"))
+    return render(request, "examdesk/examiner/settings.html#seat_numbers_preview", context)
+
+
 @require_POST
 @exam_view(examiner_only=True)
 def edit_exam(request: HtmxRequest, member: Member) -> HttpResponse:
-    form = ExamSettingsForm(request.POST, exam=member.exam)
+    form = ExamSettingsForm(request.POST)
     if not form.is_valid():
         return settings_page(request, member, exam_form=form)
     services.edit_exam(member.exam, **form.cleaned_data)
     messages.success(request, "Saved the exam.")
+    return redirect("examiner:settings", member.exam.pk)
+
+
+@require_POST
+@exam_view(examiner_only=True)
+def edit_venues_and_questions(request: HtmxRequest, member: Member) -> HttpResponse:
+    form = VenuesAndQuestionsForm(request.POST, exam=member.exam)
+    if not form.is_valid():
+        return settings_page(request, member, venues_and_questions_form=form)
+    services.edit_venues_and_questions(member.exam, **form.cleaned_data)
+    messages.success(request, "Saved the venues and questions.")
     return redirect("examiner:settings", member.exam.pk)
 
 

@@ -13,7 +13,7 @@ from django.utils import timezone
 from timezone_field import TimeZoneField
 
 from .fields import EncryptedTextField
-from .labels import parse_question_numbers
+from .labels import parse_question_numbers, parse_seats
 
 
 def new_token() -> str:
@@ -28,6 +28,13 @@ class Role(models.TextChoices):
 def validate_question_numbers(value: str) -> None:
     try:
         parse_question_numbers(value)
+    except ValueError as error:
+        raise ValidationError(str(error)) from error
+
+
+def validate_seat_numbers(value: str) -> None:
+    try:
+        parse_seats(value)
     except ValueError as error:
         raise ValidationError(str(error)) from error
 
@@ -51,6 +58,11 @@ class Exam(models.Model):
     question_numbers_locked = models.BooleanField(default=False)
     venues: models.JSONField[list[str], list[str]] = models.JSONField(default=list, blank=True)
     venues_locked = models.BooleanField(default=False)
+    # Ranges by venue, as typed: `{"HALL1": "1-200", "HALL2": "A1-A30"}`
+    seat_numbers: models.JSONField[dict[str, str], dict[str, str]] = models.JSONField(
+        default=dict, blank=True
+    )
+    seat_numbers_locked = models.BooleanField(default=False)
     version = models.PositiveBigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -66,6 +78,10 @@ class Exam(models.Model):
     def only_venue(self) -> str | None:
         """The venue, if the exam lists only one."""
         return self.venues[0] if len(self.venues) == 1 else None
+
+    def venue_seats(self, venue: str) -> list[str]:
+        """The seats listed for `venue`."""
+        return parse_seats(self.seat_numbers.get(venue, ""))
 
     @staticmethod
     def token_field(role: Role) -> str:

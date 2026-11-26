@@ -20,15 +20,7 @@ def utc_time(hour: int, minute: int) -> datetime:
 
 
 def test_one_row_per_clarification_by_question(examiner: Client, exam: Exam) -> None:
-    services.edit_exam(
-        exam,
-        name=exam.name,
-        time_zone=ZoneInfo("Asia/Singapore"),
-        question_numbers="",
-        question_numbers_locked=False,
-        venues=[],
-        venues_locked=False,
-    )
+    services.edit_exam(exam, name=exam.name, time_zone=ZoneInfo("Asia/Singapore"))
     prof, ann = member(examiner, exam), named(exam, "Ann")
     answered_report = report(exam, label="Q3b", text="Is x an integer?")
     report(exam, clarification=answered_report.clarification, venue="HALL2", seat="3")

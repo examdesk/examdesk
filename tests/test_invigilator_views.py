@@ -29,6 +29,7 @@ from tests.helpers import (
     report,
     seat_page,
     set_question_numbers,
+    set_seat_numbers,
     set_venues,
     url,
     with_venue,
@@ -216,6 +217,82 @@ def test_unlocked_question_numbers_are_suggestions(invigilator: Client, exam: Ex
     assert re.search(r'<input[^>]*name="label"[^>]*list="labels"', html)
     data = {"client_key": uuid.uuid4(), "venue": "HALL1", "seat": "21", "label": "8", "text": "?"}
     assert invigilator.post(url("invigilator:report", exam), data).status_code == 302
+
+
+def test_locked_seats_are_picked_from_the_venues_list(invigilator: Client, exam: Exam) -> None:
+    set_venues(exam, ["HALL1", "HALL2"], locked=False)
+    set_seat_numbers(exam, {"HALL1": "1-3", "HALL2": "A1-2"}, locked=True)
+    page = url("invigilator:report", exam)
+    with_venue(invigilator, exam, "HALL1")
+    html = invigilator.get(page).content.decode()
+    assert re.search(r'<select name="seat"[^>]*placeholder="e.g. 14" inputmode="numeric"', html)
+    assert re.findall(r'<option value="(\w+)">\1</option>', html) == ["1", "2", "3"]
+    data = {"client_key": uuid.uuid4(), "venue": "HALL1", "seat": "4", "label": "2", "text": "?"}
+    assert "Pick a seat from the list." in invigilator.post(page, data).content.decode()
+    assert invigilator.post(page, data | {"seat": "3"}).status_code == 302
+    with_venue(invigilator, exam, "HALL2")
+    html = invigilator.get(page).content.decode()
+    assert re.findall(r'<option value="(\w+)">\1</option>', html) == ["A1", "A2"]
+    assert "inputmode" not in html
+    with_venue(invigilator, exam, "GYM")
+    html = invigilator.get(page).content.decode()
+    assert re.search(r'<input[^>]*name="seat"[^>]*list="seats"', html)
+    assert invigilator.post(page, data | {"venue": "GYM", "seat": "99"}).status_code == 302
+
+
+def test_unlocked_seats_are_suggestions(invigilator: Client, exam: Exam) -> None:
+    report(exam, venue="HALL2", seat="9")
+    set_venues(exam, ["HALL1", "HALL2"], locked=False)
+    set_seat_numbers(exam, {"HALL1": "1-2", "HALL2": "5"}, locked=False)
+    with_venue(invigilator, exam, "HALL1")
+    page = url("invigilator:report", exam)
+    html = invigilator.get(page).content.decode()
+    assert '<datalist id="seats"><option value="1"><option value="2"><option value="9">' in html
+    assert re.search(r'<input[^>]*name="seat"[^>]*list="seats"', html)
+    data = {"client_key": uuid.uuid4(), "venue": "HALL1", "seat": "99", "label": "2", "text": "?"}
+    assert invigilator.post(page, data).status_code == 302
+    with_venue(invigilator, exam, "")  # no venue: reported seats only
+    html = invigilator.get(page).content.decode()
+    assert '<datalist id="seats"><option value="9"><option value="99"></datalist>' in html
+
+
+def test_a_seat_typed_before_the_lock_reloads(invigilator: Client, exam: Exam) -> None:
+    set_venues(exam, ["HALL1"], locked=False)
+    set_seat_numbers(exam, {"HALL1": "1-20"}, locked=True)
+    with_venue(invigilator, exam, "HALL1")
+    page = url("invigilator:report", exam)
+    response = invigilator.get(page + "?venue=HALL1&seat=99&label=2", headers=HTMX)
+    assert response["HX-Redirect"] == page + "?venue=HALL1"
+    html = invigilator.get(response["HX-Redirect"]).content.decode()
+    assert "Pick the seat from the examiners&#x27; list." in html
+    assert re.search(r'<select name="seat"[^>]*autofocus', html)
+    set_question_numbers(exam, "1-2", locked=True)
+    response = invigilator.get(page + "?venue=HALL1&seat=99&label=7", headers=HTMX)
+    html = invigilator.get(response["HX-Redirect"]).content.decode()
+    assert "Pick the seat and question from the examiners&#x27; list." in html
+    response = invigilator.get(page + "?venue=HALL1&seat=12&label=2", headers=HTMX)
+    assert "HX-Redirect" not in response
+
+
+def test_a_venue_picked_in_the_form_lists_its_seats(invigilator: Client, exam: Exam) -> None:
+    set_venues(exam, ["HALL1", "HALL2"], locked=True)
+    set_seat_numbers(exam, {"HALL1": "1-30", "HALL2": "1-5"}, locked=True)
+    with_venue(invigilator, exam, "")
+    page = url("invigilator:report", exam)
+    html = invigilator.get(page).content.decode()
+    assert 'hx-select="#report-seat"' in html
+    assert re.search(r'<input[^>]*name="seat"[^>]*list="seats"', html)  # no venue yet
+    html = invigilator.get(page + "?venue=HALL2&seat=").content.decode()
+    assert re.findall(r'<option value="(\d+)">\1</option>', html) == ["1", "2", "3", "4", "5"]
+    assert (
+        '<option value="3" selected>'
+        in invigilator.get(page + "?venue=HALL2&seat=3").content.decode()
+    )
+    html = invigilator.get(page + "?venue=HALL2&seat=12").content.decode()
+    assert "selected>12" not in html
+    assert "Pick a seat" not in html
+    response = invigilator.get(page + "?venue=HALL2&seat=12&label=2", headers=HTMX)
+    assert "HX-Redirect" not in response  # the seat field shows HALL2's seats instead
 
 
 def test_match_list_marks_what_the_seat_already_asked(invigilator: Client, exam: Exam) -> None:

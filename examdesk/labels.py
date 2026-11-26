@@ -1,6 +1,7 @@
 """Normalizing and ordering free text: question labels, places and names."""
 
 import re
+from collections.abc import Callable
 from typing import Any
 
 GENERAL = "General"
@@ -20,26 +21,33 @@ def normalize_label(raw: str) -> str:
 
 _MAX_QUESTIONS_PER_RANGE = 200
 _RANGE = re.compile(r"(.+?)\s*[-\N{EN DASH}]\s*(.+)")
-_RANGE_BOUND = re.compile(r"Q(?P<number>\d+)(?P<part>[a-z]?)")
+_QUESTION_RANGE_BOUND = re.compile(r"Q(?P<number>\d+)(?P<part>[a-z]?)")
+
+
+def _parse_ranges(
+    text: str, parse_value: Callable[[str], str], expand_range: Callable[[str, str], list[str]]
+) -> list[str]:
+    """Comma-separated values and ranges, in natural order."""
+    values: set[str] = set()
+    for entry in filter(None, (entry.strip() for entry in text.split(","))):
+        if match := _RANGE.fullmatch(entry):
+            values.update(expand_range(match[1], match[2]))
+        else:
+            values.add(parse_value(entry))
+    return sorted(values, key=natural)
 
 
 def parse_question_numbers(text: str) -> list[str]:
     """`1-3, 4a-c` -> `Q1`, `Q2`, `Q3`, `Q4a`, `Q4b`, `Q4c`, in natural order."""
-    labels: set[str] = set()
-    for item in filter(None, (item.strip() for item in text.split(","))):
-        if match := _RANGE.fullmatch(item):
-            labels.update(_expand_range(match[1], match[2]))
-        else:
-            labels.add(normalize_label(item))
-    return sorted(labels, key=natural)
+    return _parse_ranges(text, normalize_label, _expand_question_range)
 
 
-def _expand_range(first: str, last: str) -> list[str]:
+def _expand_question_range(first: str, last: str) -> list[str]:
     """`1`, `40` -> `Q1` to `Q40`; `3a`, `d` or `3a`, `3d` -> `Q3a` to `Q3d`."""
-    first_bound = _RANGE_BOUND.fullmatch(normalize_label(first))
+    first_bound = _QUESTION_RANGE_BOUND.fullmatch(normalize_label(first))
     if first_bound and last.isalpha():
         last = first_bound["number"] + last
-    last_bound = _RANGE_BOUND.fullmatch(normalize_label(last))
+    last_bound = _QUESTION_RANGE_BOUND.fullmatch(normalize_label(last))
     not_a_range = ValueError(f"Not a range: {first}-{last}. Use e.g. 1-40 or 3a-d.")
     if not (first_bound and last_bound):
         raise not_a_range
@@ -58,6 +66,40 @@ def _expand_range(first: str, last: str) -> list[str]:
         if codepoints := range(ord(first_part), ord(last_part) + 1):
             return [f"Q{first_number}{chr(codepoint)}" for codepoint in codepoints]
     raise not_a_range
+
+
+_MAX_SEAT_LENGTH = 30
+_MAX_SEATS_PER_RANGE = 1000
+_SEAT_RANGE_BOUND = re.compile(r"(?P<row>[A-Z]*)(?P<number>\d+)")
+
+
+def parse_seats(text: str) -> list[str]:
+    """`1-3, a1-2` -> `1`, `2`, `3`, `A1`, `A2`."""
+    return _parse_ranges(text, _parse_seat, _expand_seat_range)
+
+
+def _parse_seat(raw: str) -> str:
+    seat = normalize_place(raw)
+    if len(seat) > _MAX_SEAT_LENGTH:
+        raise ValueError(f"Too long: {seat}. Use up to {_MAX_SEAT_LENGTH} characters.")
+    return seat
+
+
+def _expand_seat_range(first: str, last: str) -> list[str]:
+    """`1`, `200` -> `1` to `200`; `A1`, `30` or `A1`, `A30` -> `A1` to `A30`."""
+    first_bound = _SEAT_RANGE_BOUND.fullmatch(_parse_seat(first))
+    if first_bound and last.isdigit():
+        last = first_bound["row"] + last
+    last_bound = _SEAT_RANGE_BOUND.fullmatch(_parse_seat(last))
+    if first_bound and last_bound and first_bound["row"] == last_bound["row"]:
+        numbers = range(int(first_bound["number"]), int(last_bound["number"]) + 1)
+        if len(numbers) > _MAX_SEATS_PER_RANGE:
+            raise ValueError(
+                f"Too many seats in {first}-{last}. Use up to {_MAX_SEATS_PER_RANGE} per range."
+            )
+        if numbers:
+            return [f"{first_bound['row']}{number}" for number in numbers]
+    raise ValueError(f"Not a range: {first}-{last}. Use e.g. 1-200 or A1-A30.")
 
 
 _PART = r"(?:\s?\([a-h]\)|[a-h])"

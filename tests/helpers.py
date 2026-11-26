@@ -33,26 +33,38 @@ def report(exam: Exam, **kwargs: Any) -> Report:
 
 
 def set_question_numbers(exam: Exam, numbers: str, *, locked: bool) -> None:
-    services.edit_exam(
+    services.edit_venues_and_questions(
         exam,
-        name=exam.name,
-        time_zone=exam.time_zone,
         question_numbers=numbers,
         question_numbers_locked=locked,
         venues=exam.venues,
         venues_locked=exam.venues_locked,
+        seat_numbers=exam.seat_numbers,
+        seat_numbers_locked=exam.seat_numbers_locked,
     )
 
 
 def set_venues(exam: Exam, venues: list[str], *, locked: bool) -> None:
-    services.edit_exam(
+    services.edit_venues_and_questions(
         exam,
-        name=exam.name,
-        time_zone=exam.time_zone,
         question_numbers=exam.question_numbers,
         question_numbers_locked=exam.question_numbers_locked,
         venues=venues,
         venues_locked=locked,
+        seat_numbers=exam.seat_numbers,
+        seat_numbers_locked=exam.seat_numbers_locked,
+    )
+
+
+def set_seat_numbers(exam: Exam, seat_numbers: dict[str, str], *, locked: bool) -> None:
+    services.edit_venues_and_questions(
+        exam,
+        question_numbers=exam.question_numbers,
+        question_numbers_locked=exam.question_numbers_locked,
+        venues=exam.venues,
+        venues_locked=exam.venues_locked,
+        seat_numbers=seat_numbers,
+        seat_numbers_locked=locked,
     )
 
 

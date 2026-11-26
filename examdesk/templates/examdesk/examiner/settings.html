@@ -13,14 +13,51 @@
   <form method="post" action="{% url 'examiner:edit_exam' pk %}" id="exam-form">
     {% csrf_token %}
     <div class="field">{{ exam_form.name.as_field_group }}</div>
-    <div class="field">{{ exam_form.time_zone.as_field_group }}</div>
-    <div class="field mb-0">{{ exam_form.venues.as_field_group }}</div>
+    <div class="field mb-0">{{ exam_form.time_zone.as_field_group }}</div>
+  </form>
+  <p class="meta mt-3">Created {{ exam.created_at|date:"j M Y, H:i" }}</p>
+  <footer class="card-footer justify-between">
+    {% if exam.is_live %}
+      <button type="button" class="btn btn-danger btn-sm" commandfor="close-dialog" command="show-modal"><c-icon name="lock" />Close exam</button>
+    {% else %}
+      <form method="post" action="{% url 'examiner:reopen_exam' pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary btn-sm"><c-icon name="lock-open" />Reopen exam</button>
+      </form>
+    {% endif %}
+    <button class="btn btn-primary btn-sm" form="exam-form"><c-icon name="check" />Save</button>
+  </footer>
+</section>
+<section class="card-box" aria-labelledby="venues-and-questions-title">
+  <header class="card-header"><h2 id="venues-and-questions-title">Venues and questions</h2></header>
+  <form method="post" action="{% url 'examiner:edit_venues_and_questions' pk %}" id="venues-and-questions-form">
+    {% csrf_token %}
+    <div class="field mb-0">{{ venues_and_questions_form.venues.as_field_group }}</div>
     {# Shown once there are venues to lock, or one is being typed. #}
-    <label class="mt-3 flex w-fit items-center gap-2 text-sm [.field:not(:has(option:checked)):has(input:placeholder-shown)+&]:hidden">{{ exam_form.venues_locked }}{{ exam_form.venues_locked.label }}</label>
+    <label class="mt-3 flex w-fit items-center gap-2 text-sm [.field:not(:has(option:checked)):has(input:placeholder-shown)+&]:hidden">{{ venues_and_questions_form.venues_locked }}{{ venues_and_questions_form.venues_locked.label }}</label>
+    <div id="seat-numbers-fields">
+    {% if seat_numbers_by_venue %}
+      <fieldset class="mt-4">
+        <legend class="mb-1.5 text-sm font-medium">Seat numbers</legend>
+        {# A refresh keeps the previews of unsaved text; a refused Save shows its errors. #}
+        <div class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2">
+          {% for field, preview in seat_numbers_by_venue %}
+            <label for="{{ field.id_for_label }}" class="flex h-10 max-w-28 items-center text-sm"><span class="truncate">{{ field.label }}</span></label>
+            <div class="flex flex-col gap-1">
+              {{ field }}
+              <div id="seat-numbers-preview-{{ forloop.counter0 }}" class="empty:hidden"{% if not venues_and_questions_form.is_bound %} hx-morph-skip-children{% endif %} hx-get="{% url 'examiner:preview_seat_numbers' pk %}" hx-include="previous input" hx-trigger="input delay:300ms from:previous input" hx-sync="this:replace" aria-live="polite">{% with seat_count=preview.seat_count seat_numbers_error=preview.seat_numbers_error %}{% partial seat_numbers_preview %}{% endwith %}</div>
+            </div>
+          {% endfor %}
+        </div>
+      </fieldset>
+    {% endif %}
+    </div>
+    {# Shown once there are seat numbers to lock. #}
+    <label class="mt-3 flex w-fit items-center gap-2 text-sm [#seat-numbers-fields:not(:has([placeholder]:not(:placeholder-shown)))+&]:hidden">{{ venues_and_questions_form.seat_numbers_locked }}{{ venues_and_questions_form.seat_numbers_locked.label }}</label>
     <div class="field mt-4 mb-0">
-      {{ exam_form.question_numbers.label_tag }}{{ exam_form.question_numbers }}
-      {# A refresh keeps the preview of the unsaved text. #}
-      <div id="question-numbers-preview" hx-morph-skip-children hx-get="{% url 'examiner:preview_question_numbers' pk %}" hx-include="#id_question_numbers" hx-trigger="input delay:300ms from:#id_question_numbers" hx-sync="this:replace" aria-live="polite">
+      {{ venues_and_questions_form.question_numbers.label_tag }}{{ venues_and_questions_form.question_numbers }}
+      {# A refresh keeps the preview of the unsaved text; a refused Save shows its error. #}
+      <div id="question-numbers-preview"{% if not venues_and_questions_form.is_bound %} hx-morph-skip-children{% endif %} hx-get="{% url 'examiner:preview_question_numbers' pk %}" hx-include="#id_question_numbers" hx-trigger="input delay:300ms from:#id_question_numbers" hx-sync="this:replace" aria-live="polite">
       {% partialdef question_numbers_preview inline %}
         {% if question_numbers_error %}
           <p class="errorlist">{{ question_numbers_error }}</p>
@@ -38,19 +75,10 @@
       </div>
     </div>
     {# Shown once there are question numbers to lock. #}
-    <label class="mt-3 flex w-fit items-center gap-2 text-sm [.field:has(input:placeholder-shown)+&]:hidden">{{ exam_form.question_numbers_locked }}{{ exam_form.question_numbers_locked.label }}</label>
+    <label class="mt-3 flex w-fit items-center gap-2 text-sm [.field:has(input:placeholder-shown)+&]:hidden">{{ venues_and_questions_form.question_numbers_locked }}{{ venues_and_questions_form.question_numbers_locked.label }}</label>
   </form>
-  <p class="meta mt-3">Created {{ exam.created_at|date:"j M Y, H:i" }}</p>
-  <footer class="card-footer justify-between">
-    {% if exam.is_live %}
-      <button type="button" class="btn btn-danger btn-sm" commandfor="close-dialog" command="show-modal"><c-icon name="lock" />Close exam</button>
-    {% else %}
-      <form method="post" action="{% url 'examiner:reopen_exam' pk %}">
-        {% csrf_token %}
-        <button class="btn btn-primary btn-sm"><c-icon name="lock-open" />Reopen exam</button>
-      </form>
-    {% endif %}
-    <button class="btn btn-primary btn-sm" form="exam-form"><c-icon name="check" />Save</button>
+  <footer class="card-footer">
+    <button class="btn btn-primary btn-sm" form="venues-and-questions-form"><c-icon name="check" />Save</button>
   </footer>
 </section>
 <section class="card-box flex flex-wrap items-center justify-between gap-4" aria-labelledby="export-title">
@@ -151,3 +179,5 @@
 </c-live>
 {% endwith %}
 {% endblock %}
+
+{% partialdef seat_numbers_preview %}{% if seat_numbers_error %}<p class="errorlist">{{ seat_numbers_error }}</p>{% elif seat_count %}<p class="meta">{{ seat_count }} seat{{ seat_count|pluralize }}</p>{% endif %}{% endpartialdef %}

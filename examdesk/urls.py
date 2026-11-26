@@ -75,10 +75,16 @@ examiner_patterns: list[URLPattern | URLResolver] = [
     path("settings/", examiner.exam_settings, name="settings"),
     path("edit/", examiner.edit_exam, name="edit_exam"),
     path(
+        "venues-and-questions/",
+        examiner.edit_venues_and_questions,
+        name="edit_venues_and_questions",
+    ),
+    path(
         "question-numbers/preview/",
         examiner.preview_question_numbers,
         name="preview_question_numbers",
     ),
+    path("seat-numbers/preview/", examiner.preview_seat_numbers, name="preview_seat_numbers"),
     path("ai-service/connect/", examiner.connect_ai_service, name="connect_ai_service"),
     path("ai-service/disconnect/", examiner.disconnect_ai_service, name="disconnect_ai_service"),
     path("ai-service/models/", examiner.choose_ai_models, name="choose_ai_models"),
