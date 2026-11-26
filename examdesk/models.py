@@ -47,6 +47,8 @@ class Exam(models.Model):
         max_length=500, blank=True, validators=[validate_question_numbers]
     )
     question_numbers_locked = models.BooleanField(default=False)
+    venues: models.JSONField[list[str], list[str]] = models.JSONField(default=list, blank=True)
+    venues_locked = models.BooleanField(default=False)
     version = models.PositiveBigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -57,6 +59,11 @@ class Exam(models.Model):
     def question_labels(self) -> list[str]:
         """The question numbers as labels, e.g. `Q1`, `Q3b`."""
         return parse_question_numbers(self.question_numbers)
+
+    @property
+    def only_venue(self) -> str | None:
+        """The venue, if the exam lists only one."""
+        return self.venues[0] if len(self.venues) == 1 else None
 
     @property
     def has_ai_service(self) -> bool:

@@ -70,11 +70,11 @@ def invigilator_page(
         services.release_seat(member)
     ask_venue = member.venue is None and not is_refresh(request)
     if ask_venue:
-        services.set_venue(member, "")
+        services.set_venue(member, exam.only_venue or "")
     context |= {
         "tab": tab or page,
         "invigilator_screen": True,
-        "ask_venue": ask_venue,
+        "ask_venue": ask_venue and not exam.only_venue,
         **suggestions(exam),
     }
     template = f"examdesk/invigilator/{page}.html"
@@ -369,20 +369,36 @@ def announcements(request: HtmxRequest, member: Member) -> HttpResponse:
         )
         for announcement in page_obj
     ]
-    context = {"items": items, "page_obj": page_obj}
+    context = {
+        "items": items,
+        "page_obj": page_obj,
+        "venue_form": VenueForm(exam=member.exam, auto_id=False),
+    }
     return invigilator_page(request, member, "announcements", context)
 
 
 @require_POST
 @exam_view(live_only=True)
 def choose_venue(request: HtmxRequest, member: Member) -> HttpResponse:
-    """Set "My venue": typed, picked from the known venues (`pick`), or none (`all`)."""
-    form = VenueForm({"venue": request.POST.get("pick") or request.POST.get("venue", "")})
+    """Set "My venue": typed, picked from the known venues (`pick`), or none (`all`).
+
+    A single locked venue can't be changed. With several locked, an unlisted venue (typed on a
+    page opened before the lock) is refused and the next page asks again."""
+    exam = member.exam
+    back = reverse("invigilator:report", args=[exam.pk])
+    if exam.venues_locked and exam.only_venue:
+        return redirect_next(request, back)
+    form = VenueForm(
+        {"venue": request.POST.get("pick") or request.POST.get("venue", "")}, exam=exam
+    )
     if "all" in request.POST:
         services.set_venue(member, "")
     elif form.is_valid():
         services.set_venue(member, form.cleaned_data["venue"])
-    return redirect_next(request, reverse("invigilator:report", args=[member.exam.pk]))
+    elif exam.venues_locked:
+        services.set_venue(member, None)
+        messages.info(request, "Pick your venue from the examiners' list.")
+    return redirect_next(request, back)
 
 
 @require_POST
@@ -390,7 +406,7 @@ def choose_venue(request: HtmxRequest, member: Member) -> HttpResponse:
 def mark_read_out(request: HtmxRequest, member: Member, announcement_id: int) -> HttpResponse:
     """A member without a venue posts one, which then becomes theirs."""
     announcement = get_object_or_404(Announcement, pk=announcement_id, exam=member.exam)
-    form = VenueForm(request.POST)
+    form = VenueForm(request.POST, exam=member.exam)
     venue = member.venue or (form.cleaned_data["venue"] if form.is_valid() else "")
     back = reverse("invigilator:announcements", args=[member.exam.pk])
     if not venue:

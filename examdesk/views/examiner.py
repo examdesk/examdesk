@@ -780,7 +780,7 @@ def settings_page(
     models_form = models_form or AIModelsForm(exam=exam)
     file_form = file_form or ExamFileForm()
     exam_form = exam_form or ExamSettingsForm(
-        initial=model_to_dict(exam, fields=ExamSettingsForm.base_fields)
+        initial=model_to_dict(exam, fields=ExamSettingsForm.base_fields), exam=exam
     )
     context = {
         "delete_form": delete_form,
@@ -818,7 +818,7 @@ def preview_question_numbers(request: HtmxRequest, member: Member) -> HttpRespon
 @require_POST
 @exam_view(examiner_only=True)
 def edit_exam(request: HtmxRequest, member: Member) -> HttpResponse:
-    form = ExamSettingsForm(request.POST)
+    form = ExamSettingsForm(request.POST, exam=member.exam)
     if not form.is_valid():
         return settings_page(request, member, exam_form=form)
     services.edit_exam(member.exam, **form.cleaned_data)

@@ -76,11 +76,18 @@ document.addEventListener("htmx:before:swap", (event) => {
   }
 });
 // Swapped-in live parts leave focus where it is, and Tom Select is rebuilt in them (a morph would
-// strip its markup; htmx.onLoad below rebuilds it).
+// strip its markup; htmx.onLoad below rebuilds it). A refresh keeps values not yet saved.
+const unsavedValues = new Map(); // field id → Tom Select value
 document.addEventListener("htmx:before:swap", (event) => {
+  const isRefresh = event.detail.ctx.sourceElement?.id === "refresh";
+  unsavedValues.clear();
   for (const task of event.detail.tasks) {
     if (task.swapSpec.style === "none") continue;
-    task.target.querySelectorAll(".tomselected").forEach((field) => field.tomselect.destroy());
+    task.target.querySelectorAll(".tomselected").forEach((field) => {
+      const { tomselect } = field;
+      if (isRefresh && field.id && String(tomselect.items) !== tomselect.savedValue) unsavedValues.set(field.id, [...tomselect.items]);
+      tomselect.destroy();
+    });
     if (task.type === "oob") task.fragment.querySelectorAll("[autofocus]").forEach((field) => field.removeAttribute("autofocus"));
   }
 });
@@ -552,8 +559,16 @@ const draftAnswer = async (button) => {
     answer.focus();
   }
 };
+// Places as the server writes them: `hall 1` → `HALL1`.
+const normalizePlace = (text) => text.replace(/\s+/g, "").toUpperCase();
+// Text still typed when a click elsewhere takes the focus becomes an item after that click. Added
+// earlier, the item could wrap the field and move the button under the pointer.
+let pointerIsDown = false;
+document.addEventListener("pointerdown", () => (pointerIsDown = true), true);
+document.addEventListener("pointerup", () => (pointerIsDown = false), true);
 // Tom Select for selects and datalist inputs. In a form[data-autosubmit], a multi-select
-// submits when its menu closes rather than on every pick.
+// submits when its menu closes rather than on every pick. A multi-select with
+// [data-create-places] also takes typed places, added on Enter or a comma.
 const enhance = (field) => {
   const multi = field.multiple;
   const autosubmit = field.form?.hasAttribute("data-autosubmit");
@@ -599,7 +614,30 @@ const enhance = (field) => {
       options: [...new Set([...field.list.options].map((option) => option.value).concat(field.value || []))].map((value) => ({ value, text: value })),
     });
   }
+  if (field.hasAttribute("data-create-places")) {
+    Object.assign(settings, {
+      create(input, callback) {
+        const item = { value: normalizePlace(input), text: normalizePlace(input) };
+        if (this.isFocused || !pointerIsDown) return item;
+        const listeners = new AbortController();
+        const addItem = () => {
+          listeners.abort();
+          callback(item);
+        };
+        document.addEventListener("click", addItem, { capture: true, signal: listeners.signal });
+        document.addEventListener("pointercancel", addItem, { capture: true, signal: listeners.signal });
+      },
+      createOnBlur: true,
+      render: { option_create: (data, escape) => `<div class="create">Add <strong>${escape(normalizePlace(data.input))}</strong></div>`, no_results: null },
+    });
+  }
   const tom = new TomSelect(field, settings);
+  tom.savedValue = String(tom.items);
+  const unsavedValue = unsavedValues.get(field.id);
+  if (unsavedValue) {
+    if (settings.create) tom.addOption(unsavedValue.map((item) => ({ value: item, text: item })));
+    tom.setValue(unsavedValue, true);
+  }
   // The search box has taken over the label and focus.
   field.setAttribute("aria-hidden", "true");
   field.removeAttribute("aria-label");

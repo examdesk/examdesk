@@ -17,6 +17,9 @@ Invigilators have four tabs:
   other invigilators who has it.
 - **Announcements**: messages to read out in their venue.
 
+Settings can list the exam's venues, as suggestions or as the only ones allowed. With only one
+venue listed, invigilators start in it. Locking it keeps them there.
+
 Examiners answer clarifications, merge duplicates and move seats between them. Announcing a
 clarification sends its answer to every venue to read out. A corrected answer goes back to the
 seats that had the old one. Settings can list the exam's question numbers, as suggestions or as

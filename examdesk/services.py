@@ -216,7 +216,7 @@ def promote(member: Member, role: Role) -> None:
         member.save(update_fields=["role"])
 
 
-def set_venue(member: Member, venue: str) -> None:
+def set_venue(member: Member, venue: str | None) -> None:
     member.venue = venue
     member.save(update_fields=["venue"])
 
@@ -321,6 +321,7 @@ def set_live(exam: Exam, *, live: bool) -> None:
     exam.is_live = live
 
 
+@transaction.atomic
 def edit_exam(
     exam: Exam,
     *,
@@ -328,16 +329,29 @@ def edit_exam(
     time_zone: ZoneInfo,
     question_numbers: str,
     question_numbers_locked: bool,
+    venues: list[str],
+    venues_locked: bool,
 ) -> None:
+    """Locking the venues asks members in an unlisted venue to pick again. Locking one venue moves
+    everyone who has picked into it."""
     exam.name, exam.time_zone = name, time_zone
     exam.question_numbers, exam.question_numbers_locked = question_numbers, question_numbers_locked
+    exam.venues, exam.venues_locked = venues, venues_locked
     Exam.objects.filter(pk=exam.pk).update(
         name=name,
         time_zone=time_zone,
         question_numbers=question_numbers,
         question_numbers_locked=question_numbers_locked,
+        venues=venues,
+        venues_locked=venues_locked,
         version=F("version") + 1,
     )
+    if venues_locked:
+        members_who_picked = exam.members.exclude(venue=None)
+        if exam.only_venue:
+            members_who_picked.update(venue=exam.only_venue)
+        else:
+            members_who_picked.exclude(venue__in=["", *venues]).update(venue=None)
 
 
 def connect_ai_service(exam: Exam, *, base_url: str, api_key: str, models: list[str]) -> None:

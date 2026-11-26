@@ -26,6 +26,8 @@ def test_one_row_per_clarification_by_question(examiner: Client, exam: Exam) -> 
         time_zone=ZoneInfo("Asia/Singapore"),
         question_numbers="",
         question_numbers_locked=False,
+        venues=[],
+        venues_locked=False,
     )
     prof, ann = member(examiner, exam), named(exam, "Ann")
     answered_report = report(exam, label="Q3b", text="Is x an integer?")

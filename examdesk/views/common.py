@@ -76,13 +76,22 @@ def get_clarification(exam: Exam, clarification_id: int) -> Clarification:
     return get_object_or_404(clarifications, pk=clarification_id)
 
 
+def known_venues(exam: Exam) -> list[str]:
+    """The exam's venues; when not locked, also those that reports came from."""
+    if exam.venues_locked:
+        return exam.venues
+    report_venues = Report.objects.of_exam(exam).values_list("venue", flat=True)
+    return sorted({*exam.venues, *report_venues}, key=natural)
+
+
 def suggestions(exam: Exam) -> dict[str, Any]:
-    """The datalists' options. `labels` is lazy, as refreshes don't render the datalists."""
+    """The datalists' options. `labels` and `venues` are lazy, as refreshes don't render the
+    datalists."""
     reports = Report.objects.of_exam(exam)
     labels = exam.clarifications.exclude(label="").values_list("label", flat=True)
     return {
         "labels": lambda: sorted({*labels, *exam.question_labels}, key=natural),
-        "venues": reports.values_list("venue", flat=True).distinct().order_by("venue"),
+        "venues": lambda: known_venues(exam),
         "seats": reports.values_list("seat", flat=True).distinct().order_by("seat"),
     }
 
@@ -111,6 +120,5 @@ def readout_status(exam: Exam) -> list[tuple[Announcement, list[str]]]:
     """Each announcement with the known venues it has not been read out in yet."""
     readouts = Prefetch("readouts", Readout.objects.select_related("member"))
     announcements = list(exam.announcements.select_related("member").prefetch_related(readouts))
-    venues = set(Report.objects.of_exam(exam).values_list("venue", flat=True))
-    venues |= {r.venue for a in announcements for r in a.readouts.all()}
+    venues = {*known_venues(exam), *(r.venue for a in announcements for r in a.readouts.all())}
     return [(a, sorted(venues - {r.venue for r in a.readouts.all()})) for a in announcements]

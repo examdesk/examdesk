@@ -6,7 +6,7 @@
     <div class="modal-body mt-3 flex flex-col gap-3">{{ slot }}</div>
     <div class="modal-action">
       <button type="button" class="btn btn-outline" commandfor="{{ id }}" command="close">Cancel</button>
-      <button class="btn {% if danger %}btn-error{% else %}btn-primary{% endif %}">{{ submit }}</button>
+      {% if submit %}<button class="btn {% if danger %}btn-error{% else %}btn-primary{% endif %}">{{ submit }}</button>{% endif %}
     </div>
   </form>
   <form method="dialog" class="modal-backdrop"><button>Close</button></form>

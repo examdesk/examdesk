@@ -1,8 +1,12 @@
 {% extends "examdesk/base.html" %}
 {% block appbar %}
   {% if member.is_examiner %}<a href="{% url 'examiner:clarifications' member.exam.pk %}" class="btn btn-ghost btn-sm max-sm:hidden">Examiner view</a>{% endif %}
+  {% if member.exam.venues_locked and member.exam.only_venue %}
+  <span class="inline-flex min-w-0 items-center gap-1 text-sm font-semibold whitespace-nowrap max-sm:max-w-40"><c-icon name="map-pin" class="size-4 shrink-0 text-subtle" /><span class="sr-only">Venue: </span><span class="truncate">{{ member.exam.only_venue }}</span></span>
+  {% else %}
   <button type="button" class="venue-picker-button" commandfor="venue-dialog" command="show-modal" title="Change my venue"
           aria-label="Venue: {{ member.venue|default:'All venues' }}"><c-icon name="map-pin" /><span class="truncate">{{ member.venue|default:"All venues" }}</span><c-icon name="chevron-down" class="size-3.5" /></button>
+  {% endif %}
 {% endblock %}
 {% block nav %}{% endblock %}
 {% block main_class %}pb-32{% endblock %}
@@ -63,15 +67,18 @@
 {% endwith %}
 
 <c-live id="venue-picker">
-<c-dialog id="venue-dialog" title="Which venue are you in?" action="{% url 'invigilator:choose_venue' member.exam.pk %}" submit="Save" :autoopen="ask_venue">
+{% if not member.exam.venues_locked or not member.exam.only_venue %}
+<c-dialog id="venue-dialog" title="Which venue are you in?" action="{% url 'invigilator:choose_venue' member.exam.pk %}" submit="{% if not member.exam.venues_locked %}Save{% endif %}" :autoopen="ask_venue">
   <input type="hidden" name="next" value="{{ request.path }}">
   {% if venues %}
     <div class="flex flex-wrap gap-2">
       {% for venue in venues %}<button class="btn btn-outline" form="venue-pick" name="pick" value="{{ venue }}"{% if venue == member.venue %} aria-pressed="true"{% endif %}>{{ venue }}</button>{% endfor %}
     </div>
   {% endif %}
+  {% if not member.exam.venues_locked %}
   <input name="venue" value="{{ member.venue|default:"" }}" list="venues" aria-label="My venue" placeholder="{% if venues %}Another venue, e.g. HALL1{% else %}e.g. HALL1{% endif %}"
          autocapitalize="characters" autocomplete="off">
+  {% endif %}
   <div><button class="link-button text-sm" form="venue-pick" name="all" value="1">I move between venues</button></div>
 </c-dialog>
 {# Separate form for the quick picks, so Enter in the text field submits the dialog. #}
@@ -79,5 +86,6 @@
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ request.path }}">
 </form>
+{% endif %}
 </c-live>
 {% endblock %}

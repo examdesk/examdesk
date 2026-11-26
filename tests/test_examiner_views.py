@@ -26,6 +26,7 @@ from tests.helpers import (
     open_link,
     report,
     set_question_numbers,
+    set_venues,
     url,
 )
 
@@ -757,6 +758,8 @@ def test_times_show_in_the_exam_time_zone(examiner: Client, exam: Exam) -> None:
         time_zone=ZoneInfo("Asia/Singapore"),
         question_numbers="",
         question_numbers_locked=False,
+        venues=[],
+        venues_locked=False,
     )
     assert "Asked at 14:05" in examiner.get(url("examiner:clarifications", exam)).content.decode()
 
@@ -814,3 +817,41 @@ def test_question_numbers_preview_lists_them_as_typed(examiner: Client, exam: Ex
     assert "Not a range: 3-1." in examiner.get(preview + "3-1", headers=HTMX).content.decode()
     assert "question" not in examiner.get(preview, headers=HTMX).content.decode()
     assert "3 questions" in examiner.get(preview + "1-2, 3a-", headers=HTMX).content.decode()
+
+
+def test_venues_are_saved_and_locked(examiner: Client, exam: Exam) -> None:
+    report(exam, venue="GYM")
+    page = url("examiner:edit_exam", exam)
+    data = {"name": exam.name, "time_zone": "UTC"}
+    response = examiner.post(page, data | {"venues": ["HALL1", "x" * 31]})
+    assert response.status_code == 400
+    html = response.content.decode()
+    assert f"Too long: {'X' * 31}. Use up to 30 characters." in html
+    assert f'<option value="{"x" * 31}" selected>' in html  # rejected, but still shown
+    examiner.post(page, data | {"venues_locked": "on"})
+    exam.refresh_from_db()
+    assert not exam.venues_locked  # nothing to lock to
+    venues = ["hall 10", "Hall 2", "", "hall2 "]
+    examiner.post(page, data | {"venues": venues, "venues_locked": "on"})
+    exam.refresh_from_db()
+    assert (exam.venues, exam.venues_locked) == (["HALL2", "HALL10"], True)
+    html = examiner.get(url("examiner:settings", exam)).content.decode()
+    select = re.search(
+        r'<select name="venues"[^>]*data-create-places[^>]*multiple>.*?</select>', html, re.S
+    )
+    assert select
+    options = re.findall(r'<option value="(\w+)"( selected)?>', select[0])
+    assert options == [("GYM", ""), ("HALL2", " selected"), ("HALL10", " selected")]
+    assert re.search(r'<input[^>]*name="venues_locked"[^>]*checked', html)
+
+
+def test_announcements_wait_to_be_read_out_in_listed_venues(examiner: Client, exam: Exam) -> None:
+    report(exam, venue="GYM")
+    set_venues(exam, ["HALL1"], locked=False)
+    services.announce(text="Typo in Q2", member=named(exam, "Prof"))
+    html = examiner.get(url("examiner:announcements", exam)).content.decode()
+    assert "Read out in 0 of 2 venues" in html
+    set_venues(exam, ["HALL1", "HALL2"], locked=True)
+    html = examiner.get(url("examiner:announcements", exam)).content.decode()
+    assert icon_then("clock", "HALL2</span>") in html
+    assert icon_then("clock", "GYM</span>") not in html

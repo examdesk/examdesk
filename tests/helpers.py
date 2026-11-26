@@ -39,6 +39,20 @@ def set_question_numbers(exam: Exam, numbers: str, *, locked: bool) -> None:
         time_zone=exam.time_zone,
         question_numbers=numbers,
         question_numbers_locked=locked,
+        venues=exam.venues,
+        venues_locked=exam.venues_locked,
+    )
+
+
+def set_venues(exam: Exam, venues: list[str], *, locked: bool) -> None:
+    services.edit_exam(
+        exam,
+        name=exam.name,
+        time_zone=exam.time_zone,
+        question_numbers=exam.question_numbers,
+        question_numbers_locked=exam.question_numbers_locked,
+        venues=venues,
+        venues_locked=locked,
     )
 
 

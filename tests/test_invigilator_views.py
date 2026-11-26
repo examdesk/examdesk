@@ -29,6 +29,7 @@ from tests.helpers import (
     report,
     seat_page,
     set_question_numbers,
+    set_venues,
     url,
     with_venue,
 )
@@ -451,6 +452,100 @@ def test_first_invigilator_screen_asks_for_venue_once_with_quick_picks(
     assert member(invigilator, exam).venue == "HALL2"
     invigilator.post(url("invigilator:choose_venue", exam), {"all": "1"})
     assert member(invigilator, exam).venue == ""
+
+
+def test_unlocked_venues_are_suggestions(invigilator: Client, exam: Exam) -> None:
+    report(exam, venue="GYM")
+    set_venues(exam, ["HALL2", "HALL10"], locked=False)
+    html = invigilator.get(url("invigilator:report", exam)).content.decode()
+    assert re.findall(r'name="pick" value="(\w+)"', html) == ["GYM", "HALL2", "HALL10"]
+    assert '<datalist id="venues"><option value="GYM"><option value="HALL2">' in html
+    assert 'name="venue" value="" list="venues"' in html
+    invigilator.post(url("invigilator:choose_venue", exam), {"venue": "hall 3"})
+    assert member(invigilator, exam).venue == "HALL3"
+
+
+def test_locked_venues_are_picked_from_the_list(invigilator: Client, exam: Exam) -> None:
+    report(exam, venue="GYM")
+    set_venues(exam, ["HALL1", "HALL2"], locked=True)
+    page = url("invigilator:report", exam)
+    html = invigilator.get(page).content.decode()
+    assert re.findall(r'name="pick" value="(\w+)"', html) == ["HALL1", "HALL2"]
+    assert 'list="venues"' not in html
+    assert 'name="all" value="1">I move between venues</button>' in html
+    assert ">Save</button>" not in html
+    assert re.search(r'<select name="venue"[^>]*placeholder="e.g. HALL1"', html)
+    data = {"client_key": uuid.uuid4(), "venue": "GYM", "seat": "14", "label": "2", "text": "?"}
+    assert "Pick a venue from the list." in invigilator.post(page, data).content.decode()
+    assert invigilator.post(page, data | {"venue": "HALL2"}).status_code == 302
+    invigilator.post(url("invigilator:choose_venue", exam), {"pick": "HALL2"})
+    assert member(invigilator, exam).venue == "HALL2"
+    invigilator.post(url("invigilator:choose_venue", exam), {"all": "1"})
+    assert member(invigilator, exam).venue == ""
+
+
+def test_a_venue_typed_before_the_lock_is_refused_and_asked_again(
+    invigilator: Client, exam: Exam
+) -> None:
+    with_venue(invigilator, exam, "HALL1")
+    set_venues(exam, ["HALL1", "HALL2"], locked=True)
+    next_page = url("invigilator:to_deliver", exam)
+    response = invigilator.post(
+        url("invigilator:choose_venue", exam), {"venue": "gym", "next": next_page}, follow=True
+    )
+    assert response.redirect_chain[-1][0] == next_page
+    html = response.content.decode()
+    assert "Pick your venue from the examiners&#x27; list." in html
+    assert '<dialog id="venue-dialog" class="modal" data-autoopen' in html
+
+
+def test_locking_asks_invigilators_in_other_venues_again(exam: Exam) -> None:
+    member_venues = {"Ann": "HALL1", "Ben": "GYM", "Cy": "", "Dee": None}
+    for name, venue in member_venues.items():
+        services.set_venue(named(exam, name), venue)
+    set_venues(exam, ["HALL1", "HALL2"], locked=True)
+    assert {m.name: m.venue for m in exam.members.all()} == member_venues | {"Ben": None}
+    set_venues(exam, ["HALL2"], locked=True)
+    assert {m.name: m.venue for m in exam.members.all()} == {
+        "Ann": "HALL2",
+        "Ben": None,
+        "Cy": "HALL2",
+        "Dee": None,
+    }
+
+
+def test_one_locked_venue_is_set_with_no_picker(invigilator: Client, exam: Exam) -> None:
+    set_venues(exam, ["HALL1"], locked=True)
+    html = invigilator.get(url("invigilator:report", exam)).content.decode()
+    assert member(invigilator, exam).venue == "HALL1"
+    assert 'id="venue-dialog"' not in html
+    assert "venue-picker-button" not in html
+    assert '<span class="sr-only">Venue: </span><span class="truncate">HALL1</span>' in html
+    assert '<input type="hidden" name="venue" value="HALL1">' in html
+    invigilator.post(url("invigilator:choose_venue", exam), {"all": "1"})
+    assert member(invigilator, exam).venue == "HALL1"
+
+
+def test_one_unlocked_venue_is_preset(invigilator: Client, exam: Exam) -> None:
+    set_venues(exam, ["HALL1"], locked=False)
+    html = invigilator.get(url("invigilator:report", exam)).content.decode()
+    assert member(invigilator, exam).venue == "HALL1"
+    assert '<dialog id="venue-dialog" class="modal" aria-labelledby' in html  # not opened
+    assert 'aria-label="Venue: HALL1"' in html
+    invigilator.post(url("invigilator:choose_venue", exam), {"venue": "gym"})
+    assert member(invigilator, exam).venue == "GYM"
+
+
+def test_locked_venues_mark_read_out_from_the_list(invigilator: Client, exam: Exam) -> None:
+    announcement = services.announce(text="Typo in Q2", member=named(exam, "Prof"))
+    set_venues(exam, ["HALL1", "HALL2"], locked=True)
+    html = invigilator.get(url("invigilator:announcements", exam)).content.decode()
+    assert '<option value="HALL2">HALL2</option>' in html
+    read_out_url = url("invigilator:mark_read_out", exam, announcement.pk)
+    invigilator.post(read_out_url, {"venue": "GYM"})
+    assert not announcement.readouts.exists()
+    invigilator.post(read_out_url, {"venue": "HALL2"})
+    assert announcement.readouts.get().venue == "HALL2"
 
 
 def test_match_step_groups_answered_and_open(invigilator: Client, exam: Exam) -> None:
