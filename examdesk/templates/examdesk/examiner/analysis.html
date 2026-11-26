@@ -1,0 +1,95 @@
+{% extends "examdesk/base.html" %}
+{% block content %}
+{% with pk=member.exam.pk %}
+<h1 class="sr-only">Analysis</h1>
+<c-live id="analysis" class="analysis-layout">
+{% if questions %}
+  <section class="table-card lg:order-last" aria-labelledby="questions-title">
+    <h2 id="questions-title" class="sr-only">Questions</h2>
+    <table>
+      <thead><tr><th>Question</th><th class="text-right">Clarifications</th><th class="text-right">Seats</th></tr></thead>
+      <tbody>
+        {% for question in questions %}
+          <tr>
+            <td><span class="label-chip{% if not question.label %} font-medium text-subtle{% endif %}">{{ question.label|default:"No question" }}</span></td>
+            <td class="num text-right">{{ question.clarification_count }}</td>
+            <td class="num text-right">{{ question.seat_count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <div class="min-w-0">
+    <div class="analysis-findings">
+    {% if analysis %}{% with findings=analysis.findings %}
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <p class="meta flex items-center gap-1.5"><c-icon name="sparkles" class="text-primary" />Generated {{ analysis.generated_at|date:"j M Y, H:i" }}</p>
+        <form method="post" action="{% url 'examiner:analyse' pk %}">
+          {% csrf_token %}
+          <button class="btn btn-outline btn-sm"><c-icon name="rotate-ccw" />Regenerate</button>
+        </form>
+      </div>
+
+      <section class="list-card" aria-labelledby="confusions-title">
+        <header><h2 id="confusions-title">Recurring confusions</h2><span class="count">{{ findings.confusions|length }}</span></header>
+        {% for confusion in findings.confusions %}
+          <article class="px-(--surface-padding) py-3">
+            <h3 class="font-medium">{% for question in confusion.questions %}<span class="label-chip mr-1.5">{{ question|default:"No question" }}</span>{% endfor %}{{ confusion.title }}</h3>
+            <p class="mt-1 text-muted">{{ confusion.description }}</p>
+          </article>
+        {% empty %}
+          <p class="row-item text-subtle">None found</p>
+        {% endfor %}
+      </section>
+
+      <section class="list-card" aria-labelledby="unclear-wording-title">
+        <header><h2 id="unclear-wording-title">Unclear wording</h2><span class="count">{{ findings.unclear_wording|length }}</span></header>
+        {% for wording in findings.unclear_wording %}
+          <article class="flex flex-col gap-2 px-(--surface-padding) py-3">
+            <p><span class="label-chip mr-1.5">{{ wording.question|default:"No question" }}</span>{{ wording.explanation }}</p>
+            <blockquote>{{ wording.suggested_wording }}<footer>Suggested wording</footer></blockquote>
+          </article>
+        {% empty %}
+          <p class="row-item text-subtle">None found</p>
+        {% endfor %}
+      </section>
+
+      <section class="list-card" aria-labelledby="errors-title">
+        <header><h2 id="errors-title">Errors in the paper</h2><span class="count">{{ findings.errors|length }}</span></header>
+        {% for problem in findings.errors %}{% partial problem %}{% empty %}<p class="row-item text-subtle">None found</p>{% endfor %}
+      </section>
+
+      <section class="list-card" aria-labelledby="inconsistent-answers-title">
+        <header><h2 id="inconsistent-answers-title">Inconsistent answers</h2><span class="count">{{ findings.inconsistent_answers|length }}</span></header>
+        {% for problem in findings.inconsistent_answers %}{% partial problem %}{% empty %}<p class="row-item text-subtle">None found</p>{% endfor %}
+      </section>
+    {% endwith %}{% else %}
+      <c-empty icon="sparkles" title="No analysis yet" class="boxed">
+        <form method="post" action="{% url 'examiner:analyse' pk %}" class="mt-4">
+          {% csrf_token %}
+          <button class="btn btn-primary"><c-icon name="sparkles" />Analyse clarifications</button>
+        </form>
+      </c-empty>
+    {% endif %}
+    </div>
+    <div class="analysis-loading" role="status">
+      <p class="meta flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span>Analysing clarifications</p>
+      {% for card in "123" %}
+        <div class="list-card" aria-hidden="true">
+          <header><span class="skeleton h-4 w-44"></span></header>
+          <div class="flex flex-col gap-2 px-(--surface-padding) py-4"><span class="skeleton h-3.5 w-full"></span><span class="skeleton h-3.5 w-2/3"></span></div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% else %}
+  <c-empty icon="inbox" title="No clarifications yet" class="boxed lg:col-span-2" />
+{% endif %}
+</c-live>
+{% endwith %}
+
+{% partialdef problem %}
+  <p class="px-(--surface-padding) py-3"><span class="label-chip mr-1.5">{{ problem.question|default:"No question" }}</span>{{ problem.description }}</p>
+{% endpartialdef %}
+{% endblock %}

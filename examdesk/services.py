@@ -12,7 +12,9 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from . import pdf
+from .ai import Findings
 from .models import (
+    Analysis,
     Announcement,
     Answer,
     Clarification,
@@ -376,6 +378,12 @@ def delete_file(file: ExamFile) -> None:
     file.delete()
     if pdf_name:
         transaction.on_commit(partial(file.pdf.storage.delete, pdf_name))
+
+
+@transaction.atomic
+def save_analysis(exam: Exam, findings: Findings) -> None:
+    Analysis.objects.update_or_create(exam=exam, defaults={"findings": findings.model_dump()})
+    Exam.objects.filter(pk=exam.pk).update(version=F("version") + 1)
 
 
 def reset_link(exam: Exam, role: Role) -> None:

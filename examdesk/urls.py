@@ -66,6 +66,8 @@ examiner_patterns: list[URLPattern | URLResolver] = [
         examiner.delete_announcement,
         name="delete_announcement",
     ),
+    path("analysis/", examiner.analysis, name="analysis"),
+    path("analysis/new/", examiner.analyse, name="analyse"),
     path("seats/", examiner.seats, name="seats"),
     path("seats/seat/", examiner.seat, name="seat"),
     path("members/", examiner.members, name="members"),

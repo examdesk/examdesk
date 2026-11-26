@@ -29,7 +29,8 @@ A sentence-embedding model on the server finds possible duplicates. An exam can 
 OpenAI-compatible API in its settings, with two models:
 
 - The **vision model** transcribes photos of questions and reads uploaded PDFs.
-- The **text model** drafts answers from the uploaded exam paper and confirms duplicates.
+- The **text model** drafts answers from the uploaded exam paper, confirms duplicates and analyses
+  the clarifications.
 
 API keys are encrypted with `DJANGO_SECRET_KEY`. After changing it, examiners connect again.
 
@@ -98,6 +99,7 @@ The proxy in front should allow 12 MB request bodies and not serve the media fol
 | `EXAMDESK_HEARTBEAT_EVERY` | `5` | Seconds between heartbeats on a page's stream |
 | `EXAMDESK_OFFLINE_AFTER` | `12` | Seconds without a heartbeat before a page shows it is offline |
 | `EXAMDESK_AI_TIMEOUT` | `60` | Seconds to wait for an exam's AI service |
+| `EXAMDESK_AI_ANALYSIS_TIMEOUT` | `300` | Seconds to wait for an analysis of the clarifications |
 | `EXAMDESK_PHOTO_MAX_SIDE` | `800` | Longest photo side after resizing on the phone, in pixels |
 | `EXAMDESK_PHOTO_MAX_BYTES` | `30000` | Target photo size after re-encoding on the phone |
 | `EXAMDESK_PHOTO_UPLOAD_MAX_BYTES` | `10000000` | Largest photo the server accepts |

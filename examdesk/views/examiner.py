@@ -1,5 +1,6 @@
 """The examiner's screens (laptop)."""
 
+import asyncio
 import logging
 import mimetypes
 from collections import Counter
@@ -16,14 +17,15 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import connections
-from django.db.models import Prefetch, QuerySet, prefetch_related_objects
+from django.db.models import Count, Prefetch, QuerySet, prefetch_related_objects
 from django.forms.models import model_to_dict
-from django.http import HttpResponse, HttpResponseBase, QueryDict
+from django.http import Http404, HttpResponse, HttpResponseBase, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import content_disposition_header
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET, require_POST
+from pydantic import ValidationError
 
 from .. import ai, export, pdf, services, session
 from ..access import HtmxRequest, exam_view
@@ -50,6 +52,7 @@ from ..labels import (
 from ..matching import percent, rank_similar, same_question, similar_enough
 from ..models import (
     SEAT_STATES,
+    Analysis,
     Announcement,
     Clarification,
     Exam,
@@ -545,6 +548,81 @@ def delete_announcement(request: HtmxRequest, member: Member, announcement_id: i
         services.delete_announcement(announcement)
         messages.success(request, "Deleted the announcement.")
     return redirect("examiner:announcements", member.exam.pk)
+
+
+@require_GET
+@exam_view(examiner_only=True)
+def analysis(request: HtmxRequest, member: Member) -> HttpResponse:
+    """Seats and clarifications per question, most asked first, beside the AI's findings."""
+    exam = member.exam
+    if not exam.has_ai_service:
+        raise Http404
+    questions = sorted(
+        exam.clarifications.exclude(closed_reason=Clarification.ClosedReason.MERGED)
+        .values("label")
+        .annotate(clarification_count=Count("pk", distinct=True), seat_count=Count("reports")),
+        key=lambda question: (
+            -question["seat_count"],
+            -question["clarification_count"],
+            natural(question["label"]),
+        ),
+    )
+    context = {"questions": questions, "analysis": Analysis.objects.filter(exam=exam).first()}
+    return render_live(request, member, "examdesk/examiner/analysis.html", context)
+
+
+def to_analyse(exam: Exam) -> tuple[list[Clarification], list[Announcement], list[ExamFile]]:
+    clarifications = exam.clarifications.exclude(closed_reason=Clarification.ClosedReason.MERGED)
+    return (
+        list(clarifications.prefetch_related("reports", "answers")),
+        list(exam.announcements.order_by("created_at")),
+        list(exam.files.prefetch_related("pages")),
+    )
+
+
+# Running analyses. The event loop holds only weak references to tasks.
+running_analyses: set[asyncio.Task[str | None]] = set()
+
+
+@require_POST
+@ai_view(examiner_only=True)
+async def analyse(request: HtmxRequest, member: Member) -> HttpResponseBase:
+    """Saves the analysis even if the examiner leaves before it finishes."""
+    clarifications, announcements, files = await sync_to_async(to_analyse)(member.exam)
+    await sync_to_async(connections.close_all)()
+    task = asyncio.create_task(analyse_and_save(member.exam, clarifications, announcements, files))
+    running_analyses.add(task)
+    task.add_done_callback(running_analyses.discard)
+    if error := await asyncio.shield(task):
+        messages.error(request, error)
+    return redirect("examiner:analysis", member.exam.pk)
+
+
+async def analyse_and_save(
+    exam: Exam,
+    clarifications: list[Clarification],
+    announcements: list[Announcement],
+    files: list[ExamFile],
+) -> str | None:
+    """The error to show, if the analysis failed."""
+    try:
+        findings = await ai.analyse(exam, clarifications, announcements, files)
+    except openai.APITimeoutError:
+        return "The AI service took too long."
+    except (openai.APIError, ValidationError) as error:
+        logger.warning("Couldn't analyse the clarifications: %s", error)
+        return "Couldn't analyse the clarifications."
+    await sync_to_async(save_and_close_connections, thread_sensitive=False)(exam, findings)
+    return None
+
+
+def save_and_close_connections(exam: Exam, findings: ai.Findings) -> None:
+    """Closes the thread's database connection, which no request closes once the examiner has
+    left."""
+    try:
+        services.save_analysis(exam, findings)
+    finally:
+        connections.close_all()
 
 
 @dataclass(frozen=True)

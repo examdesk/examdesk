@@ -1,11 +1,16 @@
-"""The exam's own AI service: transcribing photos, drafting answers and finding duplicates."""
+"""The exam's own AI service: transcribing photos, drafting answers, finding duplicates and
+analysing the clarifications."""
 
 import asyncio
+import contextlib
 import json
 import math
+import re
 import threading
+import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -13,19 +18,20 @@ from typing import Any
 import httpx2
 import openai
 import pytest
+from asgiref.sync import sync_to_async
 from asgiref.testing import ApplicationCommunicator
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.handlers.asgi import ASGIHandler
-from django.db import connection
-from django.test import Client
+from django.db import connection, connections
+from django.test import AsyncClient, Client
 from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 from pytest_django.fixtures import Settings
 
 from examdesk import ai as ai_service
 from examdesk import services
-from examdesk.models import Exam, ExamFile, Report
-from tests.helpers import report, url
+from examdesk.models import Analysis, Exam, ExamFile, Report
+from tests.helpers import named, report, url
 
 pytestmark = pytest.mark.django_db
 
@@ -44,6 +50,7 @@ class FakeService(ThreadingHTTPServer):
 
     status = 200
     content = " Can we assume x > 0?\n"
+    delay = 0.0
     logprobs: list[dict[str, Any]] | None = None
     never_answers = False
     client_disconnected: threading.Event
@@ -68,6 +75,7 @@ class Handler(BaseHTTPRequestHandler):
             self.connection.recv(1)  # returns when the client disconnects
             self.server.client_disconnected.set()
             return
+        time.sleep(self.server.delay)
         message = {"role": "assistant", "content": self.server.content}
         choice = {"index": 0, "finish_reason": "stop", "message": message}
         if self.server.logprobs is not None:
@@ -629,3 +637,184 @@ def test_invigilators_cannot_ask_for_duplicates(invigilator: Client, exam: Exam)
     three_clarifications(exam)
     connect(exam)
     assert duplicates(invigilator, exam)[0] == 403
+
+
+FINDINGS = {
+    "confusions": [
+        {
+            "title": "Big-O or an exact count",
+            "questions": ["Q3b"],
+            "description": "Two seats asked which form the answer takes.",
+        }
+    ],
+    "unclear_wording": [
+        {
+            "question": "Q3b",
+            "explanation": '"Count the comparisons" reads as an exact count or a bound.',
+            "suggested_wording": "Give the number of comparisons in big-O notation.",
+        }
+    ],
+    "errors": [],
+    "inconsistent_answers": [
+        {"question": "Q3b", "description": "The first answer asked for an exact count."}
+    ],
+}
+
+
+def clarifications_in_every_state(exam: Exam) -> None:
+    """Q3b answered and corrected for two seats, Q1 announced with a duplicate merged into it,
+    Q2 open, and a general announcement."""
+    prof = named(exam, "Prof")
+    q3b = report(exam, seat="14", text="Is the answer big-O or an exact count?").clarification
+    report(exam, seat="15", clarification=q3b, text="Do we give the exact count?")
+    first_answer = services.answer_clarification(
+        q3b, text="An exact count.", member=prof, expected_answer=None
+    )
+    services.answer_clarification(q3b, text="Big-O.", member=prof, expected_answer=first_answer.pk)
+    q1 = report(exam, seat="16", label="Q1", text="Is the list sorted?").clarification
+    duplicate = report(exam, seat="17", label="Q1", text="Sorted list?").clarification
+    services.merge_clarifications(sources=[duplicate], target=q1)
+    services.announce(prof, text="The list in Q1 is sorted.", clarification=q1)
+    report(exam, seat="18", label="Q2", text="Can we use a calculator?")
+    services.announce(prof, text="Ten minutes left.")
+
+
+def analyse(client: Client, exam: Exam) -> str:
+    response = client.post(url("examiner:analyse", exam), follow=True)
+    assert response.redirect_chain == [(url("examiner:analysis", exam), 302)]
+    return response.content.decode()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_analyses_the_clarifications_after_the_exam(
+    examiner: Client, exam: Exam, ai: FakeService
+) -> None:
+    clarifications_in_every_state(exam)
+    upload(examiner, exam, "paper.txt", b"Q3b. Count the comparisons.")
+    services.set_live(exam, live=False)
+    page = examiner.get(url("examiner:analysis", exam)).content.decode()
+    assert "No analysis yet" in page
+    ai.content = json.dumps(FINDINGS)
+    page = analyse(examiner, exam)
+    assert "Big-O or an exact count" in page
+    assert "Give the number of comparisons in big-O notation." in page
+    assert page.count("None found") == 1
+    assert "Generated " in page
+    [(_, body)] = ai.requests
+    assert body["model"] == "text"
+    system, clarifications = (message["content"] for message in body["messages"])
+    assert system.endswith("# paper.txt\n\nQ3b. Count the comparisons.")
+    assert clarifications == (
+        '<clarification question="Q1" seats="2">\n'
+        "Asked: Is the list sorted?\nAsked: Sorted list?\n"
+        "Announced: The list in Q1 is sorted.\n</clarification>\n\n"
+        '<clarification question="Q2" seats="1">\n'
+        "Asked: Can we use a calculator?\nNot answered\n</clarification>\n\n"
+        '<clarification question="Q3b" seats="2">\n'
+        "Asked: Is the answer big-O or an exact count?\nAsked: Do we give the exact count?\n"
+        "Answer: Big-O.\nEarlier answer: An exact count.\n</clarification>\n\n"
+        '<announcement question="">\nTen minutes left.\n</announcement>'
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_regenerating_replaces_the_analysis(examiner: Client, exam: Exam, ai: FakeService) -> None:
+    report(exam)
+    ai.content = json.dumps(FINDINGS)
+    analyse(examiner, exam)
+    generated_at = Analysis.objects.get().generated_at
+    ai.content = json.dumps(FINDINGS | {"confusions": []})
+    page = analyse(examiner, exam)
+    assert "Big-O or an exact count" not in page
+    assert page.count("None found") == 2
+    assert Analysis.objects.get().generated_at > generated_at
+
+
+@pytest.mark.parametrize(
+    ("status", "content"),
+    [(400, ""), (200, "Students asked about Q3b."), (200, '{"confusions": []}')],
+)
+@pytest.mark.django_db(transaction=True)
+def test_failed_analysis_says_so(
+    examiner: Client, exam: Exam, ai: FakeService, status: int, content: str
+) -> None:
+    report(exam)
+    ai.status, ai.content = status, content
+    page = analyse(examiner, exam)
+    assert "Couldn&#x27;t analyse the clarifications." in page
+    assert "No analysis yet" in page
+    assert not Analysis.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_analysis_is_saved_after_the_examiner_leaves(
+    examiner: Client, exam: Exam, ai: FakeService
+) -> None:
+    report(exam)
+    ai.content, ai.delay = json.dumps(FINDINGS), 0.5
+
+    async def saved_after_leaving() -> bool:
+        client = AsyncClient()
+        client.cookies = examiner.cookies
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(client.post(url("examiner:analyse", exam)), 0.1)
+        try:
+            for _ in range(50):
+                if await Analysis.objects.aexists():
+                    return True
+                await asyncio.sleep(0.1)
+            return False
+        finally:
+            await sync_to_async(connections.close_all)()
+
+    with ThreadPoolExecutor(1) as executor:  # Playwright's tests leave a loop running in this one
+        assert executor.submit(asyncio.run, saved_after_leaving()).result()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_analysis_has_its_own_timeout(
+    examiner: Client, exam: Exam, ai: FakeService, settings: Settings
+) -> None:
+    settings.EXAMDESK_AI_ANALYSIS_TIMEOUT = timedelta(seconds=0.2)
+    report(exam)
+    ai.content, ai.delay = json.dumps(FINDINGS), 0.5
+    assert "The AI service took too long." in analyse(examiner, exam)
+    assert len(ai.requests) == 1  # not retried
+
+
+def test_questions_most_asked_first(examiner: Client, exam: Exam) -> None:
+    connect(exam)
+    three_clarifications(exam)
+    q1 = exam.clarifications.get(label="Q1")
+    for seat in ("17", "18"):
+        report(exam, seat=seat, clarification=q1)
+    page = examiner.get(url("examiner:analysis", exam)).content.decode()
+    rows = re.findall(
+        r'label-chip">(Q\w+)</span></td>\s*<td class="num text-right">(\d+)</td>'
+        r'\s*<td class="num text-right">(\d+)</td>',
+        page,
+    )
+    assert rows == [("Q1", "1", "3"), ("Q3b", "2", "2")]
+
+
+def test_analysis_needs_clarifications(examiner: Client, exam: Exam) -> None:
+    connect(exam)
+    page = examiner.get(url("examiner:analysis", exam)).content.decode()
+    assert f'href="{url("examiner:analysis", exam)}" aria-current="page"' in page
+    assert "No clarifications yet" in page
+    assert url("examiner:analyse", exam) not in page
+
+
+def test_no_analysis_without_a_service(examiner: Client, exam: Exam) -> None:
+    report(exam)
+    page = examiner.get(url("examiner:clarifications", exam), follow=True).content.decode()
+    assert url("examiner:analysis", exam) not in page
+    assert examiner.get(url("examiner:analysis", exam)).status_code == 404
+    assert examiner.post(url("examiner:analyse", exam)).status_code == 404
+
+
+def test_invigilators_cannot_analyse(invigilator: Client, exam: Exam) -> None:
+    connect(exam)
+    report(exam)
+    assert invigilator.get(url("examiner:analysis", exam)).status_code == 403
+    assert invigilator.post(url("examiner:analyse", exam)).status_code == 403

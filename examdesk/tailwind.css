@@ -103,6 +103,14 @@
   /* Examiner announcements: the list beside a sticky composer from lg. */
   .announcements-layout { @apply grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_var(--pane-width)]; }
   .announcement-composer { @apply lg:sticky lg:top-20 lg:order-last; }
+  /* Analysis: the AI's findings beside the question counts from lg. Skeletons replace the findings
+     while the AI works. */
+  .analysis-layout {
+    @apply grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_var(--pane-width)];
+    .analysis-findings { @apply flex flex-col gap-6; }
+    .analysis-loading { @apply hidden flex-col gap-6; }
+    &:has(form.htmx-request) { .analysis-findings { @apply hidden; } .analysis-loading { @apply flex; } }
+  }
   .vstack { @apply flex flex-col gap-3; }
 
   /* Surfaces: a card (header, body, footer), a list card of rows, or a table card. Header and

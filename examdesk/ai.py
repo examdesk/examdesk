@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+from collections import defaultdict
 from collections.abc import Iterable, Sequence
 
 from django.conf import settings
@@ -15,9 +16,11 @@ from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionTokenLogprob,
 )
+from pydantic import BaseModel
 
 from . import pdf
-from .models import Clarification, Exam, ExamFile
+from .labels import natural
+from .models import Announcement, Clarification, Exam, ExamFile
 
 TRANSCRIBE = (
     "Transcribe the handwriting in this photo exactly, and reply with nothing else. "
@@ -61,6 +64,58 @@ is in brackets; parts such as a and b are different questions. Clarifications ab
 question often ask different things. For each other clarification, write one line: its id, a \
 colon, then Yes if it asks the same thing about the same question as the clarification, so that \
 one answer serves both, or No. Write nothing else."""
+ANALYSE = """\
+During or after an exam, an examiner reviews the clarifications students asked, to find what \
+to announce now and what to fix in the paper next time.
+
+Each clarification gives its question number and how many seats asked it, then these lines:
+- Asked: what a student asked.
+- Answer: the answer sent to those seats.
+- Earlier answer: an answer that a correction replaced.
+- Announced: an answer read out in every venue.
+Announcements outside a clarification were read out in every venue too. The exam paper and other \
+files follow, if there are any.
+
+Reply with only a JSON object of this form, and never put it in a code block:
+{"confusions": [{"title": "...", "questions": ["3b"], "description": "..."}],
+ "unclear_wording": [{"question": "3b", "explanation": "...", "suggested_wording": "..."}],
+ "errors": [{"question": "4", "description": "..."}],
+ "inconsistent_answers": [{"question": "2a", "description": "..."}]}
+
+- confusions: what students misunderstood again and again, across seats or questions, most \
+asked first.
+- unclear_wording: sentences of the paper that students read in more than one way. Explain the \
+readings, and rewrite the sentence so that it reads only one way.
+- errors: mistakes in the paper that the clarifications revealed, each with a correction that \
+can be read out as an announcement.
+- inconsistent_answers: answers or announcements that disagree with each other or with the paper.
+
+Give question numbers as the clarifications do. Leave a list empty when nothing fits. Write \
+plain sentences, with maths in plain text rather than LaTeX."""
+
+
+class Confusion(BaseModel):
+    title: str
+    questions: list[str]
+    description: str
+
+
+class UnclearWording(BaseModel):
+    question: str
+    explanation: str
+    suggested_wording: str
+
+
+class Problem(BaseModel):
+    question: str
+    description: str
+
+
+class Findings(BaseModel):
+    confusions: list[Confusion]
+    unclear_wording: list[UnclearWording]
+    errors: list[Problem]
+    inconsistent_answers: list[Problem]
 
 
 def list_models(base_url: str, api_key: str) -> list[str]:
@@ -108,9 +163,7 @@ async def read_page(exam: Exam, document: bytes, number: int) -> str:
 async def draft_answer(exam: Exam, clarification: Clarification, files: Iterable[ExamFile]) -> str:
     """Requires the clarification's reports and the files' pages prefetched."""
     canned = " | ".join(settings.EXAMDESK_CANNED_ANSWERS)
-    system = "\n\n".join(
-        [DRAFT.format(canned=canned), *(f"# {file.name}\n\n{file.text}" for file in files)]
-    )
+    system = _prompt_with_files(DRAFT.format(canned=canned), files)
     asked = "\n".join(_distinct_texts(clarification))
     question = f"Exam question: {clarification.label}\nThe student asks:\n{asked}"
     messages: list[ChatCompletionMessageParam] = [
@@ -119,6 +172,62 @@ async def draft_answer(exam: Exam, clarification: Clarification, files: Iterable
     ]
     text = await _reply(exam, exam.ai_text_model, messages)
     return text[: settings.EXAMDESK_TEXT_MAX]
+
+
+def _prompt_with_files(prompt: str, files: Iterable[ExamFile]) -> str:
+    return "\n\n".join([prompt, *(f"# {file.name}\n\n{file.text}" for file in files)])
+
+
+async def analyse(
+    exam: Exam,
+    clarifications: Iterable[Clarification],
+    announcements: Sequence[Announcement],
+    files: Iterable[ExamFile],
+) -> Findings:
+    """Requires the clarifications' reports and answers, and the files' pages, prefetched.
+
+    Raises `openai.APIError`, or `pydantic.ValidationError` for a reply that isn't the JSON asked
+    for.
+    """
+    announcements_by_clarification: defaultdict[int, list[str]] = defaultdict(list)
+    for announcement in announcements:
+        if announcement.clarification_id:
+            announcements_by_clarification[announcement.clarification_id].append(announcement.text)
+    elements = [
+        _clarification_element(clarification, announcements_by_clarification[clarification.pk])
+        for clarification in sorted(clarifications, key=lambda c: natural(c.label))
+    ]
+    elements += [
+        f'<announcement question="{a.label}">\n{a.text}\n</announcement>'
+        for a in announcements
+        if not a.clarification_id
+    ]
+    messages: list[ChatCompletionMessageParam] = [
+        {"role": "system", "content": _prompt_with_files(ANALYSE, files)},
+        {"role": "user", "content": "\n\n".join(elements)},
+    ]
+    timeout = settings.EXAMDESK_AI_ANALYSIS_TIMEOUT.total_seconds()
+    # A timeout isn't retried.
+    async with _client(exam).with_options(timeout=timeout, max_retries=0) as client:
+        completion = await client.chat.completions.create(
+            model=exam.ai_text_model, temperature=0, messages=messages
+        )
+    return Findings.model_validate_json(completion.choices[0].message.content or "")
+
+
+def _clarification_element(clarification: Clarification, announcement_texts: list[str]) -> str:
+    answers = [answer.text for answer in clarification.answers.all()]
+    lines = [
+        *(f"Asked: {text}" for text in _distinct_texts(clarification)),
+        *(f"Answer: {text}" for text in answers[:1]),
+        *(f"Earlier answer: {text}" for text in answers[1:]),
+        *(f"Announced: {text}" for text in announcement_texts),
+    ]
+    if not answers and not announcement_texts:
+        lines.append("Not answered")
+    seat_count = len(clarification.reports.all())
+    opening_tag = f'<clarification question="{clarification.label}" seats="{seat_count}">'
+    return "\n".join([opening_tag, *lines, "</clarification>"])
 
 
 def _distinct_texts(clarification: Clarification) -> list[str]:

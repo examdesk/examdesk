@@ -455,3 +455,14 @@ class Member(models.Model):
     @property
     def online(self) -> bool:
         return timezone.now() - self.last_seen < settings.EXAMDESK_ONLINE_FOR
+
+
+class Analysis(models.Model):
+    """What the exam's AI service found in its clarifications."""
+
+    exam = models.OneToOneField(Exam, on_delete=models.CASCADE, primary_key=True)
+    findings = models.JSONField()
+    generated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"Analysis of {self.exam}"
