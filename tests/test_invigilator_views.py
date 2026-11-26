@@ -458,9 +458,35 @@ def test_typed_question_offers_alike_clarifications_on_other_questions(
     step_two = url("invigilator:report", exam) + "?venue=HALL1&seat=34&label=Q3"
     assert '<span class="label-chip">Q5</span>' not in invigilator.get(step_two).content.decode()
     html = invigilator.get(step_two + "&text=Is+x+an+integer+or+a+real%3F").content.decode()
-    assert html.index(">Under other questions</h2>") < html.index("Is x an integer?")
+    assert html.index(">1 under other questions<svg") < html.index("Is x an integer?")
     assert '<span class="label-chip">Q5</span>' in html
     assert "calculator" not in html
+
+
+def test_matches_after_the_first_three_are_collapsed_under_show_more(
+    invigilator: Client, exam: Exam
+) -> None:
+    questions = ["Is x real?", "Is x an integer?", "Is x positive?", "Is x odd?"]
+    for seat, text in enumerate(questions, start=21):
+        report(exam, seat=str(seat), text=text)
+    query = "?venue=HALL1&seat=34&label=Q3"
+    html = invigilator.get(url("invigilator:report", exam) + query).content.decode()
+    show_more = html.index(">Show 1 more<svg")
+    assert html.index("Is x positive?") < show_more < html.index("Is x odd?")
+    assert html.count('<span class="match-action">Same question') == 4
+
+
+def test_typed_question_collapses_matches_that_are_not_similar(
+    invigilator: Client, exam: Exam
+) -> None:
+    report(exam, seat="21", text="Is x an integer?")
+    report(exam, seat="22", text="Can we use a calculator?")
+    step_two = url("invigilator:report", exam) + "?venue=HALL1&seat=34&label=Q3&text={}"
+    html = invigilator.get(step_two.format("Is+x+an+integer+or+a+real%3F")).content.decode()
+    show_more = html.index(">Show 1 more<svg")
+    assert html.index("Is x an integer?") < show_more < html.index("calculator")
+    unrelated = invigilator.get(step_two.format("Is+the+room+cold%3F")).content.decode()
+    assert unrelated.index(">Already asked about Q3</h2>") < unrelated.index(">Show all 2<svg")
 
 
 def test_typing_refreshes_only_the_matches(invigilator: Client, exam: Exam) -> None:

@@ -97,11 +97,17 @@ class Match:
     similarity: int | None  # to the typed text, in percent
 
 
+MATCHES_SHOWN = 3
+
+
 def find_matches(
     exam: Exam, venue: str, seat: str, label: str, text: str = ""
-) -> tuple[list[Match], list[Match]]:
-    """Unclosed clarifications under the label's top-level question, and similar ones under
-    other questions, most similar to `text` first."""
+) -> tuple[list[Match], list[Match], list[Match]]:
+    """Unclosed clarifications under the label's top-level question, split into the ones to show
+    and the rest, then similar ones under other questions.
+
+    Without `text` the first `MATCHES_SHOWN` show, answered first. With it, the most similar come
+    first and only similar ones show, at most `MATCHES_SHOWN`."""
     asked = {r.clarification_id: r for r in Report.objects.at_seat(exam, venue, seat)}
     unclosed = (
         exam.clarifications.filter(closed_reason="")
@@ -110,14 +116,20 @@ def find_matches(
         .prefetch_related("reports")
     )
     typed = bool(text.strip())
-    here, elsewhere = [], []
+    same_question_matches, other_question_matches = [], []
+    similar_count = 0
     for c, score in rank_similar([text], unclosed):
         match = Match(c, asked.get(c.pk), round(score * 100) if typed else None)
         if same_question(label, c.label):
-            here.append(match)
+            same_question_matches.append(match)
+            if similar_enough(score):
+                similar_count += 1
         elif similar_enough(score):
-            elsewhere.append(match)
-    return here, elsewhere
+            other_question_matches.append(match)
+    if not typed:
+        same_question_matches.sort(key=lambda match: not match.clarification.current_answer_id)
+    shown = min(similar_count if typed else len(same_question_matches), MATCHES_SHOWN)
+    return same_question_matches[:shown], same_question_matches[shown:], other_question_matches
 
 
 @exam_view(live_only=True)
@@ -160,14 +172,14 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
         context["mentioned"] = mismatched_label(normalize_label(query.get("label", "")), text)
     if start_form.is_bound and query.get("label") and start_form.is_valid():
         seat = start_form.cleaned_data
-        here, elsewhere = find_matches(exam, seat["venue"], seat["seat"], seat["label"], text)
-        if not text.strip():  # answered first
-            here.sort(key=lambda match: not match.clarification.current_answer_id)
+        shown_matches, collapsed_matches, other_question_matches = find_matches(
+            exam, seat["venue"], seat["seat"], seat["label"], text
+        )
         context |= {
-            "groups": [
-                (f"Already asked about {top_level(seat['label'])}", here),
-                ("Under other questions", elsewhere),
-            ],
+            "top_level_label": top_level(seat["label"]),
+            "shown_matches": shown_matches,
+            "collapsed_matches": collapsed_matches,
+            "other_question_matches": other_question_matches,
         }
     context |= {"start_form": start_form, "text": text}
     # typing re-ranks the matches

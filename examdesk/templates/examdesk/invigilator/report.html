@@ -18,35 +18,29 @@
   <c-error>{% if report_form %}{{ report_form|form_errors }}{% endif %}</c-error>
 
   {# The wrapper stays, so a late response can't land in a list already replaced. #}
-  <div hx-get="{% url 'invigilator:report' pk %}" hx-include="#report-form" hx-trigger="change from:#report-form, input delay:300ms from:#report-text" hx-swap="innerHTML" hx-sync="this:replace">
+  <div hx-get="{% url 'invigilator:report' pk %}" hx-include="#report-form" hx-trigger="change from:#report-form, input delay:300ms from:#report-text" hx-swap="innerMorph" hx-sync="this:replace">
   {% partialdef matches inline %}
   {% with pk=member.exam.pk %}
-  <div id="matches" class="mt-6"{% if groups %} data-searched{% endif %}>
+  <div id="matches" class="mt-6"{% if top_level_label %} data-searched{% endif %}>
   {% if mentioned %}<div class="flash warning" role="status"><c-icon name="triangle-alert" /><span>The question mentions {{ mentioned }}.</span></div>{% endif %}
-  {% for heading, matches in groups %}
-    {% if matches %}
-    <h2 class="section-title">{{ heading }}</h2>
+  {% if shown_matches or collapsed_matches %}
+    <h2 class="section-title">Already asked about {{ top_level_label }}</h2>
     <div class="list-card mb-6">
-      {% for match in matches %}{% with clarification=match.clarification asked_here=match.asked_here %}
-        {% if asked_here %}
-          <div class="match">
-            {% partial match_body %}
-            <div class="mt-3 flex items-center gap-3">
-              {% if clarification.current_answer %}<a class="btn btn-primary" href="{% seat_url 'invigilator:deliver_seat' pk asked_here.venue asked_here.seat back='report' %}"><c-icon name="send" />Show answer</a>{% endif %}
-              <button type="button" class="btn btn-ghost btn-danger btn-sm ml-auto" commandfor="delete-report-{{ asked_here.pk }}" command="show-modal">Delete report</button>
-            </div>
-          </div>
-          <c-delete-report-dialog :report="asked_here" next="{{ request.get_full_path }}" />
-        {% else %}
-          <button class="match match-button" name="clarification" value="{{ clarification.pk }}">
-            {% partial match_body %}
-            <span class="match-action">Same question<c-icon name="chevron-right" /></span>
-          </button>
-        {% endif %}
-      {% endwith %}{% endfor %}
+      {% for match in shown_matches %}{% partial match_row %}{% endfor %}
+      {% if collapsed_matches %}
+        <details class="group">
+          <summary class="match-button disclosure-row group-open:hidden">Show {% if shown_matches %}{{ collapsed_matches|length }} more{% else %}all {{ collapsed_matches|length }}{% endif %}<c-icon name="chevron-down" /></summary>
+          {% for match in collapsed_matches %}{% partial match_row %}{% endfor %}
+        </details>
+      {% endif %}
     </div>
-    {% endif %}
-  {% endfor %}
+  {% endif %}
+  {% if other_question_matches %}
+    <details class="list-card group mb-6">
+      <summary class="match-button disclosure-row">{{ other_question_matches|length }} under other questions<c-icon name="chevron-down" class="transition-transform group-open:rotate-180" /></summary>
+      {% for match in other_question_matches %}{% partial match_row %}{% endfor %}
+    </details>
+  {% endif %}
   </div>
   {% endwith %}
   {% endpartialdef %}
@@ -72,6 +66,24 @@
     </div>
   </details>
 </form>
+
+{% partialdef match_row %}{% with clarification=match.clarification asked_here=match.asked_here %}
+  {% if asked_here %}
+    <div class="match">
+      {% partial match_body %}
+      <div class="mt-3 flex items-center gap-3">
+        {% if clarification.current_answer %}<a class="btn btn-primary" href="{% seat_url 'invigilator:deliver_seat' pk asked_here.venue asked_here.seat back='report' %}"><c-icon name="send" />Show answer</a>{% endif %}
+        <button type="button" class="btn btn-ghost btn-danger btn-sm ml-auto" commandfor="delete-report-{{ asked_here.pk }}" command="show-modal">Delete report</button>
+      </div>
+    </div>
+    <c-delete-report-dialog :report="asked_here" next="{{ request.get_full_path }}" />
+  {% else %}
+    <button class="match match-button" name="clarification" value="{{ clarification.pk }}">
+      {% partial match_body %}
+      <span class="match-action">Same question<c-icon name="chevron-right" /></span>
+    </button>
+  {% endif %}
+{% endwith %}{% endpartialdef %}
 
 {% partialdef match_body %}
   <span class="flex flex-wrap items-center gap-1.5">

@@ -117,7 +117,7 @@
   }
   .list-card {
     @apply overflow-hidden rounded-box border border-base-300 bg-base-100;
-    > * + * { @apply border-t border-base-300; }
+    > * + *, > details > :not(summary) + * { @apply border-t border-base-300; }
   }
   /* A list card's heading row: its title and count. */
   .list-card > header { @apply flex min-h-12 items-center gap-2 px-(--surface-padding) py-2.5; }
@@ -293,6 +293,7 @@
     @apply cursor-pointer transition-colors active:bg-base-200 hover:bg-base-200/60;
     > .match-action { @apply mt-2.5 inline-flex items-center gap-1 text-sm font-semibold text-primary; }
   }
+  .disclosure-row { @apply flex list-none items-center gap-1 px-4 py-3.5 text-sm font-semibold text-primary; }
   /* The screen's main action, pinned above the tab bar while its section is on screen. */
   .action-bar { @apply sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 mt-4 bg-base-200/90 px-4 py-3 backdrop-blur; }
   .deliver-row {
