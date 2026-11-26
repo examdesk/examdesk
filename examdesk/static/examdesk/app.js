@@ -98,8 +98,9 @@ htmx.registerExtension("keep-unsent-text-visible", {
 });
 // While a link or a GET form loads, a bar at the top runs and the part it replaces is marked busy
 // (<main> for a whole page), which tailwind.css dims after 150 ms. A clarification or seat pane is
-// also inert, since its replacement drops anything typed into it. A newer request aborts the load
-// (`hx-sync` on <body>); the busy state clears when the latest navigation finishes or is aborted.
+// also inert, since its replacement drops anything typed into it. So is the queue list: a row clicked
+// in it would abort its load. A newer request aborts the load (`hx-sync` on <body>); the busy state
+// clears when the latest navigation finishes or is aborted.
 const isNavigation = ({ sourceEvent, request }) => ["click", "submit"].includes(sourceEvent?.type) && request.method === "GET";
 const loadingTarget = ({ target }) => (!target || target === document.body ? document.querySelector("main") : target);
 document.documentElement.insertAdjacentHTML("beforeend", '<div id="page-loading-bar" aria-hidden="true"></div>');
@@ -114,7 +115,7 @@ document.addEventListener("htmx:before:request", (event) => {
   loadingBar.dataset.state = "loading";
   const target = loadingTarget(ctx);
   target.setAttribute("aria-busy", "true");
-  target.inert = target.matches("#clarification-pane, #seat-pane");
+  target.inert = target.matches("#clarification-pane, #seat-pane, #queue-list");
 });
 document.addEventListener("htmx:finally:request", (event) => {
   const { ctx } = event.detail;
@@ -163,10 +164,11 @@ const buzz = () => {
   navigator.vibrate?.(200);
 };
 // Each new exam version refreshes the live parts. With a dialog, a menu, an inline editor or a Tom
-// Select menu open, the refresh waits until it closes, since a morph would remove it. The pages of an
-// exam share its stream. A stream that hasn't opened or sent a message for `offlineAfter` has
-// dropped: the page shows the offline banner and reconnects. A request that couldn't reach the
-// server shows it too, until one does.
+// Select menu open, the refresh waits until it closes, since a morph would reset it. So does a
+// refresh already in flight when the dialog, menu or editor opens. The pages of an exam share its
+// stream. A stream that hasn't opened or sent a message for `offlineAfter` has dropped: the page
+// shows the offline banner and reconnects. A request that couldn't reach the server shows it too,
+// until one does.
 const offlineAfter = Number(document.body.dataset.offlineAfter) * 1000;
 let eventSource;
 let streamUrl;
@@ -185,6 +187,14 @@ const flushRefresh = () => {
   refreshPending = false;
   refresh();
 };
+// An extension: htmx runs its hooks before the htmx:before:swap listeners.
+htmx.registerExtension("defer-refresh-while-editing", {
+  htmx_before_swap: (sourceElement) => {
+    if (sourceElement.id !== "refresh" || !isEditing()) return;
+    refreshPending = true;
+    return false;
+  },
+});
 const onStreamMessage = () => {
   lastMessageAt = Date.now();
   requestFailed = false;

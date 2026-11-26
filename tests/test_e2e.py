@@ -11,7 +11,7 @@ import pytest
 import uvicorn
 from django.contrib.auth.models import User
 from django.core.asgi import get_asgi_application
-from playwright.sync_api import Browser, Page, Route, expect
+from playwright.sync_api import Browser, Page, Request, Route, expect
 from pytest_django.fixtures import Settings
 
 from examdesk import demos, services
@@ -260,6 +260,36 @@ def test_changes_by_others_show_live_around_unsent_text(
 
 
 @pytest.mark.django_db(transaction=True)
+def test_a_refresh_in_flight_waits_for_an_open_dialog(
+    server: str, browser: Browser, staff: User
+) -> None:
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
+    report(exam)
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
+    prof.get_by_role("link", name="Is x an integer?").click()
+    prof.get_by_role("textbox", name="Answer").fill("Yes.")
+    intercepted: list[Route] = []
+
+    def is_refresh(request: Request) -> bool:
+        return request.headers.get("hx-source") == "div#refresh"
+
+    def intercept_first_refresh(route: Route) -> None:
+        if is_refresh(route.request) and not intercepted:
+            intercepted.append(route)
+        else:
+            route.continue_()
+
+    prof.route("**/*", intercept_first_refresh)
+    with prof.expect_request(is_refresh):
+        prof.get_by_role("button", name="Send", exact=True).click()
+    prof.get_by_role("button", name="Announce", exact=True).click()
+    intercepted[0].continue_()
+    expect(prof.locator("#refresh")).not_to_have_class(re.compile("htmx-request"))
+    prof.get_by_role("button", name="Announce to all venues").click()
+    expect(prof.get_by_text("Announced Q3b to all venues.")).to_be_visible()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_pages_open_at_the_top_and_keep_the_exam_stream(
     server: str, browser: Browser, staff: User
 ) -> None:
@@ -312,6 +342,29 @@ def test_a_clarification_pane_is_inert_while_another_loads(
         route.continue_()
     expect(wording).to_contain_text("Can we use a calculator?")
     expect(pane).not_to_have_attribute("inert", "")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_queue_list_ignores_clicks_while_a_tab_loads(
+    server: str, browser: Browser, staff: User
+) -> None:
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
+    report(exam)
+    answered = report(exam, seat="2", label="Q1", text="Can we use a calculator?")
+    services.answer_clarification(
+        answered.clarification, text="Yes.", member=named(exam, "Prof Two"), expected_answer=None
+    )
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
+    queue_list = prof.locator("#queue-list")
+    expect(queue_list.get_by_role("link", name="Is x an integer?")).to_be_visible()
+    routes: list[Route] = []
+    prof.route("**/*state=answered*", lambda route: routes.append(route))
+    prof.get_by_role("link", name=re.compile(r"^Answered")).click()
+    # force: click where the row is, without waiting for it to accept clicks
+    queue_list.get_by_role("link", name="Is x an integer?").click(force=True)
+    for route in routes:
+        route.continue_()
+    expect(queue_list).to_contain_text("Can we use a calculator?")
 
 
 @pytest.mark.django_db(transaction=True)
