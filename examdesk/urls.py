@@ -73,7 +73,7 @@ examiner_patterns: list[URLPattern | URLResolver] = [
     path("settings/", examiner.exam_settings, name="settings"),
     path("edit/", examiner.edit_exam, name="edit_exam"),
     path(
-        "question-numbers/",
+        "question-numbers/preview/",
         examiner.preview_question_numbers,
         name="preview_question_numbers",
     ),

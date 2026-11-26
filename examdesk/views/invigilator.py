@@ -188,11 +188,11 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
     context |= {"start_form": start_form, "text": text}
     # typing re-ranks the matches
     if request.htmx.request_type == "partial" and not is_refresh(request):
-        # A page from before the examiners locked the question numbers has a text box for them.
+        # A report page opened before the lock has a text box for the question.
         if exam.question_numbers_locked and start_form.has_error("label"):
             messages.info(request, "Pick the question from the examiners' list.")
-            seat = {name: query[name] for name in ("venue", "seat") if name in query}
-            return HttpResponseClientRedirect(f"{request.path}?{urlencode(seat)}")
+            place = {name: query[name] for name in ("venue", "seat") if name in query}
+            return HttpResponseClientRedirect(f"{request.path}?{urlencode(place)}")
         context |= {"member": member}
         return render(request, "examdesk/invigilator/report.html#matches", context)
     return invigilator_page(request, member, "report", context)

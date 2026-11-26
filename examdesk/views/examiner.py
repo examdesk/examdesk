@@ -734,7 +734,7 @@ def preview_question_numbers(request: HtmxRequest, member: Member) -> HttpRespon
     # `1-10, 11a-` previews as `1-10, 11a` while the range is typed.
     text = request.GET.get("question_numbers", "").rstrip(" ,-\N{EN DASH}")
     context = question_numbers_preview(text)
-    return render(request, "examdesk/examiner/settings.html#question_numbers", context)
+    return render(request, "examdesk/examiner/settings.html#question_numbers_preview", context)
 
 
 @require_POST

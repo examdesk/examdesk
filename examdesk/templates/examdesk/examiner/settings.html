@@ -18,13 +18,17 @@
       {{ exam_form.question_numbers.label_tag }}{{ exam_form.question_numbers }}
       {# A refresh keeps the preview of the unsaved text. #}
       <div id="question-numbers-preview" hx-morph-skip-children hx-get="{% url 'examiner:preview_question_numbers' pk %}" hx-include="#id_question_numbers" hx-trigger="input delay:300ms from:#id_question_numbers" hx-sync="this:replace" aria-live="polite">
-      {% partialdef question_numbers inline %}
+      {% partialdef question_numbers_preview inline %}
         {% if question_numbers_error %}
           <p class="errorlist">{{ question_numbers_error }}</p>
         {% elif question_labels %}{% with count=question_labels|length %}
           <p class="meta mb-1.5">{{ count }} question{{ count|pluralize }}</p>
           <div class="flex flex-wrap items-center gap-1">
-            {% for label in question_labels %}{% if forloop.counter == 25 %}<button type="button" class="link-button px-1 text-meta" data-show="more-question-numbers">Show all {{ count }}</button><span id="more-question-numbers" class="contents" hidden>{% endif %}<span class="label-chip">{{ label }}</span>{% endfor %}{% if count >= 25 %}</span>{% endif %}
+            {% for label in question_labels|slice:":24" %}<span class="label-chip">{{ label }}</span>{% endfor %}
+            {% if count > 24 %}
+              <button type="button" class="link-button px-1 text-meta" data-show="more-question-numbers">Show all {{ count }}</button>
+              <span id="more-question-numbers" class="contents" hidden>{% for label in question_labels|slice:"24:" %}<span class="label-chip">{{ label }}</span>{% endfor %}</span>
+            {% endif %}
           </div>
         {% endwith %}{% endif %}
       {% endpartialdef %}

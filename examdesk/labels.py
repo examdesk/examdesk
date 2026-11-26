@@ -48,7 +48,10 @@ def _expand_range(first: str, last: str) -> list[str]:
     if not first_part and not last_part:
         numbers = range(int(first_number), int(last_number) + 1)
         if len(numbers) > _MAX_QUESTIONS_PER_RANGE:
-            raise ValueError(f"Too many questions in {first}-{last}.")
+            raise ValueError(
+                f"Too many questions in {first}-{last}. "
+                f"Use up to {_MAX_QUESTIONS_PER_RANGE} per range."
+            )
         if numbers:
             return [f"Q{number}" for number in numbers]
     elif first_number == last_number and first_part and last_part:
