@@ -141,7 +141,7 @@ const announceNewClarifications = () => {
   openCount = count;
 };
 const submitOnCtrlEnter = (event) => {
-  if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey) || event.target.localName !== "textarea") return;
+  if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey) || event.target.localName !== "textarea" || event.target.readOnly) return;
   event.preventDefault();
   event.target.form?.requestSubmit();
 };
@@ -328,15 +328,19 @@ const filterItems = (filter) => {
   filter.form.querySelector("[data-filter-empty]").hidden = items.some((item) => !item.hidden);
 };
 document.addEventListener("input", (event) => event.target.matches("[data-filter]") && filterItems(event.target));
-// data-draft, data-retry, data-copy, data-clear (the photo) and data-show/data-hide buttons.
+// data-draft, data-transcribe-wording, data-retry, data-copy, data-clear (the photo) and
+// data-show/data-hide buttons.
 const handleButtons = (event) => {
   const target = event.target;
   const copy = target.closest("[data-copy]");
   const toggle = target.closest("[data-show], [data-hide]");
   const draft = target.closest("[data-draft]");
+  const transcribe = target.closest("[data-transcribe-wording]");
   const retry = target.closest("[data-retry]");
   if (draft) {
     draftAnswer(draft);
+  } else if (transcribe) {
+    fillWordingFromPhoto(transcribe);
   } else if (retry) {
     retry.hidden = true;
     readPages(retry.closest("[data-read-pages]"));
@@ -422,6 +426,33 @@ const transcribePhoto = async (input) => {
   if (text && !question.value.trim()) {
     question.value = text;
     question.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+};
+// Open the wording's editor and fill it in from the question's photo, unless the editor is closed
+// by then.
+const fillWordingFromPhoto = async (button) => {
+  const form = button.form;
+  const editor = form.querySelector("[data-editor]");
+  const wording = form.elements.text;
+  const save = editor.querySelector("button:not([type=button])");
+  const failed = form.querySelector("[data-transcribe-failed]");
+  failed.hidden = true;
+  if (editor.hidden) toggleEditor(form, true);
+  button.setAttribute("aria-busy", "true");
+  button.disabled = true;
+  save.disabled = true;
+  wording.readOnly = true;
+  wording.placeholder = "Reading the photo…";
+  const text = await askAI(button.dataset.transcribeWording, form);
+  button.removeAttribute("aria-busy");
+  button.disabled = false;
+  save.disabled = false;
+  wording.readOnly = false;
+  wording.placeholder = "";
+  failed.hidden = Boolean(text);
+  if (text && !editor.hidden) {
+    wording.value = text;
+    wording.focus();
   }
 };
 // Read a PDF's unread pages four at a time, counting them on its progress bar, then refresh. A

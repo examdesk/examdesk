@@ -19,7 +19,7 @@ from pytest_django.fixtures import Settings
 
 from examdesk import ai as ai_service
 from examdesk import services
-from examdesk.models import Exam, ExamFile
+from examdesk.models import Exam, ExamFile, Report
 from tests.helpers import report, url
 
 pytestmark = pytest.mark.django_db
@@ -273,6 +273,73 @@ def test_no_draft_without_a_service(examiner: Client, exam: Exam) -> None:
 def test_invigilators_cannot_draft(invigilator: Client, exam: Exam) -> None:
     connect(exam)
     assert draft(invigilator, exam, report(exam).clarification_id)[0] == 403
+
+
+def report_with_photo(exam: Exam, jpeg: bytes, text: str = "") -> Report:
+    return report(exam, text=text, photo=SimpleUploadedFile("p.jpg", jpeg, "image/jpeg"))
+
+
+def transcribe_report_photo(client: Client, exam: Exam, report_id: int) -> tuple[int, bytes]:
+    response = client.post(url("examiner:transcribe_photo", exam, report_id))
+    return response.status_code, response.content
+
+
+def clarification_page(client: Client, exam: Exam, clarification_id: int) -> str:
+    return client.get(url("examiner:clarification", exam, clarification_id)).content.decode()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_examiners_transcribe_the_question_photo(
+    examiner: Client, exam: Exam, media: Path, jpeg: bytes, ai: FakeService
+) -> None:
+    photo_report = report_with_photo(exam, jpeg)
+    transcribe_url = url("examiner:transcribe_photo", exam, photo_report.pk)
+    page = clarification_page(examiner, exam, photo_report.clarification_id)
+    assert f'data-transcribe-wording="{transcribe_url}"' in page
+    result = transcribe_report_photo(examiner, exam, photo_report.pk)
+    assert result == (200, b"Can we assume x > 0?")
+    [(_, body)] = ai.requests
+    assert body["model"] == "vision"
+    image = body["messages"][0]["content"][0]["image_url"]["url"]
+    assert image.startswith("data:image/jpeg;base64,")
+
+
+def test_no_transcription_when_the_question_has_wording(
+    examiner: Client, exam: Exam, media: Path, jpeg: bytes
+) -> None:
+    connect(exam)
+    photo_report = report_with_photo(exam, jpeg, text="Is x an integer?")
+    transcribe_url = url("examiner:transcribe_photo", exam, photo_report.pk)
+    assert transcribe_url not in clarification_page(examiner, exam, photo_report.clarification_id)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_failed_photo_transcription_is_bad_gateway(
+    examiner: Client, exam: Exam, media: Path, jpeg: bytes, ai: FakeService
+) -> None:
+    ai.status = 400
+    assert transcribe_report_photo(examiner, exam, report_with_photo(exam, jpeg).pk)[0] == 502
+
+
+def test_no_photo_transcription_without_a_service(
+    examiner: Client, exam: Exam, media: Path, jpeg: bytes
+) -> None:
+    photo_report = report_with_photo(exam, jpeg)
+    assert transcribe_report_photo(examiner, exam, photo_report.pk)[0] == 404
+    page = clarification_page(examiner, exam, photo_report.clarification_id)
+    assert "data-transcribe-wording=" not in page
+
+
+def test_only_reports_with_a_photo_are_transcribed(examiner: Client, exam: Exam) -> None:
+    connect(exam)
+    assert transcribe_report_photo(examiner, exam, report(exam).pk)[0] == 404
+
+
+def test_invigilators_cannot_transcribe_a_reports_photo(
+    invigilator: Client, exam: Exam, media: Path, jpeg: bytes
+) -> None:
+    connect(exam)
+    assert transcribe_report_photo(invigilator, exam, report_with_photo(exam, jpeg).pk)[0] == 403
 
 
 def read(client: Client, exam: Exam, file: ExamFile, number: int) -> int:

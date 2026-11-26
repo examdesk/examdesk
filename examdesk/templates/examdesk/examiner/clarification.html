@@ -36,26 +36,30 @@
 
       <section aria-label="Question">
         {% if editable %}
-          <form method="post" action="{% url 'examiner:reword_clarification' pk clarification.pk %}" data-inline-edit data-saved-text="{{ clarification.wording }}">
+          <form method="post" action="{% url 'examiner:reword_clarification' pk clarification.pk %}" id="wording-form" data-inline-edit data-saved-text="{{ clarification.wording }}">
             {% csrf_token %}
             <button type="button" class="wording-view group" data-edit title="Edit wording"><span class="sr-only">Edit wording: </span>
               {% if clarification.wording %}<span class="wording-text">{{ clarification.wording }}</span>{% else %}<span class="text-sm font-medium text-primary">Add wording</span>{% endif %}
               <c-icon name="pencil" class="wording-edit-icon" />
             </button>
-            <div class="wording-editor" data-editor hidden>
+            <div class="wording-editor peer" data-editor hidden>
               <textarea name="text" maxlength="{{ config.text_max }}" rows="1" aria-label="Wording" class="field-sizing-content min-h-0 resize-none px-2 py-1 text-lg leading-7 font-medium">{{ clarification.wording }}</textarea>
               <div class="flex shrink-0 gap-1">
                 <button class="btn btn-primary btn-sm btn-square" aria-label="Save wording" title="Save"><c-icon name="check" /></button>
                 <button type="button" class="btn btn-ghost btn-sm btn-square" data-cancel-edit aria-label="Cancel" title="Cancel"><c-icon name="x" /></button>
               </div>
             </div>
+            {% if question_photo and member.exam.has_ai_service %}<p class="meta mt-1 peer-[[hidden]]:hidden" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>{% endif %}
           </form>
         {% elif clarification.wording %}
           <p class="wording-text">{{ clarification.wording }}</p>
         {% endif %}
         {% if question_photo %}
           {% url 'photo' pk question_photo.pk as photo %}
-          <c-photo-viewer id="photo-{{ question_photo.pk }}" src="{{ photo }}" alt="Photo, {{ question_photo.venue }} {{ question_photo.seat }}" class="mt-3 block w-fit"><img class="max-h-80 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>
+          <div class="relative mt-3 w-fit">
+            <c-photo-viewer id="photo-{{ question_photo.pk }}" src="{{ photo }}" alt="Photo, {{ question_photo.venue }} {{ question_photo.seat }}" class="block"><img class="max-h-80 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>
+            {% if editable and member.exam.has_ai_service %}<button type="button" form="wording-form" class="btn btn-outline btn-sm absolute right-2 bottom-2" data-transcribe-wording="{% url 'examiner:transcribe_photo' pk question_photo.pk %}" title="Read with AI"><c-icon name="sparkles" class="in-aria-busy:hidden" />Read photo</button>{% endif %}
+          </div>
         {% endif %}
         {% if reports %}
           <div class="seat-pills mt-3" role="group" aria-label="Seats">

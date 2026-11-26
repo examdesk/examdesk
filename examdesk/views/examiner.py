@@ -1,6 +1,7 @@
 """The examiner's screens (laptop)."""
 
 import logging
+import mimetypes
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -369,6 +370,26 @@ async def draft_answer(
     clarification, files = await sync_to_async(to_draft)(member, clarification_id)
     await sync_to_async(connections.close_all)()
     text = await ai.draft_answer(member.exam, clarification, files)
+    return HttpResponse(text, content_type="text/plain")
+
+
+def load_report_photo(member: Member, report_id: int) -> tuple[bytes, str]:
+    reports = Report.objects.of_exam(member.exam).exclude(photo="")
+    photo = get_object_or_404(reports, pk=report_id).photo
+    content_type, _ = mimetypes.guess_type(photo.url)
+    with photo.open("rb"):
+        return photo.read(), content_type or "application/octet-stream"
+
+
+@require_POST
+@ai_view(examiner_only=True, live_only=True)
+async def transcribe_photo(
+    request: HtmxRequest, member: Member, report_id: int
+) -> HttpResponseBase:
+    """The handwriting in a report's photo, as plain text."""
+    photo, content_type = await sync_to_async(load_report_photo)(member, report_id)
+    await sync_to_async(connections.close_all)()
+    text = await ai.transcribe(member.exam, photo, content_type)
     return HttpResponse(text, content_type="text/plain")
 
 

@@ -54,6 +54,11 @@ examiner_patterns: list[URLPattern | URLResolver] = [
     path("clarifications/export/", examiner.export_clarifications, name="export_clarifications"),
     path("clarifications/<int:clarification_id>/", include(clarification_patterns)),
     path("reports/<int:report_id>/move/", examiner.move_report, name="move_report"),
+    path(
+        "reports/<int:report_id>/transcribe/",
+        examiner.transcribe_photo,
+        name="transcribe_photo",
+    ),
     path("announcements/", examiner.announcements, name="announcements"),
     path("announcements/new/", examiner.announce, name="announce"),
     path(
