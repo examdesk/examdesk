@@ -296,6 +296,13 @@
     > .match-action { @apply mt-2.5 inline-flex items-center gap-1 text-sm font-semibold text-primary; }
   }
   .disclosure-row { @apply flex list-none items-center gap-1 px-4 py-3.5 text-sm font-semibold text-primary; }
+  /* Icon-only Retake and Remove on phones, to fit beside "Couldn't read the photo." */
+  .photo-card:has([data-transcribe-failed]:not([hidden])) [data-photo-actions] .btn {
+    @apply max-sm:btn-square;
+    > span { @apply max-sm:sr-only; }
+  }
+  /* Same question waits, like Save, while a photo is shrunk or read (app.js). */
+  .report-form:has(.action-bar[hidden] [data-save]) button.match-button { @apply pointer-events-none opacity-60 transition-opacity delay-150 duration-150; }
   /* The screen's main action, pinned above the tab bar while its section is on screen. */
   .action-bar { @apply sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 mt-4 bg-base-200/90 px-4 py-3 backdrop-blur; }
   .deliver-row {
@@ -562,6 +569,8 @@
   :is(body.invigilator, .landing-phone) .btn:not(.btn-xs) { @apply min-h-11; }
   .btn .icon { @apply size-4; }
   .btn-lg .icon { @apply size-5; }
+  /* New clarification's Type question and Take photo tiles. */
+  .question-choice { @apply h-auto flex-col gap-2 px-3 py-6; .icon { @apply size-6; } }
   .btn[aria-busy=true]::before, form.htmx-request .btn:not([type=button])::before { content: ""; @apply loading loading-spinner loading-sm; }
   /* While a link or GET form loads (app.js): the part it replaces dims after 150 ms, and a bar at
      the top eases towards 90%, completes when the page arrives, then fades. Transitions, not

@@ -65,6 +65,7 @@ ignore = ["RUF012"]  # Django's Meta.ordering and Meta.constraints are plain lis
 strict = true
 plugins = ["mypy_django_plugin.main"]
 exclude = ["examdesk/migrations/"]
+untyped_calls_exclude = ["asgiref.testing"]
 
 [[tool.mypy.overrides]]
 module = ["segno.*", "onnxruntime.*", "allauth.*", "pypdfium2.*", "timezone_field.*"]

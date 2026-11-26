@@ -328,8 +328,8 @@ const filterItems = (filter) => {
   filter.form.querySelector("[data-filter-empty]").hidden = items.some((item) => !item.hidden);
 };
 document.addEventListener("input", (event) => event.target.matches("[data-filter]") && filterItems(event.target));
-// data-draft, data-transcribe-wording, data-retry, data-copy, data-clear (the photo) and
-// data-show/data-hide buttons.
+// data-draft, data-transcribe-wording, data-retry, data-copy, data-type-question,
+// data-clear (the photo) and data-show/data-hide buttons.
 const handleButtons = (event) => {
   const target = event.target;
   const copy = target.closest("[data-copy]");
@@ -350,10 +350,15 @@ const handleButtons = (event) => {
       label.textContent = "Copied";
       setTimeout(() => (label.textContent = label.dataset.copyLabel), 2000);
     });
+  } else if (target.closest("[data-type-question]")) {
+    const form = target.closest("form");
+    showComposer(form, true);
+    form.elements.text.focus();
   } else if (target.closest("[data-clear]")) {
     const input = target.closest("[data-photo-field]").querySelector("[data-photo]");
     input.value = "";
     input.dispatchEvent(new Event("change", { bubbles: true }));
+    if (!input.form.elements.text.value.trim()) showComposer(input.form, false);
   } else if (toggle) {
     const show = "show" in toggle.dataset;
     const id = show ? toggle.dataset.show : toggle.dataset.hide;
@@ -371,14 +376,38 @@ const followRow = (event) => {
   if (event.ctrlKey || event.metaKey) window.open(link.href, "_blank");
   else link.click();
 };
+// While a photo is shrunk or read, Save and the photo's actions are hidden.
+const setPhotoBusy = (field, busy) => {
+  field.closest("form").querySelector("[data-save]").closest(".action-bar").hidden = busy;
+  const photoActions = field.querySelector("[data-photo-actions]");
+  photoActions.hidden = busy;
+  if (busy) return;
+  // A double tap on Cancel mustn't land on Remove, which takes its place.
+  photoActions.inert = true;
+  setTimeout(() => (photoActions.inert = false), 400);
+};
+// Block submits, Same question included, while a photo is shrunk or read.
+document.addEventListener("submit", (event) => {
+  if (!event.target.querySelector(".action-bar[hidden] [data-save]")) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}, true);
+// Shows New clarification's form, or the Type question / Take photo choice before it.
+const showComposer = (form, shown) => {
+  form.querySelector("[data-question-choice]").hidden = shown;
+  form.querySelector("[data-composer]").hidden = !shown;
+};
 // Downscale and re-encode photos before upload; this also strips EXIF location.
 const shrinkPhoto = async (input) => {
-  const preview = input.closest("[data-photo-field]").querySelector("[data-preview]");
+  const field = input.closest("[data-photo-field]");
+  const preview = field.querySelector("[data-preview]");
   preview.hidden = !input.files.length;
+  field.querySelector("[data-add-photo]").hidden = !preview.hidden;
   if (!input.files.length) return;
-  const submit = input.form.querySelector("[data-save]");
-  submit.setAttribute("aria-busy", "true");
-  submit.disabled = true;
+  const image = preview.querySelector("img");
+  image.addEventListener("load", () => preview.scrollIntoView({ block: "nearest", behavior: "smooth" }), { once: true });
+  image.src = URL.createObjectURL(input.files[0]);
+  setPhotoBusy(field, true);
   try {
     const bitmap = await createImageBitmap(input.files[0]);
     const scale = Math.min(1, Number(document.body.dataset.photoMaxSide) / Math.max(bitmap.width, bitmap.height));
@@ -395,35 +424,55 @@ const shrinkPhoto = async (input) => {
     files.items.add(new File([blob], "photo.jpg", { type: "image/jpeg" }));
     input.files = files.files;
   } finally {
-    submit.removeAttribute("aria-busy");
-    submit.disabled = false;
-    preview.querySelector("img").src = URL.createObjectURL(input.files[0]);
+    setPhotoBusy(field, false);
+    image.src = URL.createObjectURL(input.files[0]);
   }
 };
-// POST to one of the AI service views: its text, or null if it failed.
-const askAI = async (url, form, body) => {
+// POST to one of the AI service views: its text, or null if it failed or was aborted.
+const askAI = async (url, form, body, signal) => {
   const headers = { "X-CSRFToken": form.elements.csrfmiddlewaretoken.value };
-  const response = await fetch(url, { method: "POST", body, headers }).catch(() => null);
-  return response?.ok ? await response.text() : null;
+  const response = await fetch(url, { method: "POST", body, headers, signal }).catch(() => null);
+  return response?.ok ? await response.text().catch(() => null) : null;
 };
-// Fill in the question from the photo, unless the invigilator has typed one.
+// Fill in the question from the photo, unless the invigilator has typed one. Cancel shows after
+// 3 s; Cancel, typing, another photo or leaving the page stops the read.
 const transcribePhoto = async (input) => {
   const field = input.closest("[data-photo-field]");
   const question = input.form.elements.text;
-  const failed = field.querySelector("[data-transcribe-failed]");
-  failed.hidden = true;
+  const errorMessage = field.querySelector("[data-transcribe-failed]");
+  errorMessage.hidden = true;
   if (!field.dataset.transcribe || !input.files.length || question.value.trim()) return;
-  const button = input.closest("label");
+  const status = field.querySelector("[data-transcribe-status]");
+  const skeleton = input.form.querySelector("[data-text-skeleton]");
+  const cancelButton = field.querySelector("[data-cancel-transcribe]");
+  const placeholder = question.placeholder;
+  const abortController = new AbortController();
+  const { signal } = abortController;
+  const endTranscription = () => abortController.abort();
+  const cancelButtonTimer = setTimeout(() => (cancelButton.hidden = false), 3000);
+  status.hidden = false;
+  skeleton.hidden = false;
+  question.placeholder = "";
+  setPhotoBusy(field, true);
+  cancelButton.addEventListener("click", endTranscription, { signal });
+  question.addEventListener("input", endTranscription, { signal });
+  input.addEventListener("change", endTranscription, { signal });
+  document.addEventListener("htmx:after:swap", () => input.isConnected || endTranscription(), { signal });
+  signal.addEventListener("abort", () => {
+    clearTimeout(cancelButtonTimer);
+    cancelButton.hidden = true;
+    status.hidden = true;
+    skeleton.hidden = true;
+    question.placeholder = placeholder;
+    setPhotoBusy(field, false);
+  });
   const body = new FormData();
   body.append("photo", input.files[0]);
-  const placeholder = question.placeholder;
-  button.setAttribute("aria-busy", "true");
-  question.placeholder = "Reading the photo…";
-  const text = await askAI(field.dataset.transcribe, input.form, body);
-  button.removeAttribute("aria-busy");
-  question.placeholder = placeholder;
-  failed.hidden = Boolean(text);
-  if (text && !question.value.trim()) {
+  const text = await askAI(field.dataset.transcribe, input.form, body, signal);
+  if (signal.aborted) return;
+  endTranscription();
+  errorMessage.hidden = Boolean(text);
+  if (text) {
     question.value = text;
     question.dispatchEvent(new Event("input", { bubbles: true }));
   }
@@ -620,6 +669,8 @@ document.addEventListener("keydown", (event) => {
 });
 document.addEventListener("change", (event) => {
   const field = event.target;
-  if (field.matches("[data-photo]")) shrinkPhoto(field).then(() => transcribePhoto(field));
-  else if (field.form?.hasAttribute("data-autosubmit") && field.name && !field.classList.contains("tomselected")) field.form.requestSubmit();
+  if (field.matches("[data-photo]")) {
+    if (field.files.length) showComposer(field.form, true);
+    shrinkPhoto(field).then(() => transcribePhoto(field));
+  } else if (field.form?.hasAttribute("data-autosubmit") && field.name && !field.classList.contains("tomselected")) field.form.requestSubmit();
 });

@@ -182,9 +182,18 @@ def show_photo(demo: Demo, already_taken: bool = False) -> None:
     demo.set_attributes("phone", "[data-preview] img", src=static("examdesk/handwriting.svg"))
     if already_taken:
         demo.set_attributes("phone", "[data-preview]", hidden=None)
+        demo.set_attributes("phone", "[data-add-photo]", hidden="")
     else:
         demo.set("phone", "[data-preview]", hidden=False)
+        demo.set("phone", "[data-add-photo]", hidden=True)
         demo.scroll("phone", with_previous=True)
+
+
+def tap_question_choice(demo: Demo, on: str) -> None:
+    """Tap Type question or Take photo and show the question form."""
+    demo.tap("phone", on, delay=0.4)
+    demo.set("phone", "[data-question-choice]", hidden=True)
+    demo.set("phone", "[data-composer]", hidden=False)
 
 
 def hero() -> Demo:
@@ -222,6 +231,7 @@ def hero() -> Demo:
     )
     demo.tap("phone", f"{NEW_QUESTION} > summary", delay=0.6)
     demo.set("phone", NEW_QUESTION, open=True)
+    tap_question_choice(demo, "[data-type-question]")
     demo.tap("phone", "#report-text")
     demo.type("phone", "#report-text", question)
     demo.tap("phone", SAVE_BUTTON, delay=0.4)
@@ -310,9 +320,11 @@ def report() -> Demo:
     demo.tap("phone", f"{NEW_QUESTION} > summary", delay=0.6)
     demo.set("phone", NEW_QUESTION, open=True)
     demo.scroll("phone")
-    demo.tap("phone", "[data-photo-field] label", delay=0.4)
+    tap_question_choice(demo, "[data-question-choice] label")
+    demo.set("phone", "[data-text-skeleton], [data-transcribe-status]", hidden=False)
+    demo.set("phone", "[data-photo-actions], [data-composer] .action-bar", hidden=True)
+    demo.set("phone", "#report-text", attr={"placeholder": ""})
     show_photo(demo)
-    demo.set("phone", "#report-text", attr={"placeholder": "Reading the photo…"})
     demo.pause(1.2)
     demo.show(
         "phone",

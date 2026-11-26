@@ -1,9 +1,11 @@
 """The exam's own AI service: transcribing photos, drafting answers and finding duplicates."""
 
+import asyncio
 import json
 import math
 import threading
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -11,10 +13,13 @@ from typing import Any
 import httpx2
 import openai
 import pytest
+from asgiref.testing import ApplicationCommunicator
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.handlers.asgi import ASGIHandler
 from django.db import connection
 from django.test import Client
+from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 from pytest_django.fixtures import Settings
 
 from examdesk import ai as ai_service
@@ -34,11 +39,14 @@ def connect(exam: Exam, base_url: str = SERVICE["base_url"]) -> None:
 
 
 class FakeService(ThreadingHTTPServer):
-    """An OpenAI-compatible service on localhost that answers with `status` and `content`."""
+    """An OpenAI-compatible service on localhost that answers with `status` and `content`. With
+    `never_answers` it doesn't answer, and sets `client_disconnected` once the client hangs up."""
 
     status = 200
     content = " Can we assume x > 0?\n"
     logprobs: list[dict[str, Any]] | None = None
+    never_answers = False
+    client_disconnected: threading.Event
     requests: list[tuple[dict[str, str], dict[str, Any]]]
 
     @property
@@ -56,6 +64,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         self.server.requests.append(({k.lower(): v for k, v in self.headers.items()}, body))
+        if self.server.never_answers:
+            self.connection.recv(1)  # returns when the client disconnects
+            self.server.client_disconnected.set()
+            return
         message = {"role": "assistant", "content": self.server.content}
         choice = {"index": 0, "finish_reason": "stop", "message": message}
         if self.server.logprobs is not None:
@@ -88,6 +100,7 @@ def ai(exam: Exam) -> Iterator[FakeService]:
     cache.clear()
     with FakeService(("127.0.0.1", 0), Handler) as server:
         server.requests = []
+        server.client_disconnected = threading.Event()
         threading.Thread(target=server.serve_forever, daemon=True).start()
         connect(exam, server.base_url)
         yield server
@@ -128,6 +141,42 @@ def test_failed_transcription_is_bad_gateway(
 ) -> None:
     ai.status = 400
     assert transcribe(invigilator, exam, jpeg)[0] == 502
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_cancelled_transcription_stops_asking_the_service(
+    invigilator: Client, exam: Exam, jpeg: bytes, ai: FakeService
+) -> None:
+    ai.never_answers = True
+    invigilator.get(url("invigilator:report", exam))  # sets the CSRF cookie
+    photo = SimpleUploadedFile("photo.jpg", jpeg, content_type="image/jpeg")
+    body = encode_multipart(BOUNDARY, {"photo": photo})
+    cookies = "; ".join(f"{name}={cookie.value}" for name, cookie in invigilator.cookies.items())
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": url("invigilator:transcribe_photo", exam),
+        "query_string": b"",
+        "headers": [
+            (b"host", b"testserver"),
+            (b"content-type", MULTIPART_CONTENT.encode()),
+            (b"content-length", str(len(body)).encode()),
+            (b"cookie", cookies.encode()),
+            (b"x-csrftoken", invigilator.cookies["csrftoken"].value.encode()),
+        ],
+    }
+
+    async def post_then_disconnect() -> bool:
+        communicator = ApplicationCommunicator(ASGIHandler(), scope)
+        await communicator.send_input({"type": "http.request", "body": body})
+        while not ai.requests:
+            await asyncio.sleep(0.01)
+        await communicator.send_input({"type": "http.disconnect"})
+        await communicator.wait()
+        return await asyncio.to_thread(ai.client_disconnected.wait, 5)
+
+    with ThreadPoolExecutor(1) as executor:  # Playwright's tests leave a loop running in this one
+        assert executor.submit(asyncio.run, post_then_disconnect()).result()
 
 
 def test_no_transcription_without_a_service(invigilator: Client, exam: Exam, jpeg: bytes) -> None:

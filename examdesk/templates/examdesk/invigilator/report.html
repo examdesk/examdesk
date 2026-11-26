@@ -1,5 +1,7 @@
 {% extends "examdesk/invigilator/base.html" %}
 {% load examdesk_tags %}
+{# Room to scroll the form's end above the Save bar and the tab bar. #}
+{% block main_class %}pb-40{% endblock %}
 {% block content %}
 {% with pk=member.exam.pk %}
 <h1 class="sr-only">Report a question</h1>
@@ -18,7 +20,7 @@
   <c-error>{% if report_form %}{{ report_form|form_errors }}{% endif %}</c-error>
 
   {# The wrapper stays, so a late response can't land in a list already replaced. #}
-  <div hx-get="{% url 'invigilator:report' pk %}" hx-include="#report-form" hx-trigger="change from:#report-form, input delay:300ms from:#report-text" hx-swap="innerMorph" hx-sync="this:replace">
+  <div hx-get="{% url 'invigilator:report' pk %}" hx-include="#report-form" hx-trigger="change[target.type!='file'] from:#report-form, input delay:300ms from:#report-text" hx-swap="innerMorph" hx-sync="this:replace">
   {% partialdef matches inline %}
   {% with pk=member.exam.pk %}
   <div id="matches" class="mt-6"{% if top_level_label %} data-searched{% endif %}>
@@ -48,21 +50,35 @@
 
   <details class="group new-question" id="new-question"{% if report_form.errors or text %} open{% endif %}>
     <summary class="btn btn-outline btn-block list-none group-open:hidden"><c-icon name="plus" />New clarification</summary>
-    <div class="flex flex-col gap-3">
-      <h2 class="section-title mb-0">New clarification</h2>
-      <textarea name="text" id="report-text" maxlength="{{ config.text_max }}" rows="3" placeholder="What is the student asking?" aria-label="What is the student asking?">{{ text }}</textarea>
-      <div data-photo-field{% if member.exam.has_ai_service %} data-transcribe="{% url 'invigilator:transcribe_photo' pk %}"{% endif %}>
-        <div class="mb-2.5 flex items-start gap-3" data-preview hidden>
-          <img class="max-h-32 rounded-lg border border-base-300" alt="Photo to send">
-          <button type="button" class="btn btn-ghost btn-danger btn-sm" data-clear aria-label="Remove photo"><c-icon name="x" />Remove</button>
-        </div>
-        <label class="btn btn-outline btn-block mb-0 flex-row">
-          <c-icon name="camera" /><span>{% if member.exam.has_ai_service %}Fill in from photo{% else %}Take photo{% endif %}</span>
-          <input type="file" name="photo" accept="image/*" capture="environment" data-photo hidden>
-        </label>
-        <p class="meta mt-1" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>
+    <div class="flex flex-col gap-1.5">
+      <h2 class="text-sm font-medium">New clarification</h2>
+      <div class="grid grid-cols-2 gap-3" data-question-choice{% if report_form.errors or text %} hidden{% endif %}>
+        <button type="button" class="btn btn-outline btn-lg question-choice" data-type-question><c-icon name="square-pen" />Type question</button>
+        <label for="report-photo" class="btn btn-outline btn-lg question-choice"><c-icon name="camera" />Take photo</label>
       </div>
-      <div class="action-bar"><button class="btn btn-primary btn-block btn-lg" name="clarification" value="" data-save><c-icon name="check" />Save clarification</button></div>
+      <div class="flex flex-col gap-3" data-composer{% if not report_form.errors and not text %} hidden{% endif %}>
+        <div class="relative">
+          <textarea name="text" id="report-text" maxlength="{{ config.text_max }}" rows="3" placeholder="What is the student asking?" aria-label="What is the student asking?">{{ text }}</textarea>
+          <div class="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-3 px-4 py-3.5" data-text-skeleton hidden><div class="skeleton h-4 w-11/12"></div><div class="skeleton h-4 w-2/3"></div></div>
+        </div>
+        <div data-photo-field{% if member.exam.has_ai_service %} data-transcribe="{% url 'invigilator:transcribe_photo' pk %}"{% endif %}>
+          <input type="file" name="photo" id="report-photo" accept="image/*" capture="environment" data-photo hidden>
+          <div class="photo-card scroll-mb-40 overflow-hidden rounded-box border border-base-300 bg-base-200" data-preview hidden>
+            <img class="mx-auto max-h-58 w-auto" alt="Photo to send">
+            <div class="flex min-h-14 items-center gap-1 border-t border-base-300 bg-base-100/90 px-3">
+              <span class="flex items-center" data-transcribe-status hidden><span class="loading loading-spinner text-primary"></span><span class="ml-1 font-medium">Reading the photo</span></span>
+              <button type="button" class="btn btn-outline btn-sm ml-auto" data-cancel-transcribe hidden>Cancel</button>
+              <span class="meta px-1" role="status" data-transcribe-failed hidden>Couldn't read the photo.</span>
+              <span class="ml-auto flex gap-1" data-photo-actions>
+                <label for="report-photo" class="btn btn-ghost btn-sm"><c-icon name="camera" /><span>Retake</span></label>
+                <button type="button" class="btn btn-ghost btn-danger btn-sm" data-clear aria-label="Remove photo"><c-icon name="x" /><span>Remove</span></button>
+              </span>
+            </div>
+          </div>
+          <label for="report-photo" class="btn btn-outline btn-block mb-0 flex-row" data-add-photo><c-icon name="camera" />Add photo</label>
+        </div>
+        <div class="action-bar"><button class="btn btn-primary btn-block btn-lg" name="clarification" value="" data-save><c-icon name="check" />Save clarification</button></div>
+      </div>
     </div>
   </details>
 </form>

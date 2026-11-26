@@ -62,6 +62,7 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
     invigilator.get_by_role("combobox", name="Question").fill("3(b)")
     invigilator.keyboard.press("Tab")
     # No clarification asked about Q3 yet, so New clarification opens.
+    invigilator.get_by_role("button", name="Type question").click()
     invigilator.get_by_label("What is the student asking?").fill("Is x an integer?")
     invigilator.get_by_role("button", name="Save clarification").click()
     expect(invigilator.get_by_role("heading", name="Reported")).to_be_visible()
