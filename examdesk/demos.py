@@ -120,7 +120,9 @@ class DemoExam:
         self.exam: Exam = services.create_exam(
             name="Algorithms Final", owner=owner, time_zone=ZoneInfo(settings.TIME_ZONE)
         )
-        services.choose_ai_models(self.exam, vision_model="demo", text_model="demo")
+        services.choose_ai_models(
+            self.exam, vision_model="demo", fast_model="demo", careful_model="demo"
+        )
 
     def member(self, name: str, role: Role, venue: str | None = None) -> Member:
         member = services.add_member(self.exam, name=name, role=role)

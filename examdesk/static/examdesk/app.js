@@ -603,6 +603,8 @@ const enhance = (field) => {
   if (multi) settings.plugins = ["remove_button"];
   // A single select in a filter bar (the sort) has a few options: no search box.
   else if (autosubmit && field.localName === "select") settings.controlInput = null;
+  // A select with an empty option can be cleared.
+  if (!multi && field.querySelector("option[value='']")) settings.plugins = { clear_button: { title: "Clear" } };
   if (field.localName === "input") {
     Object.assign(settings, {
       maxItems: 1,

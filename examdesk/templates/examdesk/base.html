@@ -55,7 +55,7 @@
   <div id="toasts" class="toast toast-center toast-bottom z-50">
     {# A refresh leaves the messages to the page the send redirects to. #}
     {% if not is_refresh %}{% for message in messages|unique %}
-      <div class="alert {{ message.tags }}" role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}"><c-icon name="{% if message.tags == 'error' %}circle-alert{% elif message.tags == 'info' %}info{% else %}circle-check{% endif %}" /><span>{{ message }}</span>{% if message.tags == 'error' %}<button type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Dismiss" onclick="this.parentElement.remove()"><c-icon name="x" /></button>{% endif %}</div>
+      <div class="alert {{ message.tags }}" role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}"><c-icon name="{% if message.tags == 'error' %}circle-alert{% elif message.tags == 'warning' %}triangle-alert{% elif message.tags == 'info' %}info{% else %}circle-check{% endif %}" /><span>{{ message }}</span>{% if message.tags == 'error' or message.tags == 'warning' %}<button type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Dismiss" onclick="this.parentElement.remove()"><c-icon name="x" /></button>{% endif %}</div>
     {% endfor %}{% endif %}
   </div>
   <p id="news" class="sr-only" aria-live="polite"></p>

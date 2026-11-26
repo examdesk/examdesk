@@ -49,7 +49,7 @@
                 <button type="button" class="btn btn-ghost btn-sm btn-square" data-cancel-edit aria-label="Cancel" title="Cancel"><c-icon name="x" /></button>
               </div>
             </div>
-            {% if question_photo and member.exam.has_ai_service %}<p class="meta mt-1 peer-[[hidden]]:hidden" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>{% endif %}
+            {% if question_photo and member.exam.ai_vision_model %}<p class="meta mt-1 peer-[[hidden]]:hidden" role="status" data-transcribe-failed hidden>Couldn't read the photo.</p>{% endif %}
           </form>
         {% elif clarification.wording %}
           <p class="wording-text">{{ clarification.wording }}</p>
@@ -58,7 +58,7 @@
           {% url 'photo' pk question_photo.pk as photo %}
           <div class="relative mt-3 w-fit">
             <c-photo-viewer id="photo-{{ question_photo.pk }}" src="{{ photo }}" alt="Photo, {{ question_photo.venue }} {{ question_photo.seat }}" class="block"><img class="max-h-80 rounded-lg border border-base-300" src="{{ photo }}" alt=""></c-photo-viewer>
-            {% if editable and member.exam.has_ai_service %}<button type="button" form="wording-form" class="btn btn-outline btn-sm absolute right-2 bottom-2" data-transcribe-wording="{% url 'examiner:transcribe_photo' pk question_photo.pk %}" title="Read with AI"><c-icon name="sparkles" class="in-aria-busy:hidden" />Read photo</button>{% endif %}
+            {% if editable and member.exam.ai_vision_model %}<button type="button" form="wording-form" class="btn btn-outline btn-sm absolute right-2 bottom-2" data-transcribe-wording="{% url 'examiner:transcribe_photo' pk question_photo.pk %}" title="Read with AI"><c-icon name="sparkles" class="in-aria-busy:hidden" />Read photo</button>{% endif %}
           </div>
         {% endif %}
         {% if reports %}
@@ -102,7 +102,7 @@
       {% endif %}
 
       {% if can_answer %}
-        {% if member.exam.has_ai_service %}
+        {% if member.exam.ai_fast_model %}
           {# The most alike until the AI service replies. Keeps what it found through morphs; finds again, in place, when the exam changes. #}
           <div id="duplicates" class="empty:hidden" hx-morph-skip-children hx-get="{% url 'examiner:clarification_duplicates' pk clarification.pk %}?version={{ member.exam.version }}" hx-trigger="load" hx-swap="innerMorph" hx-sync="this:queue last">{% partial duplicates %}</div>
         {% else %}
@@ -116,9 +116,9 @@
         {% csrf_token %}
         <input type="hidden" name="expected_answer" value="{{ answer_form.expected_answer.value|default_if_none:'' }}">
         <textarea name="text" maxlength="{{ config.text_max }}" id="answer-text" rows="3" required aria-label="{% if clarification.current_answer %}Corrected answer{% else %}Answer{% endif %}" placeholder="{% if clarification.current_answer %}Corrected answer{% else %}Answer{% endif %}"{% if correcting %} autofocus{% endif %}>{{ answer_form.text.value|default:"" }}</textarea>
-        {% if member.exam.has_ai_service %}<p class="meta mt-1" role="status" data-draft-failed hidden>Couldn't draft an answer.</p>{% endif %}
+        {% if member.exam.ai_careful_model %}<p class="meta mt-1" role="status" data-draft-failed hidden>Couldn't draft an answer.</p>{% endif %}
         <div class="mt-3 flex flex-wrap items-center gap-1">
-          {% if member.exam.has_ai_service %}<button type="button" class="btn btn-ghost btn-sm max-sm:btn-square text-primary" data-draft="{% url 'examiner:draft_answer' pk clarification.pk %}" title="Draft with AI"><c-icon name="sparkles" /><span class="max-sm:sr-only">Draft</span></button>{% endif %}
+          {% if member.exam.ai_careful_model %}<button type="button" class="btn btn-ghost btn-sm max-sm:btn-square text-primary" data-draft="{% url 'examiner:draft_answer' pk clarification.pk %}" title="Draft with AI"><c-icon name="sparkles" /><span class="max-sm:sr-only">Draft</span></button>{% endif %}
           {% if canned %}
             <button type="button" class="btn btn-ghost btn-sm" popovertarget="quick-replies" style="anchor-name: --quick-replies">Quick replies<c-icon name="chevron-down" class="size-3.5 text-subtle" /></button>
             <ul class="menu-panel" id="quick-replies" popover style="position-anchor: --quick-replies; position-area: top span-right">

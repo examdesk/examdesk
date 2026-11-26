@@ -76,14 +76,19 @@
     <c-dialog id="disconnect-dialog" title="Disconnect the AI service?" action="{% url 'examiner:disconnect_ai_service' pk %}" submit="Disconnect" danger>
       <p>Its address, API key and models are removed.</p>
     </c-dialog>
-    <form method="post" action="{% url 'examiner:choose_ai_models' pk %}" id="models-form">
-      {% csrf_token %}
-      <div class="field">{{ models_form.vision_model.as_field_group }}</div>
-      <div class="field mb-0">{{ models_form.text_model.as_field_group }}</div>
-    </form>
+    {% if exam.ai_models|length == 1 %}
+      <p class="flex items-center justify-between gap-4 text-sm"><span class="font-medium">Model</span><span class="truncate text-muted">{{ exam.ai_vision_model }}</span></p>
+    {% else %}
+      <form method="post" action="{% url 'examiner:choose_ai_models' pk %}" id="models-form">
+        {% csrf_token %}
+        <div class="field">{{ models_form.vision_model.as_field_group }}</div>
+        <div class="field">{{ models_form.fast_model.as_field_group }}</div>
+        <div class="field mb-0">{{ models_form.careful_model.as_field_group }}</div>
+      </form>
+    {% endif %}
     <footer class="card-footer justify-between">
       <button type="button" class="btn btn-ghost btn-danger btn-sm -ml-3" commandfor="disconnect-dialog" command="show-modal"><c-icon name="unplug" />Disconnect AI service</button>
-      <button class="btn btn-primary btn-sm ml-auto" form="models-form"><c-icon name="check" />Save models</button>
+      {% if exam.ai_models|length != 1 %}<button class="btn btn-primary btn-sm ml-auto" form="models-form"><c-icon name="check" />Save models</button>{% endif %}
     </footer>
   {% else %}
     <form method="post" action="{% url 'examiner:connect_ai_service' pk %}" id="connect-form">
@@ -91,17 +96,18 @@
       <div class="field">{{ connect_form.base_url.as_field_group }}</div>
       <div class="field mb-0">{{ connect_form.api_key.as_field_group }}</div>
     </form>
-    <footer class="card-footer"><button class="btn btn-primary btn-sm" form="connect-form"><c-icon name="plug" />Connect</button></footer>
+    {# The id keeps the morph from reusing this button, and its focus, as Disconnect. #}
+    <footer class="card-footer"><button class="btn btn-primary btn-sm" form="connect-form" id="connect-button"><c-icon name="plug" />Connect</button></footer>
   {% endif %}
 </section>
 
-{% if exam.has_ai_service %}
+{% if exam.ai_careful_model %}
 <section class="card-box" aria-labelledby="files-title">
   <header class="card-header">
     <h2 id="files-title" class="flex items-center gap-2">Files for the AI<span class="count">{{ files|length }}</span></h2>
     <form method="post" action="{% url 'examiner:add_file' pk %}" enctype="multipart/form-data" data-autosubmit>
       {% csrf_token %}
-      <label class="btn btn-outline btn-sm"><c-icon name="upload" />Upload file<input type="file" name="file" accept=".pdf,.txt,.md" hidden></label>
+      <label class="btn btn-outline btn-sm"><c-icon name="upload" />Upload file<input type="file" name="file" accept="{% if exam.ai_vision_model %}.pdf,{% endif %}.txt,.md" hidden></label>
     </form>
   </header>
   {{ file_form.file.errors }}

@@ -24,6 +24,7 @@ from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.handlers.asgi import ASGIHandler
 from django.db import connection, connections
+from django.db.migrations.executor import MigrationExecutor
 from django.test import AsyncClient, Client
 from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 from pytest_django.fixtures import Settings
@@ -36,12 +37,13 @@ from tests.helpers import named, report, url
 pytestmark = pytest.mark.django_db
 
 SERVICE = {"base_url": "https://ai.example.edu/v1", "api_key": "sk-1"}
-MODELS = ["text", "vision"]
+MODELS = ["careful", "fast", "vision"]
+CHOSEN_MODELS = {"vision_model": "vision", "fast_model": "fast", "careful_model": "careful"}
 
 
 def connect(exam: Exam, base_url: str = SERVICE["base_url"]) -> None:
     services.connect_ai_service(exam, base_url=base_url, api_key="sk-1", models=MODELS)
-    services.choose_ai_models(exam, vision_model="vision", text_model="text")
+    services.choose_ai_models(exam, **CHOSEN_MODELS)
 
 
 class FakeService(ThreadingHTTPServer):
@@ -130,6 +132,11 @@ def saved(exam: Exam) -> Exam:
     return Exam.objects.get(pk=exam.pk)
 
 
+def chosen_models(exam: Exam) -> tuple[str, str, str]:
+    models = Exam.objects.values_list("ai_vision_model", "ai_fast_model", "ai_careful_model")
+    return models.get(pk=exam.pk)
+
+
 @pytest.mark.django_db(transaction=True)
 def test_transcribes_with_the_exams_service(
     invigilator: Client, exam: Exam, jpeg: bytes, ai: FakeService
@@ -196,32 +203,161 @@ def test_lists_the_services_models(ai: FakeService) -> None:
     assert ai_service.list_models(ai.base_url, "sk-1") == MODELS
 
 
+def connect_to_service_listing(
+    client: Client, exam: Exam, monkeypatch: pytest.MonkeyPatch, models: list[str]
+) -> str:
+    """The settings page after connecting to a service that lists `models` and gives logprobs."""
+    monkeypatch.setattr(ai_service, "list_models", lambda base_url, api_key: models)
+    monkeypatch.setattr(ai_service, "fast_model_returns_logprobs", lambda exam: True)
+    response = client.post(url("examiner:connect_ai_service", exam), SERVICE, follow=True)
+    assert response.redirect_chain == [(url("examiner:settings", exam), 302)]
+    return response.content.decode()
+
+
 def test_examiner_connects_then_picks_models(
     examiner: Client, exam: Exam, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(ai_service, "list_models", lambda base_url, api_key: MODELS)
-    response = examiner.post(url("examiner:connect_ai_service", exam), SERVICE)
-    assert response["Location"] == url("examiner:settings", exam)
+    page = connect_to_service_listing(examiner, exam, monkeypatch, MODELS)
     assert (saved(exam).ai_api_key, saved(exam).ai_models) == ("sk-1", MODELS)
-    page = examiner.get(url("examiner:settings", exam)).content.decode()
+    assert chosen_models(exam) == ("", "", "")
+    assert page.count('<option value="" selected>Pick a model…</option>') == 3
     assert "Connected" in page
+    for label, hint in [
+        ("Vision model", "Reads photos and PDFs"),
+        ("Fast model", "Checks possible duplicates"),
+        ("Careful model", "Drafts answers"),
+    ]:
+        assert f">{label}</label>" in page
+        assert f">{hint}</div>" in page
     assert '<option value="vision">vision</option>' in page
     assert "sk-1" not in page
-    assert not saved(exam).has_ai_service
-    response = examiner.post(url("examiner:choose_ai_models", exam), {"vision_model": "vision"})
-    assert response.status_code == 400
-    assert not saved(exam).has_ai_service
-    models = {"vision_model": "vision", "text_model": "text"}
-    examiner.post(url("examiner:choose_ai_models", exam), models)
-    assert saved(exam).has_ai_service
+    assert "Files for the AI" not in page
+    examiner.post(url("examiner:choose_ai_models", exam), {"vision_model": "vision"})
+    assert chosen_models(exam) == ("vision", "", "")
+    examiner.post(url("examiner:choose_ai_models", exam), CHOSEN_MODELS)
+    assert chosen_models(exam) == ("vision", "fast", "careful")
+    assert "Files for the AI" in examiner.get(url("examiner:settings", exam)).content.decode()
+    examiner.post(url("examiner:choose_ai_models", exam), CHOSEN_MODELS | {"careful_model": ""})
+    assert chosen_models(exam) == ("vision", "fast", "")
+    assert "Files for the AI" not in examiner.get(url("examiner:settings", exam)).content.decode()
+
+
+def test_one_listed_model_does_everything(
+    examiner: Client, exam: Exam, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    page = connect_to_service_listing(examiner, exam, monkeypatch, ["qwen"])
+    assert chosen_models(exam) == ("qwen", "qwen", "qwen")
+    assert '<span class="truncate text-muted">qwen</span>' in page
+    assert "models-form" not in page
+    assert "Files for the AI" in page
 
 
 def test_only_listed_models_can_be_picked(examiner: Client, exam: Exam) -> None:
     connect(exam)
-    examiner.post(
-        url("examiner:choose_ai_models", exam), {"vision_model": "gpt", "text_model": "text"}
+    response = examiner.post(
+        url("examiner:choose_ai_models", exam), CHOSEN_MODELS | {"vision_model": "gpt"}
     )
-    assert saved(exam).ai_vision_model == "vision"
+    assert response.status_code == 400
+    assert chosen_models(exam) == ("vision", "fast", "careful")
+
+
+def save_fast_model(client: Client, exam: Exam, model: str) -> str:
+    response = client.post(
+        url("examiner:choose_ai_models", exam), CHOSEN_MODELS | {"fast_model": model}, follow=True
+    )
+    return response.content.decode()
+
+
+NO_LOGPROBS_WARNING = "With careful, every possible duplicate shows 100% match."
+
+
+def test_warns_when_the_fast_model_gives_no_logprobs(
+    examiner: Client, exam: Exam, ai: FakeService
+) -> None:
+    page = save_fast_model(examiner, exam, "careful")
+    assert "Saved the models." in page
+    assert NO_LOGPROBS_WARNING in page
+    assert chosen_models(exam) == ("vision", "careful", "careful")
+    [(_, body)] = ai.requests
+    assert (body["model"], body["logprobs"]) == ("careful", True)
+
+
+def test_no_warning_when_the_fast_model_gives_logprobs(
+    examiner: Client, exam: Exam, ai: FakeService
+) -> None:
+    ai.logprobs = reply_line_tokens(0.9)
+    assert NO_LOGPROBS_WARNING not in save_fast_model(examiner, exam, "careful")
+
+
+@pytest.mark.parametrize(("status", "warns"), [(400, True), (404, False)])
+def test_only_a_refused_logprobs_request_warns(
+    examiner: Client, exam: Exam, ai: FakeService, status: int, warns: bool
+) -> None:
+    ai.status = status
+    page = save_fast_model(examiner, exam, "careful")
+    assert (NO_LOGPROBS_WARNING in page) == warns
+    assert chosen_models(exam) == ("vision", "careful", "careful")
+
+
+def test_an_unchanged_fast_model_is_not_tested_again(
+    examiner: Client, exam: Exam, ai: FakeService
+) -> None:
+    save_fast_model(examiner, exam, "fast")
+    assert ai.requests == []
+
+
+def test_connecting_warns_when_the_fast_model_gives_no_logprobs(
+    examiner: Client, exam: Exam, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(ai_service, "list_models", lambda base_url, api_key: ["qwen"])
+    monkeypatch.setattr(ai_service, "fast_model_returns_logprobs", lambda exam: False)
+    response = examiner.post(url("examiner:connect_ai_service", exam), SERVICE, follow=True)
+    assert "With qwen, every possible duplicate shows 100% match." in response.content.decode()
+    assert chosen_models(exam) == ("qwen", "qwen", "qwen")
+
+
+@pytest.mark.parametrize("model", list(CHOSEN_MODELS))
+def test_each_feature_needs_only_its_model(
+    examiner: Client, invigilator: Client, exam: Exam, jpeg: bytes, model: str
+) -> None:
+    connect(exam)
+    services.choose_ai_models(
+        exam, **dict.fromkeys(CHOSEN_MODELS, "") | {model: CHOSEN_MODELS[model]}
+    )
+    clarification = report(exam).clarification
+    page = examiner.get(url("examiner:clarification", exam, clarification.pk)).content.decode()
+    settings_page = examiner.get(url("examiner:settings", exam)).content.decode()
+    assert ("data-transcribe=" in step_two(invigilator, exam)) == (model == "vision_model")
+    duplicates_url = url("examiner:clarification_duplicates", exam, clarification.pk)
+    assert (duplicates_url in page) == (model == "fast_model")
+    assert ("data-draft=" in page) == (model == "careful_model")
+    assert ("Files for the AI" in settings_page) == (model == "careful_model")
+    assert (url("examiner:analysis", exam) in settings_page) == (model == "careful_model")
+    if model != "vision_model":
+        assert transcribe(invigilator, exam, jpeg)[0] == 404
+    if model != "fast_model":
+        assert duplicates(examiner, exam)[0] == 404
+    if model != "careful_model":
+        assert draft(examiner, exam, clarification.pk)[0] == 404
+
+
+@pytest.mark.django_db(transaction=True)
+def test_migration_keeps_the_text_model_as_the_fast_and_careful_models() -> None:
+    previous_migration = [("examdesk", "0011_exam_venues")]
+    executor = MigrationExecutor(connection)
+    executor.migrate(previous_migration)
+    apps = executor.loader.project_state(previous_migration).apps
+    owner = apps.get_model("auth", "User").objects.create(username="owner")
+    apps.get_model("examdesk", "Exam").objects.create(
+        name="Algorithms Final",
+        owner=owner,
+        time_zone="UTC",
+        ai_vision_model="vision",
+        ai_text_model="text",
+    )
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+    assert chosen_models(Exam.objects.get()) == ("vision", "text", "text")
 
 
 def test_refused_key_is_an_error_on_the_key(
@@ -242,7 +378,7 @@ def test_disconnect_clears_the_service(examiner: Client, exam: Exam) -> None:
     connect(exam)
     examiner.post(url("examiner:disconnect_ai_service", exam))
     assert (saved(exam).ai_base_url, saved(exam).ai_api_key, saved(exam).ai_models) == ("", "", [])
-    assert not saved(exam).has_ai_service
+    assert chosen_models(exam) == ("", "", "")
 
 
 def test_service_needs_https(examiner: Client, exam: Exam) -> None:
@@ -307,7 +443,7 @@ def test_drafts_from_the_exams_files(examiner: Client, exam: Exam, ai: FakeServi
     assert "data-draft=" in page
     assert draft(examiner, exam, clarification.pk) == (200, b"Can we assume x > 0?")
     [(_, body)] = ai.requests
-    assert body["model"] == "text"
+    assert body["model"] == "careful"
     system, question = (message["content"] for message in body["messages"])
     assert "No comment." in system
     assert "# errata.txt\n\nQ3b: x is a positive integer." in system
@@ -434,6 +570,7 @@ def test_reads_pdf_pages_with_the_service(
     [file] = exam.files.all()
     assert read(examiner, exam, file, 2) == 204
     [(_, body)] = ai.requests
+    assert body["model"] == "vision"
     image, prompt = body["messages"][0]["content"]
     assert image["image_url"]["url"].startswith("data:image/png;base64,")
     assert "never put the text in a code block" in prompt["text"]
@@ -504,6 +641,15 @@ def test_examiner_sees_each_page_and_what_the_ai_read(
     assert invigilator.get(url("examiner:file", exam, file.pk)).status_code == 403
 
 
+def test_pdfs_need_a_vision_model(examiner: Client, exam: Exam) -> None:
+    connect(exam)
+    services.choose_ai_models(exam, **CHOSEN_MODELS | {"vision_model": ""})
+    page = upload(examiner, exam, "paper.pdf", pdf(1))
+    assert "Pick a vision model to read PDFs." in page
+    assert 'accept=".txt,.md"' in page
+    assert not exam.files.exists()
+
+
 def test_text_files_show_their_text_without_images(examiner: Client, exam: Exam) -> None:
     connect(exam)
     upload(examiner, exam, "errata.md", b"Q3b: x is a positive integer.")
@@ -558,7 +704,7 @@ def test_ai_confirms_possible_duplicates(examiner: Client, exam: Exam, ai: FakeS
     assert "100% match" in panel  # without logprobs
     assert "big-O" in panel
     [(_, body)] = ai.requests
-    assert body["model"] == "text"
+    assert body["model"] == "fast"
     assert body["logprobs"]
     prompt = body["messages"][1]["content"]
     assert "Clarification:\n<clarification>\n[Q3b] Do we give the exact count?\n" in prompt
@@ -701,7 +847,7 @@ def test_analyses_the_clarifications_after_the_exam(
     assert page.count("None found") == 1
     assert "Generated " in page
     [(_, body)] = ai.requests
-    assert body["model"] == "text"
+    assert body["model"] == "careful"
     system, clarifications = (message["content"] for message in body["messages"])
     assert system.endswith("# paper.txt\n\nQ3b. Count the comparisons.")
     assert clarifications == (

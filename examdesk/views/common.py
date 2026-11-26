@@ -3,7 +3,7 @@ from collections import defaultdict
 from collections.abc import Callable, Coroutine, Iterable, Iterator
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any
+from typing import Any, Literal
 
 import openai
 from asgiref.sync import sync_to_async
@@ -21,12 +21,13 @@ from ..models import Announcement, Clarification, Exam, Member, Readout, Report
 logger = logging.getLogger(__name__)
 
 type AsyncView = Callable[..., Coroutine[Any, Any, HttpResponseBase]]
+type AIModelField = Literal["ai_vision_model", "ai_fast_model", "ai_careful_model"]
 
 
 def ai_view(
-    *, examiner_only: bool = False, live_only: bool = False
+    model: AIModelField, *, examiner_only: bool = False, live_only: bool = False
 ) -> Callable[[AsyncView], AsyncView]:
-    """An async `exam_view` for exams with an AI service, answering 502 when the service fails.
+    """An async `exam_view` for exams with `model` chosen, answering 502 when the AI service fails.
 
     The view closes its database connections before waiting on the service.
     """
@@ -39,7 +40,7 @@ def ai_view(
             )
             if not isinstance(member, Member):
                 return member
-            if not member.exam.has_ai_service:
+            if not getattr(member.exam, model):
                 raise Http404
             try:
                 return await view(request, member, **kwargs)

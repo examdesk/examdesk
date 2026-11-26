@@ -261,19 +261,34 @@ class AIConnectForm(BaseForm):
 
 
 class AIModelsForm(BaseForm):
-    vision_model = forms.ChoiceField(label="Vision")
-    text_model = forms.ChoiceField(label="Text")
+    vision_model = forms.ChoiceField(
+        label="Vision model", help_text="Reads photos and PDFs", required=False
+    )
+    fast_model = forms.ChoiceField(
+        label="Fast model", help_text="Checks possible duplicates", required=False
+    )
+    careful_model = forms.ChoiceField(
+        label="Careful model", help_text="Drafts answers", required=False
+    )
 
     def __init__(self, *args: Any, exam: Exam, **kwargs: Any) -> None:
-        initial = {"vision_model": exam.ai_vision_model, "text_model": exam.ai_text_model}
+        initial = {
+            "vision_model": exam.ai_vision_model,
+            "fast_model": exam.ai_fast_model,
+            "careful_model": exam.ai_careful_model,
+        }
         super().__init__(*args, initial=initial, **kwargs)
         choices = [("", "Pick a model…"), *((model, model) for model in exam.ai_models)]
-        for name in ("vision_model", "text_model"):
-            self.fields[name].choices = choices  # type: ignore[attr-defined]
+        for field in self.fields.values():
+            field.choices = choices  # type: ignore[attr-defined]
 
 
 class ExamFileForm(BaseForm):
     file = forms.FileField()
+
+    def __init__(self, *args: Any, exam: Exam, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.exam = exam
 
     def clean_file(self) -> UploadedFile[bytes]:
         upload: UploadedFile[bytes] = self.cleaned_data["file"]
@@ -282,6 +297,8 @@ class ExamFileForm(BaseForm):
         data = upload.read()
         upload.seek(0)
         match Path(upload.name or "").suffix.lower():
+            case ".pdf" if not self.exam.ai_vision_model:
+                raise forms.ValidationError("Pick a vision model to read PDFs.")
             case ".pdf":
                 try:
                     pdf.page_count(data)

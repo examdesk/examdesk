@@ -40,7 +40,8 @@ class Exam(models.Model):
     time_zone = TimeZoneField()
     ai_base_url = models.URLField("API base URL", blank=True)
     ai_vision_model = models.CharField("vision model", max_length=200, blank=True)
-    ai_text_model = models.CharField("text model", max_length=200, blank=True)
+    ai_fast_model = models.CharField("fast model", max_length=200, blank=True)
+    ai_careful_model = models.CharField("careful model", max_length=200, blank=True)
     ai_api_key = EncryptedTextField("API key", blank=True)
     ai_models = models.JSONField("models", default=list, blank=True)
     question_numbers = models.CharField(
@@ -64,10 +65,6 @@ class Exam(models.Model):
     def only_venue(self) -> str | None:
         """The venue, if the exam lists only one."""
         return self.venues[0] if len(self.venues) == 1 else None
-
-    @property
-    def has_ai_service(self) -> bool:
-        return bool(self.ai_vision_model and self.ai_text_model)
 
     @staticmethod
     def token_field(role: Role) -> str:

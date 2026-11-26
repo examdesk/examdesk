@@ -10,7 +10,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 
 from django.conf import settings
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI, BadRequestError, OpenAI
 from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionMessageParam,
@@ -118,11 +118,32 @@ class Findings(BaseModel):
     inconsistent_answers: list[Problem]
 
 
+def _sync_client(base_url: str, api_key: str) -> OpenAI:
+    timeout = settings.EXAMDESK_AI_TIMEOUT.total_seconds()
+    return OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
+
+
 def list_models(base_url: str, api_key: str) -> list[str]:
     """Raises `openai.APIError`."""
-    timeout = settings.EXAMDESK_AI_TIMEOUT.total_seconds()
-    with OpenAI(base_url=base_url, api_key=api_key, timeout=timeout) as client:
+    with _sync_client(base_url, api_key) as client:
         return sorted(model.id for model in client.models.list())
+
+
+def fast_model_returns_logprobs(exam: Exam) -> bool:
+    """False when the service refuses logprobs. Raises `openai.APIError`."""
+    with _sync_client(exam.ai_base_url, exam.ai_api_key) as client:
+        try:
+            completion = client.chat.completions.create(
+                model=exam.ai_fast_model,
+                messages=[{"role": "user", "content": "Reply with Yes."}],
+                max_tokens=1,
+                logprobs=True,
+                top_logprobs=5,
+            )
+        except BadRequestError:
+            return False
+    logprobs = completion.choices[0].logprobs
+    return bool(logprobs and logprobs.content)
 
 
 def _client(exam: Exam) -> AsyncOpenAI:
@@ -170,7 +191,7 @@ async def draft_answer(exam: Exam, clarification: Clarification, files: Iterable
         {"role": "system", "content": system},
         {"role": "user", "content": question},
     ]
-    text = await _reply(exam, exam.ai_text_model, messages)
+    text = await _reply(exam, exam.ai_careful_model, messages)
     return text[: settings.EXAMDESK_TEXT_MAX]
 
 
@@ -210,7 +231,7 @@ async def analyse(
     # A timeout isn't retried.
     async with _client(exam).with_options(timeout=timeout, max_retries=0) as client:
         completion = await client.chat.completions.create(
-            model=exam.ai_text_model, temperature=0, messages=messages
+            model=exam.ai_careful_model, temperature=0, messages=messages
         )
     return Findings.model_validate_json(completion.choices[0].message.content or "")
 
@@ -261,7 +282,7 @@ def duplicates_cache_key(
 ) -> str:
     """Changes with the service, the model and the prompt."""
     messages = _duplicates_messages(clarification, candidates)
-    data = json.dumps([exam.ai_base_url, exam.ai_text_model, messages])
+    data = json.dumps([exam.ai_base_url, exam.ai_fast_model, messages])
     return "duplicates:" + hashlib.sha256(data.encode()).hexdigest()
 
 
@@ -275,7 +296,7 @@ async def confirm_duplicates(
     """
     async with _client(exam) as client:
         completion = await client.chat.completions.create(
-            model=exam.ai_text_model,
+            model=exam.ai_fast_model,
             temperature=0,
             messages=_duplicates_messages(clarification, candidates),
             logprobs=True,

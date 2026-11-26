@@ -29,11 +29,13 @@ Settings exports the clarifications to CSV.
 ## AI service
 
 A sentence-embedding model on the server finds possible duplicates. An exam can also connect an
-OpenAI-compatible API in its settings, with two models:
+OpenAI-compatible API in its settings, with three models:
 
 - The **vision model** transcribes photos of questions and reads uploaded PDFs.
-- The **text model** drafts answers from the uploaded exam paper, confirms duplicates and analyses
-  the clarifications.
+- The **fast model** confirms possible duplicates, with a percentage from its logprobs.
+- The **careful model** drafts answers from the uploaded exam paper and analyses the clarifications.
+
+A feature works once its model is chosen.
 
 API keys are encrypted with `DJANGO_SECRET_KEY`. After changing it, examiners connect again.
 

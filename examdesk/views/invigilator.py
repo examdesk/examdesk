@@ -199,7 +199,7 @@ def report(request: HtmxRequest, member: Member) -> HttpResponse:
 
 
 @require_POST
-@ai_view(live_only=True)
+@ai_view("ai_vision_model", live_only=True)
 async def transcribe_photo(request: HtmxRequest, member: Member) -> HttpResponseBase:
     """The handwriting in a photo, as plain text."""
     form = PhotoForm(request.POST, request.FILES)

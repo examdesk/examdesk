@@ -61,7 +61,7 @@
           <textarea name="text" id="report-text" maxlength="{{ config.text_max }}" rows="3" placeholder="What is the student asking?" aria-label="What is the student asking?">{{ text }}</textarea>
           <div class="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-3 px-4 py-3.5" data-text-skeleton hidden><div class="skeleton h-4 w-11/12"></div><div class="skeleton h-4 w-2/3"></div></div>
         </div>
-        <div data-photo-field{% if member.exam.has_ai_service %} data-transcribe="{% url 'invigilator:transcribe_photo' pk %}"{% endif %}>
+        <div data-photo-field{% if member.exam.ai_vision_model %} data-transcribe="{% url 'invigilator:transcribe_photo' pk %}"{% endif %}>
           <input type="file" name="photo" id="report-photo" accept="image/*" capture="environment" data-photo hidden>
           <div class="photo-card scroll-mb-40 overflow-hidden rounded-box border border-base-300 bg-base-200" data-preview hidden>
             <img class="mx-auto max-h-58 w-auto" alt="Photo to send">

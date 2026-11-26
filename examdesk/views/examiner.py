@@ -235,7 +235,7 @@ def clarification_page(
         "question_photo": None
         if clarification.wording
         else next((r for r in reports if r.photo), None),
-        # with an AI service, replaced by `clarification_duplicates`
+        # with a fast model, replaced by `clarification_duplicates`
         "duplicates": possible_duplicates(clarification, ranked),
         "answer_form": form,
         "reports": reports,
@@ -290,7 +290,7 @@ def rank_others(
 
 
 @require_GET
-@ai_view(examiner_only=True, live_only=True)
+@ai_view("ai_fast_model", examiner_only=True, live_only=True)
 async def clarification_duplicates(
     request: HtmxRequest, member: Member, clarification_id: int
 ) -> HttpResponseBase:
@@ -373,7 +373,7 @@ def to_draft(member: Member, clarification_id: int) -> tuple[Clarification, list
 
 
 @require_POST
-@ai_view(examiner_only=True, live_only=True)
+@ai_view("ai_careful_model", examiner_only=True, live_only=True)
 async def draft_answer(
     request: HtmxRequest, member: Member, clarification_id: int
 ) -> HttpResponseBase:
@@ -393,7 +393,7 @@ def load_report_photo(member: Member, report_id: int) -> tuple[bytes, str]:
 
 
 @require_POST
-@ai_view(examiner_only=True, live_only=True)
+@ai_view("ai_vision_model", examiner_only=True, live_only=True)
 async def transcribe_photo(
     request: HtmxRequest, member: Member, report_id: int
 ) -> HttpResponseBase:
@@ -555,7 +555,7 @@ def delete_announcement(request: HtmxRequest, member: Member, announcement_id: i
 def analysis(request: HtmxRequest, member: Member) -> HttpResponse:
     """Seats and clarifications per question, most asked first, beside the AI's findings."""
     exam = member.exam
-    if not exam.has_ai_service:
+    if not exam.ai_careful_model:
         raise Http404
     questions = sorted(
         exam.clarifications.exclude(closed_reason=Clarification.ClosedReason.MERGED)
@@ -585,7 +585,7 @@ running_analyses: set[asyncio.Task[str | None]] = set()
 
 
 @require_POST
-@ai_view(examiner_only=True)
+@ai_view("ai_careful_model", examiner_only=True)
 async def analyse(request: HtmxRequest, member: Member) -> HttpResponseBase:
     """Saves the analysis even if the examiner leaves before it finishes."""
     clarifications, announcements, files = await sync_to_async(to_analyse)(member.exam)
@@ -778,7 +778,7 @@ def settings_page(
     delete_form = delete_form or DeleteExamForm(exam_name=exam.name)
     connect_form = connect_form or AIConnectForm()
     models_form = models_form or AIModelsForm(exam=exam)
-    file_form = file_form or ExamFileForm()
+    file_form = file_form or ExamFileForm(exam=exam)
     exam_form = exam_form or ExamSettingsForm(
         initial=model_to_dict(exam, fields=ExamSettingsForm.base_fields), exam=exam
     )
@@ -839,6 +839,7 @@ def connect_ai_service(request: HtmxRequest, member: Member) -> HttpResponse:
             form.add_error("base_url", "No API answered at that address.")
         else:
             services.connect_ai_service(member.exam, **form.cleaned_data, models=models)
+            warn_if_fast_model_lacks_logprobs(request, member.exam)
             return redirect("examiner:settings", member.exam.pk)
     return settings_page(request, member, connect_form=form)
 
@@ -858,13 +859,28 @@ def choose_ai_models(request: HtmxRequest, member: Member) -> HttpResponse:
         return settings_page(request, member, models_form=form)
     services.choose_ai_models(member.exam, **form.cleaned_data)
     messages.success(request, "Saved the models.")
+    if "fast_model" in form.changed_data:
+        warn_if_fast_model_lacks_logprobs(request, member.exam)
     return redirect("examiner:settings", member.exam.pk)
+
+
+def warn_if_fast_model_lacks_logprobs(request: HtmxRequest, exam: Exam) -> None:
+    if not exam.ai_fast_model:
+        return
+    try:
+        has_logprobs = ai.fast_model_returns_logprobs(exam)
+    except openai.APIError as error:
+        logger.warning("Couldn't test the fast model: %s", error)
+        return
+    if not has_logprobs:
+        fast_model = exam.ai_fast_model
+        messages.warning(request, f"With {fast_model}, every possible duplicate shows 100% match.")
 
 
 @require_POST
 @exam_view(examiner_only=True)
 def add_file(request: HtmxRequest, member: Member) -> HttpResponse:
-    form = ExamFileForm(request.POST, request.FILES)
+    form = ExamFileForm(request.POST, request.FILES, exam=member.exam)
     if not form.is_valid():
         return settings_page(request, member, file_form=form)
     file = services.add_file(member.exam, form.cleaned_data["file"])
@@ -909,7 +925,7 @@ def page_image(request: HtmxRequest, member: Member, file_id: int, number: int) 
 
 
 @require_POST
-@ai_view(examiner_only=True)
+@ai_view("ai_vision_model", examiner_only=True)
 async def read_page(
     request: HtmxRequest, member: Member, file_id: int, number: int
 ) -> HttpResponseBase:

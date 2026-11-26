@@ -140,6 +140,7 @@
   /* Forms */
   .field { @apply mb-4 flex flex-col gap-1.5; }
   .field > label { @apply text-sm font-medium text-base-content; }
+  .field > .helptext { @apply -mt-1 text-meta text-subtle; }
   label:has(> input:not([type=checkbox], [type=radio], [type=file]), > textarea) { @apply mb-4 flex flex-col gap-1.5 text-sm font-medium; }
   .errorlist, [aria-invalid=true] ~ small { @apply text-meta text-error; }
   input[list]::-webkit-calendar-picker-indicator { display: none !important; }
@@ -170,11 +171,13 @@
     .icon { @apply mt-0.5 size-4; }
   }
   .offline { @apply sticky top-18 z-30 shadow-sm; }
-  /* Messages float over the page, so an action doesn't move it. An error stays until dismissed. */
+  /* Messages float over the page, so an action doesn't move it. An error or a warning stays until
+     dismissed. */
   .toast { @apply pointer-events-none; }
   .toast > .alert {
     @apply text-sm shadow-lg;
     &.error { @apply pointer-events-auto alert-error; }
+    &.warning { @apply pointer-events-auto alert-warning; }
     .icon { @apply size-4; }
   }
 
@@ -374,6 +377,9 @@
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.75rem center / 1rem;
   }
   input + .ts-wrapper.single .ts-control { @apply cursor-text; }
+  .ts-wrapper.plugin-clear_button.has-items .ts-control { @apply pr-15; }
+  .clear-button { @apply absolute top-1/2 right-9 -translate-y-1/2 cursor-pointer px-1.5 text-subtle hover:text-base-content; }
+  .ts-wrapper:not(.has-items) .clear-button { @apply hidden; }
   .ts-wrapper.input-hidden .ts-control > input { @apply absolute -left-[10000px] opacity-0; }
   .ts-wrapper.focus .ts-control { @apply border-primary ring-3 ring-primary/15; }
   .filters .ts-control { @apply min-h-9; }
