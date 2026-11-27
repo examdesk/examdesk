@@ -411,10 +411,10 @@ def test_tab_bar_alerts_newest_unread_announcement(invigilator: Client, exam: Ex
     html = invigilator.get(page).content.decode()
     assert f'data-alert="{newest.pk}.0"' in html
     assert "1 more" in html
-    assert "Mark as read out</a>" in html
+    assert "</svg>Read out</a>" in html
     with_venue(invigilator, exam, "HALL1")
     html = invigilator.get(page, headers=REFRESH).content.decode()
-    assert "Read out in HALL1" in html
+    assert "</svg>Read out</button>" in html
     assert f'<input type="hidden" name="next" value="{page}">' in html
     here = url("invigilator:to_deliver", exam)
     response = invigilator.post(url("invigilator:mark_read_out", exam, newest.pk), {"next": here})
@@ -510,12 +510,12 @@ def test_announcements_unread_then_marked_as_announced(invigilator: Client, exam
     assert "HALL1 back to not read out." in html
     assert not announcement.readouts.exists()
     unread = invigilator.get(url("invigilator:announcements", exam)).content.decode()
-    assert "</svg>Read out in HALL1</button>" in unread
+    assert "</svg>Read out</button>" in unread
     response = invigilator.post(url("invigilator:mark_read_out", exam, announcement.pk))
     assert response["Location"] == url("invigilator:announcements", exam)
     read = invigilator.get(url("invigilator:announcements", exam)).content.decode()
     assert 'aria-label="Undo read out in HALL1"' in read
-    assert re.search(r'</svg>HALL1 · Ann · <span class="num">\d\d:\d\d</span>', read)
+    assert re.search(r'>HALL1 · Ann ·</span><span class="num">\d\d:\d\d</span>', read)
 
 
 def test_invigilator_and_examiner_remove_a_seat(

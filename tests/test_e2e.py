@@ -111,7 +111,7 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
     expect(invigilator.locator(".dock .count.urgent")).to_have_text("1")
     alert = invigilator.locator("[data-alert]")
     expect(alert).to_contain_text("Q2: read f as g.")
-    alert.get_by_role("button", name="Read out in HALL1").click()
+    alert.get_by_role("button", name="Read out", exact=True).click()
     expect(invigilator.get_by_text("Marked as read out in HALL1.")).to_be_visible()
     expect(alert).to_be_hidden()
     invigilator.locator(".dock").get_by_role("link", name="Read out").click()

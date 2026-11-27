@@ -27,7 +27,7 @@
           {% if member.venue %}
             <c-read-out-button :announcement="alert" :member="member" next="{{ page_url }}" />
           {% else %}
-            <a class="btn btn-read-out btn-block" href="{% url 'invigilator:announcements' pk %}"><c-icon name="check" />Mark as read out</a>
+            <a class="btn btn-read-out btn-block" href="{% url 'invigilator:announcements' pk %}"><c-icon name="check" />Read out</a>
           {% endif %}
         </div>
         <form method="post" action="{% url 'invigilator:snooze_announcement' pk alert.pk %}">
