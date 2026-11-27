@@ -3,13 +3,15 @@
 import csv
 import io
 from datetime import UTC, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 
 from examdesk import services
-from examdesk.models import Announcement, Answer, Clarification, Exam
+from examdesk.models import Announcement, Answer, Clarification, Exam, Report
 from tests.helpers import member, named, report, url
 
 pytestmark = pytest.mark.django_db
@@ -119,6 +121,39 @@ def test_one_row_per_clarification_by_question(examiner: Client, exam: Exam) -> 
         "2026-11-26 11:00",
         "2026-11-26 11:10",
     ]
+
+
+def test_photo_only_clarifications_export_without_the_photo_placeholder(
+    examiner: Client, exam: Exam, media: Path, jpeg: bytes
+) -> None:
+    def report_photo_only(seat: str) -> Report:
+        return report(
+            exam, seat=seat, text="", photo=SimpleUploadedFile("p.jpg", jpeg, "image/jpeg")
+        )
+
+    target_report, source_report = report_photo_only("14"), report_photo_only("15")
+    services.merge_clarifications(
+        sources=[source_report.clarification], target=target_report.clarification
+    )
+    response = examiner.get(url("examiner:export_clarifications", exam))
+    rows = csv.DictReader(io.StringIO(response.content.decode("utf-8-sig")))
+    assert [(row["Wording"], row["Merged into"]) for row in rows] == [("", ""), ("", "Q3b")]
+
+
+def test_clarification_delivered_to_every_seat_exports_as_delivered(
+    examiner: Client, exam: Exam
+) -> None:
+    delivered_report = report(exam)
+    answer = services.answer_clarification(
+        delivered_report.clarification,
+        text="Yes, an integer.",
+        member=member(examiner, exam),
+        expected_answer=None,
+    )
+    services.mark_delivered(delivered_report, answer=answer, member=named(exam, "Ann"))
+    response = examiner.get(url("examiner:export_clarifications", exam))
+    [row] = list(csv.DictReader(io.StringIO(response.content.decode("utf-8-sig"))))
+    assert (row["State"], row["Seats delivered"]) == ("Delivered", "1")
 
 
 def test_export_is_a_csv_file_excel_reads_as_utf8(examiner: Client, exam: Exam) -> None:

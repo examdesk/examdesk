@@ -56,11 +56,14 @@ def clarifications_csv(exam: Exam) -> bytes:
         answer = clarification.current_answer
         announcement = latest_announcements.get(clarification.pk)
         answer_or_announcement = answer or announcement
+        merged_into = clarification.merged_into
         row = [
             clarification.label,
-            clarification.summary,
-            clarification.state.label,
-            titled(clarification.merged_into) if clarification.merged_into else "",
+            clarification.wording,
+            str(clarification.display_state.label),
+            (titled(merged_into) if merged_into.wording else merged_into.label)
+            if merged_into
+            else "",
             answer.text if answer else "",
             announcement.text if announcement else "",
             str(len(reports)),
