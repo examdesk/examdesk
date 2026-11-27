@@ -60,7 +60,9 @@ def test_report_answer_deliver_and_announce(server: str, browser: Browser, staff
     expect(invigilator.get_by_role("button", name="Venue: HALL1")).to_be_visible()
     invigilator.get_by_role("combobox", name="Seat").fill(" 14")
     invigilator.get_by_role("combobox", name="Question").fill("3(b)")
-    invigilator.keyboard.press("Tab")
+    with invigilator.expect_request(re.compile(r"/report/\?.*label=3")) as search_request:
+        invigilator.keyboard.press("Tab")
+    assert "csrfmiddlewaretoken" not in search_request.value.url
     # No clarification asked about Q3 yet, so New clarification opens.
     invigilator.get_by_role("button", name="Type question").click()
     invigilator.get_by_label("What is the student asking?").fill("Is x an integer?")

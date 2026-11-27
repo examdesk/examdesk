@@ -23,7 +23,7 @@
   <c-error>{% if report_form %}{{ report_form|form_errors }}{% endif %}</c-error>
 
   {# The wrapper stays, so a late response can't land in a list already replaced. #}
-  <div hx-get="{% url 'invigilator:report' pk %}" hx-include="#report-form" hx-trigger="change[target.type!='file'] from:#report-form, input delay:300ms from:#report-text" hx-swap="innerMorph" hx-sync="this:replace">
+  <div hx-get="{% url 'invigilator:report' pk %}" hx-include="#report-form [name=venue], #id_seat, #id_label, #report-text" hx-trigger="change[target.type!='file'] from:#report-form, input delay:300ms from:#report-text" hx-swap="innerMorph" hx-sync="this:replace">
   {% partialdef matches inline %}
   {% with pk=member.exam.pk %}
   <div id="matches" class="mt-6"{% if top_level_label %} data-searched{% endif %}>
