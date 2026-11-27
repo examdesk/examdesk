@@ -368,6 +368,25 @@ def test_the_seat_field_is_read_only_while_it_reloads_for_a_venue(
 
 
 @pytest.mark.django_db(transaction=True)
+def test_a_refresh_keeps_the_focus_in_a_live_field(
+    server: str, browser: Browser, staff: User
+) -> None:
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
+    invigilator = open_link(browser, f"{server}/join/{exam.invigilator_token}/", "Ann", phone=True)
+    venue_dialog = invigilator.get_by_role("heading", name="Which venue are you in?")
+    expect(venue_dialog).to_be_visible()
+    invigilator.keyboard.press("Escape")
+    expect(venue_dialog).to_be_hidden()
+    venue = invigilator.locator("#report-venue").get_by_role("combobox")
+    venue.focus()
+    with invigilator.expect_response(
+        lambda response: response.request.headers.get("hx-source") == "div#refresh"
+    ):
+        report(exam)
+    expect(venue).to_be_focused()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_the_queue_list_ignores_clicks_while_a_tab_loads(
     server: str, browser: Browser, staff: User
 ) -> None:

@@ -88,14 +88,17 @@ document.addEventListener("htmx:response:error", (event) => {
 // Swapped-in live parts leave focus where it is, and Tom Select is rebuilt in them (a morph would
 // strip its markup; htmx.onLoad below rebuilds it). A refresh keeps values not yet saved.
 const unsavedValues = new Map(); // field id → Tom Select value
+let focusedFieldId; // id of the Tom Select field focused when its part was swapped
 document.addEventListener("htmx:before:swap", (event) => {
   const isRefresh = event.detail.ctx.sourceElement?.id === "refresh";
   unsavedValues.clear();
+  focusedFieldId = undefined;
   for (const task of event.detail.tasks) {
     if (task.swapSpec.style === "none") continue;
     task.target.querySelectorAll(".tomselected").forEach((field) => {
       const { tomselect } = field;
       if (isRefresh && field.id && String(tomselect.items) !== tomselect.savedValue) unsavedValues.set(field.id, [...tomselect.items]);
+      if (task.type === "oob" && tomselect.isFocused) focusedFieldId = field.id;
       tomselect.destroy();
     });
     if (task.type === "oob") task.fragment.querySelectorAll("[autofocus]").forEach((field) => field.removeAttribute("autofocus"));
@@ -668,7 +671,7 @@ const enhance = (field) => {
   for (const name of ["autocapitalize", "inputmode", "placeholder"]) {
     if (field.hasAttribute(name)) tom.control_input.setAttribute(name, field.getAttribute(name));
   }
-  if (field.autofocus) tom.focus();
+  if (field.autofocus || field.id === focusedFieldId) tom.focus();
 };
 // An [autofocus] field hidden by Tom Select passes the focus to its search box.
 document.addEventListener("focusin", (event) => event.target.tomselect?.focus());
