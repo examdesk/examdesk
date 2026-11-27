@@ -674,13 +674,24 @@ const enhance = (field) => {
 document.addEventListener("focusin", (event) => event.target.tomselect?.focus());
 
 // Reporting: the seat field lists one venue's seats (data-venue). It reloads when the form's venue
-// changes, from the venue field or a refresh.
+// changes, from the venue field or a refresh. While it reloads it is read-only, since the
+// reloaded field drops a seat typed meanwhile.
 const reloadSeatField = () => {
   const seatField = document.getElementById("report-seat");
-  if (seatField && seatField.closest("form").elements.venue.value !== seatField.dataset.venue) htmx.trigger(seatField, "venue-changed");
+  if (!seatField || seatField.closest("form").elements.venue.value === seatField.dataset.venue) return;
+  document.getElementById("id_seat").tomselect?.setReadOnly(true);
+  htmx.trigger(seatField, "venue-changed");
 };
 document.addEventListener("htmx:after:swap", reloadSeatField);
 document.addEventListener("change", reloadSeatField);
+// A reload that a newer one aborted leaves the field read-only.
+let latestSeatReload;
+document.addEventListener("htmx:before:request", (event) => {
+  if (event.detail.ctx.sourceElement?.id === "report-seat") latestSeatReload = event.detail.ctx;
+});
+document.addEventListener("htmx:finally:request", (event) => {
+  if (event.detail.ctx === latestSeatReload) document.getElementById("id_seat").tomselect?.setReadOnly(false);
+});
 // Reporting: once the seat and question find no clarification already asked, open New clarification.
 // While the search runs, everything after Question is hidden, so Tab from Question focuses the tab bar.
 document.addEventListener("htmx:after:swap", (event) => {

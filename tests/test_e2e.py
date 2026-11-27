@@ -347,6 +347,27 @@ def test_a_clarification_pane_is_inert_while_another_loads(
 
 
 @pytest.mark.django_db(transaction=True)
+def test_the_seat_field_is_read_only_while_it_reloads_for_a_venue(
+    server: str, browser: Browser, staff: User
+) -> None:
+    exam = services.create_exam(name="Biology Final", owner=staff, time_zone=ZoneInfo("UTC"))
+    invigilator = open_link(browser, f"{server}/join/{exam.invigilator_token}/", "Ann", phone=True)
+    routes: list[Route] = []
+    invigilator.route(
+        re.compile(r"/report/\?venue=HALL1&seat=$"), lambda route: routes.append(route)
+    )
+    invigilator.get_by_label("My venue").fill("hall 1")
+    invigilator.get_by_role("button", name="Save", exact=True).click()
+    seat = invigilator.get_by_role("combobox", name="Seat")
+    expect(seat).not_to_be_editable()
+    for route in routes:
+        route.continue_()
+    seat.fill("14")
+    invigilator.keyboard.press("Enter")
+    expect(invigilator.locator("#id_seat")).to_have_value("14")
+
+
+@pytest.mark.django_db(transaction=True)
 def test_the_queue_list_ignores_clicks_while_a_tab_loads(
     server: str, browser: Browser, staff: User
 ) -> None:
