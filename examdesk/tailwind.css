@@ -207,15 +207,15 @@
   .wait.late { @apply font-medium text-amber-700; }
   .wait.very-late { @apply font-medium text-red-600; }
 
-  /* App bar: brand, exam, tabs, account. Tabs wrap to a second row below lg. */
+  /* App bar: brand, exam, tabs, account. Tabs wrap to a second row below lg; from lg a long exam name is truncated instead. */
   .appbar { @apply sticky top-0 z-20 border-b border-base-300 bg-base-100/95 backdrop-blur; }
-  .appbar-row { @apply flex min-h-14 flex-wrap items-center gap-x-4; &:has(> .tabs-nav) { @apply max-lg:pt-2; } }
+  .appbar-row { @apply flex min-h-14 flex-wrap items-center gap-x-4 lg:flex-nowrap; &:has(> .tabs-nav) { @apply max-lg:pt-2; } }
   .brand { @apply flex shrink-0 items-center gap-2 font-semibold whitespace-nowrap text-base-content; }
   /* A person's initials, and the account menu's button showing them */
   .avatar-button, .initials { @apply grid size-8 shrink-0 place-items-center rounded-full bg-base-200 text-xs font-semibold text-muted ring-1 ring-base-300; }
   .avatar-button { @apply cursor-pointer hover:bg-base-300/60; }
   .tabs-nav {
-    @apply no-scrollbar order-last -mx-4 flex w-[calc(100%+2rem)] gap-5 overflow-x-auto px-4 lg:order-none lg:mx-2 lg:w-auto lg:self-stretch lg:px-0;
+    @apply no-scrollbar order-last -mx-4 flex w-[calc(100%+2rem)] gap-5 overflow-x-auto px-4 lg:order-none lg:mx-2 lg:w-auto lg:shrink-0 lg:self-stretch lg:px-0;
     > a { @apply -mb-px flex items-center gap-1.5 border-b-2 border-transparent py-3 text-sm font-medium whitespace-nowrap text-muted hover:text-base-content; }
     > a[aria-current=page] { @apply border-primary text-base-content; }
   }

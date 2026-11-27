@@ -368,6 +368,28 @@ def test_the_queue_list_ignores_clicks_while_a_tab_loads(
 
 
 @pytest.mark.django_db(transaction=True)
+def test_a_long_exam_name_is_truncated_to_keep_the_app_bar_on_one_row(
+    server: str, browser: Browser, staff: User
+) -> None:
+    name = "Introductory Data Structures and Algorithms Final Examination"
+    exam = services.create_exam(name=name, owner=staff, time_zone=ZoneInfo("UTC"))
+    # A careful model shows the Analysis tab.
+    services.choose_ai_models(exam, vision_model="", fast_model="", careful_model="careful")
+    prof = open_link(browser, f"{server}/join/{exam.examiner_token}/", "Prof")
+    tabs = prof.get_by_role("navigation", name="Exam")
+    tabs_box = tabs.bounding_box()
+    account_button_box = prof.get_by_role("button", name="Account: Prof").bounding_box()
+    assert tabs_box
+    assert account_button_box
+    account_button_center_y = account_button_box["y"] + account_button_box["height"] / 2
+    assert tabs_box["y"] < account_button_center_y < tabs_box["y"] + tabs_box["height"]
+    assert tabs.evaluate("element => element.scrollWidth == element.clientWidth")
+    exam_name = prof.locator("#exam-name")
+    expect(exam_name).to_have_attribute("title", name)
+    assert exam_name.evaluate("element => element.scrollWidth > element.clientWidth")
+
+
+@pytest.mark.django_db(transaction=True)
 def test_landing_demos_find_what_they_act_on(
     server: str, browser: Browser, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
